@@ -1,0 +1,1557 @@
+import Foundation
+#if canImport(Combine)
+public import Combine
+#else
+public import OpenCombine
+#endif
+
+/// A two-way connection to a value owned by a source of truth.
+@dynamicMemberLookup
+@propertyWrapper
+public struct Binding<Value> {
+
+    private let getValue: () -> Value
+
+    private let setValue: (Value) -> Void
+
+    public var wrappedValue: Value {
+        get {
+            getValue()
+        }
+        nonmutating set {
+            setValue(newValue)
+        }
+    }
+
+    public var projectedValue: Binding<Value> {
+        self
+    }
+
+    public init(get: @escaping () -> Value, set: @escaping (Value) -> Void) {
+        self.getValue = get
+        self.setValue = set
+    }
+
+    public init(projectedValue: Binding<Value>) {
+        self = projectedValue
+    }
+
+    public static func constant(_ value: Value) -> Binding<Value> {
+        Binding(
+            get: { value },
+            set: { _ in }
+        )
+    }
+
+    public subscript<Subject>(
+        dynamicMember keyPath: WritableKeyPath<Value, Subject>
+    ) -> Binding<Subject> {
+        Binding<Subject>(
+            get: {
+                wrappedValue[keyPath: keyPath]
+            },
+            set: { newValue in
+                var value = wrappedValue
+                value[keyPath: keyPath] = newValue
+                wrappedValue = value
+            }
+        )
+    }
+}
+
+/// A property wrapper type that can read and write a value managed by SwiftTUI.
+@propertyWrapper
+public struct State<Value> {
+
+    private let storage: StateStorage<Value>
+
+    public var wrappedValue: Value {
+        get {
+            cell.value
+        }
+        nonmutating set {
+            cell.value = newValue
+        }
+    }
+
+    public var projectedValue: Binding<Value> {
+        let cell = cell
+        return Binding(
+            get: {
+                cell.value
+            },
+            set: { newValue in
+                cell.value = newValue
+            }
+        )
+    }
+
+    public init(wrappedValue value: Value) {
+        self.storage = StateStorage(initialValue: value)
+    }
+
+    public init(initialValue value: Value) {
+        self.init(wrappedValue: value)
+    }
+
+    private var cell: StateCell<Value> {
+        guard let context = StateRenderContext.current else {
+            return storage.fallback
+        }
+
+        return context.cell(for: storage)
+    }
+}
+
+public extension State where Value: ExpressibleByNilLiteral {
+
+    init() {
+        self.init(wrappedValue: nil)
+    }
+}
+
+/// A property wrapper type that instantiates an observable object.
+@propertyWrapper
+public struct StateObject<ObjectType: ObservableObject> {
+
+    private let storage: StateObjectStorage<ObjectType>
+
+    public var wrappedValue: ObjectType {
+        cell.value
+    }
+
+    public var projectedValue: ObservedObject<ObjectType>.Wrapper {
+        ObservedObject<ObjectType>.Wrapper(object: wrappedValue)
+    }
+
+    public init(wrappedValue createObject: @autoclosure @escaping () -> ObjectType) {
+        self.storage = StateObjectStorage(createObject: createObject)
+    }
+
+    public init(initialValue createObject: @autoclosure @escaping () -> ObjectType) {
+        self.init(wrappedValue: createObject())
+    }
+
+    private var cell: ObservableObjectCell<ObjectType> {
+        guard let context = StateRenderContext.current else {
+            return storage.fallback
+        }
+
+        return context.stateObjectCell(for: storage)
+    }
+}
+
+/// A property wrapper type that observes an observable object owned elsewhere.
+@propertyWrapper
+public struct ObservedObject<ObjectType: ObservableObject> {
+
+    private let storage: ObservedObjectStorage<ObjectType>
+
+    public var wrappedValue: ObjectType {
+        get {
+            cell.value
+        }
+        nonmutating set {
+            storage.object = newValue
+            cell.updateValue(newValue)
+        }
+    }
+
+    public var projectedValue: Wrapper {
+        Wrapper(object: wrappedValue)
+    }
+
+    public init(wrappedValue object: ObjectType) {
+        self.storage = ObservedObjectStorage(object: object)
+    }
+
+    public init(initialValue object: ObjectType) {
+        self.init(wrappedValue: object)
+    }
+
+    private var cell: ObservableObjectCell<ObjectType> {
+        guard let context = StateRenderContext.current else {
+            return storage.fallback
+        }
+
+        return context.observedObjectCell(for: storage)
+    }
+
+    /// A wrapper that creates bindings to properties of the observed object.
+    @dynamicMemberLookup
+    public struct Wrapper {
+
+        private let object: ObjectType
+
+        fileprivate init(object: ObjectType) {
+            self.object = object
+        }
+
+        public subscript<Subject>(
+            dynamicMember keyPath: ReferenceWritableKeyPath<ObjectType, Subject>
+        ) -> Binding<Subject> {
+            Binding(
+                get: {
+                    object[keyPath: keyPath]
+                },
+                set: { newValue in
+                    object[keyPath: keyPath] = newValue
+                }
+            )
+        }
+    }
+}
+
+/// A property wrapper type that can read and write the current focus location.
+@propertyWrapper
+public struct FocusState<Value: Hashable> {
+
+    private let storage: FocusStateStorage<Value>
+
+    public var wrappedValue: Value {
+        get {
+            cell.value
+        }
+        nonmutating set {
+            cell.setValue(newValue)
+        }
+    }
+
+    public var projectedValue: Binding {
+        Binding(cell: cell)
+    }
+
+    public init() {
+        guard let value = FocusInitialValue<Value>.value else {
+            fatalError("FocusState only supports Bool and Optional values.")
+        }
+
+        self.storage = FocusStateStorage(initialValue: value)
+    }
+
+    public init(wrappedValue value: Value) {
+        guard FocusInitialValue<Value>.value != nil else {
+            fatalError("FocusState only supports Bool and Optional values.")
+        }
+
+        self.storage = FocusStateStorage(initialValue: value)
+    }
+
+    private var cell: FocusCell<Value> {
+        guard let context = StateRenderContext.current else {
+            return storage.fallback
+        }
+
+        return context.focusCell(for: storage)
+    }
+}
+
+public extension FocusState {
+
+    /// A property wrapper type that can read and write a focus state value.
+    @propertyWrapper
+    struct Binding {
+
+        fileprivate let cell: FocusCell<Value>
+
+        public var wrappedValue: Value {
+            get {
+                cell.value
+            }
+            nonmutating set {
+                cell.setValue(newValue)
+            }
+        }
+
+        public var projectedValue: Binding {
+            self
+        }
+
+        fileprivate init(cell: FocusCell<Value>) {
+            self.cell = cell
+        }
+    }
+}
+
+final class StateRuntime {
+
+    private var cells: [StateKey: Any] = [:]
+
+    private let focus = FocusRuntime()
+
+    private let input = InputRuntime()
+
+    private let lifecycle = LifecycleRuntime()
+
+    private var textFieldStates: [[Int]: TextFieldState] = [:]
+
+    private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
+
+    private var scrollViewStates: [[Int]: ScrollViewState] = [:]
+
+    private var terminationHandler: TerminationHandler?
+
+    private var invalidated = false
+
+    private var focusGeneration = 0
+
+    private var suppressRenderRegistrations = false
+
+    private var pendingRemovedStateSubtrees: [[Int]] = []
+
+    var isSuppressingRenderRegistrations: Bool {
+        suppressRenderRegistrations
+    }
+
+    func block<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal? = nil
+    ) -> RenderedBlock? {
+        focus.beginRender(requests: currentFocusRequests())
+        input.beginRender()
+        lifecycle.beginRender()
+        terminationHandler = nil
+        defer {
+            if focus.finishRender(requests: currentFocusRequests()) {
+                invalidated = true
+            }
+            lifecycle.finishRender(perform: performLifecycleHandler)
+            removePendingStateSubtrees()
+        }
+
+        let block = ViewResolver.block(
+            from: view,
+            in: ViewResolver.rootProposal(for: view, proposal: proposal),
+            path: [],
+            runtime: self
+        )
+        input.updateHitRegions(block?.hitRegions ?? [])
+        input.updateScrollRegions(block?.scrollRegions ?? [])
+        input.updateFocusRegions(block?.focusRegions ?? [])
+        return block
+    }
+
+    func element<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal? = nil
+    ) -> RenderedElement? {
+        focus.beginRender(requests: currentFocusRequests())
+        input.beginRender()
+        lifecycle.beginRender()
+        terminationHandler = nil
+        defer {
+            if focus.finishRender(requests: currentFocusRequests()) {
+                invalidated = true
+            }
+            lifecycle.finishRender(perform: performLifecycleHandler)
+            removePendingStateSubtrees()
+        }
+
+        return ViewResolver.element(from: view, in: proposal, path: [], runtime: self)
+    }
+
+    func consumeInvalidation() -> Bool {
+        defer {
+            invalidated = false
+        }
+
+        return invalidated
+    }
+
+    fileprivate func cell<Value>(
+        for key: StateKey,
+        initialValue: @autoclosure () -> Value
+    ) -> StateCell<Value> {
+        if let cell = cells[key] as? StateCell<Value> {
+            return cell
+        }
+
+        let cell = StateCell(value: initialValue()) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        cells[key] = cell
+        return cell
+    }
+
+    fileprivate func focusCell<Value: Hashable>(
+        for key: StateKey,
+        initialValue: @autoclosure () -> Value
+    ) -> FocusCell<Value> {
+        if let cell = cells[key] as? FocusCell<Value> {
+            return cell
+        }
+
+        let cell = FocusCell(
+            value: initialValue(),
+            invalidate: {
+                [weak self] in
+
+                self?.invalidated = true
+            },
+            nextGeneration: {
+                [weak self] in
+
+                guard let self else {
+                    return 0
+                }
+
+                focusGeneration += 1
+                return focusGeneration
+            }
+        )
+        cells[key] = cell
+        return cell
+    }
+
+    fileprivate func stateObjectCell<ObjectType: ObservableObject>(
+        for key: StateKey,
+        createObject: () -> ObjectType
+    ) -> ObservableObjectCell<ObjectType> {
+        if let cell = cells[key] as? ObservableObjectCell<ObjectType> {
+            return cell
+        }
+
+        let cell = ObservableObjectCell(value: createObject()) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        cells[key] = cell
+        return cell
+    }
+
+    fileprivate func observedObjectCell<ObjectType: ObservableObject>(
+        for key: StateKey,
+        object: ObjectType
+    ) -> ObservableObjectCell<ObjectType> {
+        if let cell = cells[key] as? ObservableObjectCell<ObjectType> {
+            cell.updateValue(object)
+            return cell
+        }
+
+        let cell = ObservableObjectCell(value: object) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        cells[key] = cell
+        return cell
+    }
+
+    func registerFocusable(_ isFocusable: Bool, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        focus.registerFocusable(isFocusable, at: path)
+    }
+
+    func registerFocusAttachment(_ attachment: any FocusAttachment, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        focus.registerAttachment(attachment, at: path)
+    }
+
+    func registerKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        input.register(
+            environmentRestoringKeyPressHandler(handler),
+            at: path
+        )
+    }
+
+    func registerGlobalKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        input.registerGlobal(
+            environmentRestoringKeyPressHandler(handler),
+            at: path
+        )
+    }
+
+    func registerTapGestureHandler(_ handler: TapGestureHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        input.register(handler, at: path)
+    }
+
+    func registerTerminationHandler(_ handler: TerminationHandler) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        terminationHandler = handler
+    }
+
+    func registerLifecycleHandler(_ handler: LifecycleHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        lifecycle.register(handler, at: path)
+    }
+
+    func scrollPoint(at path: [Int]) -> ScrollPoint? {
+        scrollViewStates[path]?.point
+    }
+
+    func registerScrollView(
+        at path: [Int],
+        axes: Axis.Set,
+        point: ScrollPoint,
+        maximumPoint: ScrollPoint,
+        binding: Binding<ScrollPosition>?
+    ) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        scrollViewStates[path] = ScrollViewState(
+            axes: axes,
+            point: point,
+            maximumPoint: maximumPoint,
+            binding: binding
+        )
+    }
+
+    func isFocused(at path: [Int]) -> Bool {
+        focus.activePath == path
+    }
+
+    func textFieldState(at path: [Int], initialText: String) -> TextFieldState {
+        if let cursor = textFieldStates[path] {
+            return cursor
+        }
+
+        let cursor = TextFieldState(initialText: initialText) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        textFieldStates[path] = cursor
+        return cursor
+    }
+
+    func forEachChildIndex(at path: [Int], id: AnyHashable) -> Int {
+        let key = ForEachIdentityKey(path: path)
+        var state = forEachIdentityStates[key] ?? ForEachIdentityState()
+
+        if let index = state.indicesByID[id] {
+            return index
+        }
+
+        let index = state.nextIndex
+        state.indicesByID[id] = index
+        state.nextIndex += 1
+        forEachIdentityStates[key] = state
+        return index
+    }
+
+    func finishForEachRender(at path: [Int], activeIDs: [AnyHashable]) {
+        let key = ForEachIdentityKey(path: path)
+        guard var state = forEachIdentityStates[key] else {
+            return
+        }
+
+        let activeIDs = Set(activeIDs)
+        let removedPaths = state.indicesByID.compactMap { id, index -> [Int]? in
+            activeIDs.contains(id) ? nil : path + [index]
+        }
+        state.indicesByID = state.indicesByID.filter {
+            activeIDs.contains($0.key)
+        }
+        forEachIdentityStates[key] = state
+
+        pendingRemovedStateSubtrees.append(contentsOf: removedPaths)
+    }
+
+    func dispatch(_ keyPress: KeyPress) -> KeyPress.Result {
+        if let activePath = focus.activePath,
+           input.dispatch(keyPress, from: activePath, perform: performKeyPress) == .handled {
+            return .handled
+        }
+
+        return input.dispatchGlobal(keyPress, perform: performKeyPress)
+    }
+
+    func dispatch(_ mouseEvent: MouseEvent, at date: Date = Date()) -> KeyPress.Result {
+        input.dispatch(
+            mouseEvent,
+            at: date,
+            perform: { path, operation in
+                withView(at: path, perform: operation)
+            },
+            focus: { path in
+                let result = focus.requestFocus(at: path)
+                if result.changed {
+                    invalidated = true
+                }
+                return result.handled
+            },
+            scroll: { path, mouseEvent in
+                dispatchScroll(mouseEvent, at: path)
+            }
+        )
+    }
+
+    var nextTapDeadline: Date? {
+        input.nextTapDeadline
+    }
+
+    func dispatchExpiredTapActions(at date: Date = Date()) -> KeyPress.Result {
+        input.dispatchExpiredTapActions(at: date) { path, operation in
+            withView(at: path, perform: operation)
+        }
+    }
+
+    func dispatchTerminate() {
+        guard let terminationHandler else {
+            return
+        }
+
+        EnvironmentRenderContext.withValues(terminationHandler.environment) {
+            withView(at: terminationHandler.actionPath) {
+                terminationHandler.action()
+            }
+        }
+    }
+
+    func updateRenderedFrame(_ frame: TextFrame) {
+        input.updateRootFrame(frame)
+    }
+
+    private func performKeyPress(
+        at path: [Int],
+        operation: () -> KeyPress.Result
+    ) -> KeyPress.Result {
+        withView(at: path, perform: operation)
+    }
+
+    private func performLifecycleHandler(_ handler: LifecycleHandler) {
+        EnvironmentRenderContext.withValues(handler.environment) {
+            withView(at: handler.actionPath) {
+                handler.action()
+            }
+        }
+    }
+
+    private func environmentRestoringKeyPressHandler(
+        _ handler: KeyPressHandler
+    ) -> KeyPressHandler {
+        let environment = EnvironmentRenderContext.current
+        return KeyPressHandler(
+            actionPath: handler.actionPath,
+            matches: handler.matches,
+            action: { keyPress in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action(keyPress)
+                }
+            }
+        )
+    }
+
+    func withView<Value>(
+        at path: [Int],
+        perform operation: () -> Value
+    ) -> Value {
+        let previous = StateRenderContext.current
+        let context = StateRenderContext(runtime: self, path: path)
+        StateRenderContext.current = context
+        defer {
+            StateRenderContext.current = previous
+        }
+
+        return operation()
+    }
+
+    func withoutRenderRegistrations<Value>(_ operation: () -> Value) -> Value {
+        let previous = suppressRenderRegistrations
+        suppressRenderRegistrations = true
+        defer {
+            suppressRenderRegistrations = previous
+        }
+
+        return operation()
+    }
+
+    private func removeStateSubtree(at path: [Int]) {
+        cells = cells.filter {
+            !$0.key.path.starts(with: path)
+        }
+        textFieldStates = textFieldStates.filter {
+            !$0.key.starts(with: path)
+        }
+        forEachIdentityStates = forEachIdentityStates.filter {
+            !$0.key.path.starts(with: path)
+        }
+        scrollViewStates = scrollViewStates.filter {
+            !$0.key.starts(with: path)
+        }
+    }
+
+    private func removePendingStateSubtrees() {
+        for path in pendingRemovedStateSubtrees {
+            removeStateSubtree(at: path)
+        }
+
+        pendingRemovedStateSubtrees = []
+    }
+
+    private func dispatchScroll(
+        _ mouseEvent: MouseEvent,
+        at path: [Int]
+    ) -> KeyPress.Result {
+        guard var state = scrollViewStates[path],
+              let delta = scrollDelta(for: mouseEvent, axes: state.axes) else {
+            return .ignored
+        }
+
+        let currentPoint = state.binding?.wrappedValue.point ?? state.point
+        let nextPoint = ScrollPoint(
+            x: clamped(
+                currentPoint.x + delta.x,
+                upperBound: state.maximumPoint.x
+            ),
+            y: clamped(
+                currentPoint.y + delta.y,
+                upperBound: state.maximumPoint.y
+            )
+        )
+        guard nextPoint != currentPoint else {
+            return .ignored
+        }
+
+        state.point = nextPoint
+        scrollViewStates[path] = state
+        state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
+        invalidated = true
+        return .handled
+    }
+
+    private func scrollDelta(
+        for mouseEvent: MouseEvent,
+        axes: Axis.Set
+    ) -> (x: Int, y: Int)? {
+        switch mouseEvent.button {
+        case .wheelUp:
+            if axes.contains(.horizontal)
+                && (mouseEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                return (x: -1, y: 0)
+            }
+            guard axes.contains(.vertical) else {
+                return nil
+            }
+            return (x: 0, y: -1)
+        case .wheelDown:
+            if axes.contains(.horizontal)
+                && (mouseEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                return (x: 1, y: 0)
+            }
+            guard axes.contains(.vertical) else {
+                return nil
+            }
+            return (x: 0, y: 1)
+        case .wheelLeft:
+            guard axes.contains(.horizontal) else {
+                return nil
+            }
+            return (x: -1, y: 0)
+        case .wheelRight:
+            guard axes.contains(.horizontal) else {
+                return nil
+            }
+            return (x: 1, y: 0)
+        default:
+            return nil
+        }
+    }
+
+    private func clamped(_ value: Int, upperBound: Int) -> Int {
+        min(max(value, 0), upperBound)
+    }
+
+    private func currentFocusRequests() -> [FocusRequestRecord] {
+        cells.compactMap { key, cell -> FocusRequestRecord? in
+            guard let source = cell as? any FocusRequestSource,
+                  let request = source.currentRequest() else {
+                return nil
+            }
+
+            return FocusRequestRecord(
+                request: request,
+                sourcePath: key.path,
+                generation: source.requestGeneration
+            )
+        }
+    }
+}
+
+private final class StateStorage<Value> {
+
+    let initialValue: Value
+
+    let fallback: StateCell<Value>
+
+    var key: StateKey?
+
+    init(initialValue: Value) {
+        self.initialValue = initialValue
+        self.fallback = StateCell(value: initialValue, invalidate: {})
+    }
+}
+
+private final class FocusStateStorage<Value: Hashable> {
+
+    let initialValue: Value
+
+    let fallback: FocusCell<Value>
+
+    var key: StateKey?
+
+    init(initialValue: Value) {
+        self.initialValue = initialValue
+        self.fallback = FocusCell(
+            value: initialValue,
+            invalidate: {},
+            nextGeneration: {
+                0
+            }
+        )
+    }
+}
+
+private final class StateObjectStorage<ObjectType: ObservableObject> {
+
+    let createObject: () -> ObjectType
+
+    var key: StateKey?
+
+    private var fallbackCell: ObservableObjectCell<ObjectType>?
+
+    var fallback: ObservableObjectCell<ObjectType> {
+        if let fallbackCell {
+            return fallbackCell
+        }
+
+        let cell = ObservableObjectCell(value: createObject(), invalidate: {})
+        fallbackCell = cell
+        return cell
+    }
+
+    init(createObject: @escaping () -> ObjectType) {
+        self.createObject = createObject
+    }
+}
+
+private final class ObservedObjectStorage<ObjectType: ObservableObject> {
+
+    var object: ObjectType
+
+    var key: StateKey?
+
+    private var fallbackCell: ObservableObjectCell<ObjectType>?
+
+    var fallback: ObservableObjectCell<ObjectType> {
+        if let fallbackCell {
+            fallbackCell.updateValue(object)
+            return fallbackCell
+        }
+
+        let cell = ObservableObjectCell(value: object, invalidate: {})
+        fallbackCell = cell
+        return cell
+    }
+
+    init(object: ObjectType) {
+        self.object = object
+    }
+}
+
+private final class StateCell<Value> {
+
+    private let invalidate: () -> Void
+
+    var value: Value {
+        didSet {
+            invalidate()
+        }
+    }
+
+    init(value: Value, invalidate: @escaping () -> Void) {
+        self.value = value
+        self.invalidate = invalidate
+    }
+}
+
+private final class ObservableObjectCell<ObjectType: ObservableObject> {
+
+    private let invalidate: () -> Void
+
+    private var subscription: AnyCancellable?
+
+    private(set) var value: ObjectType
+
+    init(value: ObjectType, invalidate: @escaping () -> Void) {
+        self.value = value
+        self.invalidate = invalidate
+        subscribe(to: value)
+    }
+
+    func updateValue(_ newValue: ObjectType) {
+        guard value !== newValue else {
+            return
+        }
+
+        value = newValue
+        subscribe(to: newValue)
+        invalidate()
+    }
+
+    private func subscribe(to object: ObjectType) {
+        subscription = object.objectWillChange.sink {
+            [weak self] _ in
+
+            self?.invalidate()
+        }
+    }
+}
+
+private final class FocusCell<Value: Hashable> {
+
+    private let invalidate: () -> Void
+
+    private let nextGeneration: () -> Int
+
+    private(set) var value: Value
+
+    private(set) var generation = 0
+
+    init(
+        value: Value,
+        invalidate: @escaping () -> Void,
+        nextGeneration: @escaping () -> Int
+    ) {
+        self.value = value
+        self.invalidate = invalidate
+        self.nextGeneration = nextGeneration
+    }
+
+    @discardableResult
+    func setValue(
+        _ newValue: Value,
+        invalidates: Bool = true,
+        recordsRequest: Bool = true
+    ) -> Bool {
+        guard value != newValue else {
+            return false
+        }
+
+        value = newValue
+
+        if recordsRequest {
+            generation = nextGeneration()
+        }
+
+        if invalidates {
+            invalidate()
+        }
+
+        return true
+    }
+}
+
+private enum FocusInitialValue<Value: Hashable> {
+
+    static var value: Value? {
+        if Value.self == Bool.self {
+            return false as? Value
+        }
+
+        return (Value.self as? any OptionalFocusValue.Type)?.nilValue as? Value
+    }
+}
+
+private protocol OptionalFocusValue {
+
+    static var nilValue: Any { get }
+}
+
+extension Optional: OptionalFocusValue {
+
+    fileprivate static var nilValue: Any {
+        Self.none as Any
+    }
+}
+
+private struct StateKey: Hashable {
+
+    enum Kind: Hashable {
+
+        case state
+
+        case stateObject
+
+        case observedObject
+
+        case focus
+    }
+
+    var kind: Kind
+
+    var path: [Int]
+
+    var slot: Int
+
+    var valueType: ObjectIdentifier
+}
+
+private struct ForEachIdentityKey: Hashable {
+
+    var path: [Int]
+}
+
+private struct ForEachIdentityState {
+
+    var indicesByID: [AnyHashable: Int] = [:]
+
+    var nextIndex = 0
+}
+
+private struct ScrollViewState {
+
+    var axes: Axis.Set
+
+    var point: ScrollPoint
+
+    var maximumPoint: ScrollPoint
+
+    var binding: Binding<ScrollPosition>?
+}
+
+struct TerminationHandler {
+
+    var actionPath: [Int]
+
+    var environment: EnvironmentValues
+
+    var action: () -> Void
+}
+
+private final class StateRenderContext {
+
+    private static let threadKey = "SwiftTUI.StateRenderContext"
+
+    let runtime: StateRuntime
+
+    let path: [Int]
+
+    private var nextSlot = 0
+
+    static var current: StateRenderContext? {
+        get {
+            Thread.current.threadDictionary[threadKey] as? StateRenderContext
+        }
+        set {
+            let dictionary = Thread.current.threadDictionary
+            if let newValue {
+                dictionary[threadKey] = newValue
+            }
+            else {
+                dictionary.removeObject(forKey: threadKey)
+            }
+        }
+    }
+
+    init(runtime: StateRuntime, path: [Int]) {
+        self.runtime = runtime
+        self.path = path
+    }
+
+    func cell<Value>(for storage: StateStorage<Value>) -> StateCell<Value> {
+        let key: StateKey
+        if let storedKey = storage.key, storedKey.path == path {
+            key = storedKey
+            nextSlot = max(nextSlot, storedKey.slot + 1)
+        }
+        else {
+            key = StateKey(
+                kind: .state,
+                path: path,
+                slot: nextSlot,
+                valueType: ObjectIdentifier(Value.self)
+            )
+            storage.key = key
+            nextSlot += 1
+        }
+
+        return runtime.cell(for: key, initialValue: storage.initialValue)
+    }
+
+    func focusCell<Value: Hashable>(
+        for storage: FocusStateStorage<Value>
+    ) -> FocusCell<Value> {
+        let key: StateKey
+        if let storedKey = storage.key, storedKey.path == path {
+            key = storedKey
+            nextSlot = max(nextSlot, storedKey.slot + 1)
+        }
+        else {
+            key = StateKey(
+                kind: .focus,
+                path: path,
+                slot: nextSlot,
+                valueType: ObjectIdentifier(Value.self)
+            )
+            storage.key = key
+            nextSlot += 1
+        }
+
+        return runtime.focusCell(for: key, initialValue: storage.initialValue)
+    }
+
+    func stateObjectCell<ObjectType: ObservableObject>(
+        for storage: StateObjectStorage<ObjectType>
+    ) -> ObservableObjectCell<ObjectType> {
+        let key: StateKey
+        if let storedKey = storage.key, storedKey.path == path {
+            key = storedKey
+            nextSlot = max(nextSlot, storedKey.slot + 1)
+        }
+        else {
+            key = StateKey(
+                kind: .stateObject,
+                path: path,
+                slot: nextSlot,
+                valueType: ObjectIdentifier(ObjectType.self)
+            )
+            storage.key = key
+            nextSlot += 1
+        }
+
+        return runtime.stateObjectCell(for: key, createObject: storage.createObject)
+    }
+
+    func observedObjectCell<ObjectType: ObservableObject>(
+        for storage: ObservedObjectStorage<ObjectType>
+    ) -> ObservableObjectCell<ObjectType> {
+        let key: StateKey
+        if let storedKey = storage.key, storedKey.path == path {
+            key = storedKey
+            nextSlot = max(nextSlot, storedKey.slot + 1)
+        }
+        else {
+            key = StateKey(
+                kind: .observedObject,
+                path: path,
+                slot: nextSlot,
+                valueType: ObjectIdentifier(ObjectType.self)
+            )
+            storage.key = key
+            nextSlot += 1
+        }
+
+        return runtime.observedObjectCell(for: key, object: storage.object)
+    }
+}
+
+enum StateContext {
+
+    static var currentPath: [Int]? {
+        StateRenderContext.current?.path
+    }
+}
+
+struct FocusRequest: Equatable {
+
+    var bindingID: ObjectIdentifier
+
+    var value: AnyHashable
+}
+
+struct FocusRequestRecord {
+
+    var request: FocusRequest
+
+    var sourcePath: [Int]?
+
+    var generation: Int
+}
+
+private protocol FocusRequestSource: AnyObject {
+
+    var requestGeneration: Int { get }
+
+    func currentRequest() -> FocusRequest?
+}
+
+private protocol FocusRequestValue {
+
+    var focusRequestValue: AnyHashable? { get }
+}
+
+extension Bool: FocusRequestValue {
+
+    var focusRequestValue: AnyHashable? {
+        self ? AnyHashable(true) : nil
+    }
+}
+
+extension Optional: FocusRequestValue where Wrapped: Hashable {
+
+    var focusRequestValue: AnyHashable? {
+        map {
+            AnyHashable($0)
+        }
+    }
+}
+
+extension FocusCell: FocusRequestSource {
+
+    var requestGeneration: Int {
+        generation
+    }
+
+    func currentRequest() -> FocusRequest? {
+        guard let value = (value as? any FocusRequestValue)?.focusRequestValue else {
+            return nil
+        }
+
+        return FocusRequest(
+            bindingID: ObjectIdentifier(self),
+            value: value
+        )
+    }
+}
+
+protocol FocusAttachment {
+
+    var bindingID: ObjectIdentifier { get }
+
+    var generation: Int { get }
+
+    func currentRequest() -> FocusRequest?
+
+    func matches(_ request: FocusRequest) -> Bool
+
+    func matchesValue(_ value: AnyHashable) -> Bool
+
+    @discardableResult
+    func setActive() -> Bool
+
+    @discardableResult
+    func clear() -> Bool
+}
+
+private struct BoolFocusAttachment: FocusAttachment {
+
+    let binding: FocusState<Bool>.Binding
+
+    var bindingID: ObjectIdentifier {
+        ObjectIdentifier(binding.cell)
+    }
+
+    var generation: Int {
+        binding.cell.generation
+    }
+
+    func currentRequest() -> FocusRequest? {
+        guard binding.wrappedValue else {
+            return nil
+        }
+
+        return FocusRequest(bindingID: bindingID, value: AnyHashable(true))
+    }
+
+    func matches(_ request: FocusRequest) -> Bool {
+        request.bindingID == bindingID && request.value == AnyHashable(true)
+    }
+
+    func matchesValue(_ value: AnyHashable) -> Bool {
+        value == AnyHashable(true)
+    }
+
+    func setActive() -> Bool {
+        binding.cell.setValue(true, invalidates: false, recordsRequest: false)
+    }
+
+    func clear() -> Bool {
+        binding.cell.setValue(false, invalidates: false, recordsRequest: false)
+    }
+}
+
+private struct OptionalFocusAttachment<Value: Hashable>: FocusAttachment {
+
+    let binding: FocusState<Value?>.Binding
+
+    let value: Value
+
+    var bindingID: ObjectIdentifier {
+        ObjectIdentifier(binding.cell)
+    }
+
+    var generation: Int {
+        binding.cell.generation
+    }
+
+    func currentRequest() -> FocusRequest? {
+        guard let value = binding.wrappedValue else {
+            return nil
+        }
+
+        return FocusRequest(bindingID: bindingID, value: AnyHashable(value))
+    }
+
+    func matches(_ request: FocusRequest) -> Bool {
+        request.bindingID == bindingID && request.value == AnyHashable(value)
+    }
+
+    func matchesValue(_ value: AnyHashable) -> Bool {
+        value == AnyHashable(self.value)
+    }
+
+    func setActive() -> Bool {
+        binding.cell.setValue(value, invalidates: false, recordsRequest: false)
+    }
+
+    func clear() -> Bool {
+        binding.cell.setValue(nil, invalidates: false, recordsRequest: false)
+    }
+}
+
+extension FocusState.Binding where Value == Bool {
+
+    func focusAttachment() -> any FocusAttachment {
+        BoolFocusAttachment(binding: self)
+    }
+}
+
+extension FocusState.Binding {
+
+    func focusAttachment<Wrapped>(
+        equals value: Wrapped
+    ) -> any FocusAttachment where Value == Wrapped?, Wrapped: Hashable {
+        OptionalFocusAttachment(binding: self, value: value)
+    }
+}
+
+private final class FocusRuntime {
+
+    private struct Candidate {
+
+        var path: [Int]
+
+        var attachments: [any FocusAttachment]
+    }
+
+    struct RequestResult {
+
+        var handled: Bool
+
+        var changed: Bool
+    }
+
+    private var pathsInRenderOrder: [[Int]] = []
+
+    private var focusablePaths: Set<[Int]> = []
+
+    private var disabledPaths: Set<[Int]> = []
+
+    private var attachmentsByPath: [[Int]: [any FocusAttachment]] = [:]
+
+    private var allAttachments: [any FocusAttachment] = []
+
+    private var candidates: [Candidate] = []
+
+    private var requestsForCurrentRender: [FocusRequestRecord] = []
+
+    private(set) var activePath: [Int]?
+
+    func beginRender(requests: [FocusRequestRecord]) {
+        pathsInRenderOrder = []
+        focusablePaths = []
+        disabledPaths = []
+        attachmentsByPath = [:]
+        allAttachments = []
+        requestsForCurrentRender = requests.sorted {
+            $0.generation > $1.generation
+        }
+    }
+
+    func registerFocusable(_ isFocusable: Bool, at path: [Int]) {
+        registerPath(path)
+
+        if isFocusable {
+            focusablePaths.insert(path)
+            updateActivePathDuringRender(at: path)
+        }
+        else {
+            focusablePaths.remove(path)
+            disabledPaths.insert(path)
+        }
+    }
+
+    func registerAttachment(_ attachment: any FocusAttachment, at path: [Int]) {
+        registerPath(path)
+        attachmentsByPath[path, default: []].append(attachment)
+        allAttachments.append(attachment)
+        updateActivePathDuringRender(at: path)
+    }
+
+    func finishRender(requests extraRequests: [FocusRequestRecord]) -> Bool {
+        candidates = pathsInRenderOrder.compactMap { path -> Candidate? in
+            guard focusablePaths.contains(path),
+                  !disabledPaths.contains(path) else {
+                return nil
+            }
+
+            return Candidate(path: path, attachments: attachmentsByPath[path] ?? [])
+        }
+
+        let previousActivePath = activePath
+        let activeCandidate = activeCandidate(
+            from: candidates,
+            extraRequests: extraRequests
+        )
+        activePath = activeCandidate?.path
+        let attachmentsChanged = syncAttachments(for: activeCandidate)
+        return activePath != previousActivePath || attachmentsChanged
+    }
+
+    private func activeCandidate(
+        from candidates: [Candidate],
+        extraRequests: [FocusRequestRecord]
+    ) -> Candidate? {
+        let renderedRequests = currentRenderedRequests()
+        let requests = (renderedRequests + extraRequests).sorted {
+            $0.generation > $1.generation
+        }
+
+        for request in requests {
+            if let candidate = candidate(matching: request, in: candidates) {
+                return candidate
+            }
+        }
+
+        guard renderedRequests.isEmpty else {
+            return nil
+        }
+
+        guard let activePath,
+              let candidate = candidates.first(where: { $0.path == activePath }),
+              candidate.attachments.isEmpty else {
+            return nil
+        }
+
+        return candidate
+    }
+
+    func requestFocus(at path: [Int]) -> RequestResult {
+        guard let candidate = candidates.first(where: { $0.path == path }) else {
+            return RequestResult(handled: false, changed: false)
+        }
+
+        let previousActivePath = activePath
+        activePath = candidate.path
+        let attachmentsChanged = syncAttachments(for: candidate)
+        return RequestResult(
+            handled: true,
+            changed: activePath != previousActivePath || attachmentsChanged
+        )
+    }
+
+    private func currentRenderedRequests() -> [FocusRequestRecord] {
+        allAttachments
+            .compactMap { attachment -> FocusRequestRecord? in
+                attachment.currentRequest().map {
+                    FocusRequestRecord(
+                        request: $0,
+                        sourcePath: nil,
+                        generation: attachment.generation
+                    )
+                }
+            }
+    }
+
+    private func candidate(
+        matching record: FocusRequestRecord,
+        in candidates: [Candidate]
+    ) -> Candidate? {
+        if let candidate = candidates.first(where: { candidate in
+            candidate.attachments.contains {
+                $0.matches(record.request)
+            }
+        }) {
+            return candidate
+        }
+
+        guard let sourcePath = record.sourcePath else {
+            return nil
+        }
+
+        return candidates.first { candidate in
+            candidate.path.starts(with: sourcePath)
+                && candidate.attachments.contains {
+                    $0.matchesValue(record.request.value)
+                }
+        }
+    }
+
+    private func updateActivePathDuringRender(at path: [Int]) {
+        guard focusablePaths.contains(path),
+              !disabledPaths.contains(path),
+              let attachments = attachmentsByPath[path] else {
+            return
+        }
+
+        for request in requestsForCurrentRender
+            where attachments.contains(where: { attachment in
+                attachment.matches(request.request)
+                    || (request.sourcePath.map { path.starts(with: $0) } == true
+                        && attachment.matchesValue(request.request.value))
+            }) {
+            activePath = path
+            return
+        }
+    }
+
+    private func syncAttachments(for activeCandidate: Candidate?) -> Bool {
+        var changed = false
+        var activeBindingIDs = Set<ObjectIdentifier>()
+        if let activeCandidate {
+            for attachment in activeCandidate.attachments
+                where !activeBindingIDs.contains(attachment.bindingID) {
+                activeBindingIDs.insert(attachment.bindingID)
+                changed = attachment.setActive() || changed
+            }
+        }
+
+        var clearedBindingIDs = Set<ObjectIdentifier>()
+        for attachment in allAttachments
+            where !activeBindingIDs.contains(attachment.bindingID)
+                && !clearedBindingIDs.contains(attachment.bindingID) {
+            clearedBindingIDs.insert(attachment.bindingID)
+            changed = attachment.clear() || changed
+        }
+
+        return changed
+    }
+
+    private func registerPath(_ path: [Int]) {
+        guard !pathsInRenderOrder.contains(path) else {
+            return
+        }
+
+        pathsInRenderOrder.append(path)
+    }
+}

@@ -1,0 +1,51 @@
+{
+  "originHash" : "8a11f93dce392187da55e0c6df06a863106d5777f3336fd5bcdeb11714e6a87b",
+  "pins" : [
+    {
+      "identity" : "opencombine",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/OpenSwiftUIProject/OpenCombine.git",
+      "state" : {
+        "revision" : "63aef318cb3a853bcb8d774cce15f4dcb1ccdfe4",
+        "version" : "0.15.1"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "swift-system",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-system",
+      "state" : {
+        "revision" : "7502b711c92a17741fa625d722b0ccbd595d8ed1",
+        "version" : "1.7.2"
+      }
+    },
+    {
+      "identity" : "swift-terminal",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/minacle/swift-terminal",
+      "state" : {
+        "branch" : "main",
+        "revision" : "7a063ee497c5ab22c0f747eb0ec170ffe0ed2951"
+      }
+    },
+    {
+      "identity" : "swift-termios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/minacle/swift-termios",
+      "state" : {
+        "branch" : "main",
+        "revision" : "e21d00bd0d3640af26e0a849928e2e6e9d44ba74"
+      }
+    }
+  ],
+  "version" : 3
+}
