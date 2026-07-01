@@ -2747,6 +2747,112 @@ import Testing
     )
 }
 
+@Test func onChangeDoesNotRunInitiallyByDefault() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(runtime.block(from: OnChangeValueView(value: 1, probe: probe))?.text == "1")
+    #expect(probe.events.isEmpty)
+
+    #expect(runtime.block(from: OnChangeValueView(value: 1, probe: probe))?.text == "1")
+    #expect(probe.events.isEmpty)
+}
+
+@Test func onChangeInitialRunsOnceForStableIdentity() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: OnChangeValueView(value: 1, initial: true, probe: probe)
+        )?.text == "1"
+    )
+    #expect(probe.events == ["changed 1"])
+
+    #expect(
+        runtime.block(
+            from: OnChangeValueView(value: 1, initial: true, probe: probe)
+        )?.text == "1"
+    )
+    #expect(probe.events == ["changed 1"])
+}
+
+@Test func onChangeRunsWhenValueChanges() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(runtime.block(from: OnChangeValueView(value: 1, probe: probe))?.text == "1")
+    #expect(runtime.block(from: OnChangeValueView(value: 2, probe: probe))?.text == "2")
+
+    #expect(probe.events == ["changed 2"])
+}
+
+@Test func onChangeActionMutatesStateWithRestoredViewContext() {
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: OnChangeStateMutationView(value: 1))?.text == "idle")
+    #expect(runtime.block(from: OnChangeStateMutationView(value: 2))?.text == "idle")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: OnChangeStateMutationView(value: 2))?.text == "changed")
+}
+
+@Test func onChangeActionUsesLatestEnvironment() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: OnChangeEnvironmentView(value: 1, probe: probe)
+                .environment(\.testMarker, "first")
+        )?.text == "marker"
+    )
+    #expect(
+        runtime.block(
+            from: OnChangeEnvironmentView(value: 2, probe: probe)
+                .environment(\.testMarker, "second")
+        )?.text == "marker"
+    )
+
+    #expect(probe.events == ["second"])
+}
+
+@Test func onChangeInitialRunsAgainAfterConditionalReinsert() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: ConditionalOnChangeView(isVisible: true, value: 1, probe: probe)
+        )?.text == "A"
+    )
+    #expect(probe.events == ["changed 1"])
+
+    #expect(runtime.block(from: ConditionalOnChangeView(isVisible: false, value: 1, probe: probe)) == nil)
+    #expect(
+        runtime.block(
+            from: ConditionalOnChangeView(isVisible: true, value: 1, probe: probe)
+        )?.text == "A"
+    )
+    #expect(probe.events == ["changed 1", "changed 1"])
+}
+
+@Test func forEachReorderDoesNotTriggerOnChangeActions() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+    let first = [
+        LifecycleItem(id: "a", label: "A"),
+        LifecycleItem(id: "b", label: "B"),
+    ]
+    let reordered = [
+        LifecycleItem(id: "b", label: "B"),
+        LifecycleItem(id: "a", label: "A"),
+    ]
+
+    #expect(runtime.block(from: ForEachOnChangeView(items: first, probe: probe))?.lines == ["A", "B"])
+    #expect(runtime.block(from: ForEachOnChangeView(items: reordered, probe: probe))?.lines == ["B", "A"])
+    #expect(probe.events.isEmpty)
+}
+
 @Test func terminalParsesPrintableAndUTF8Input() {
     #expect(TerminalControl.input(for: [65]) == .keyPress(KeyPress(key: "A", characters: "A")))
     #expect(
@@ -4196,6 +4302,86 @@ private struct StackedLifecycleView: View {
                         probe.events.append("outer disappear")
                     }
             }
+        }
+    }
+}
+
+private struct OnChangeValueView: View {
+
+    let value: Int
+
+    var initial = false
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        Text("\(value)")
+            .onChange(of: value, initial: initial) {
+                probe.events.append("changed \(value)")
+            }
+    }
+}
+
+private struct OnChangeStateMutationView: View {
+
+    let value: Int
+
+    @State private var status = "idle"
+
+    var body: some View {
+        Text(status)
+            .onChange(of: value) {
+                status = "changed"
+            }
+    }
+}
+
+private struct OnChangeEnvironmentView: View {
+
+    let value: Int
+
+    let probe: LifecycleProbe
+
+    @Environment(\.testMarker) private var marker
+
+    var body: some View {
+        Text("marker")
+            .onChange(of: value) {
+                probe.events.append(marker)
+            }
+    }
+}
+
+private struct ConditionalOnChangeView: View {
+
+    let isVisible: Bool
+
+    let value: Int
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        if isVisible {
+            Text("A")
+                .onChange(of: value, initial: true) {
+                    probe.events.append("changed \(value)")
+                }
+        }
+    }
+}
+
+private struct ForEachOnChangeView: View {
+
+    let items: [LifecycleItem]
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        ForEach(items) { item in
+            Text(item.label)
+                .onChange(of: item.label) {
+                    probe.events.append("changed \(item.id)")
+                }
         }
     }
 }

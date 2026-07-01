@@ -283,6 +283,8 @@ final class StateRuntime {
 
     private let lifecycle = LifecycleRuntime()
 
+    private let change = ChangeRuntime()
+
     private var textFieldStates: [[Int]: TextFieldState] = [:]
 
     private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
@@ -310,12 +312,14 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
+        change.beginRender()
         terminationHandler = nil
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
+            change.finishRender(perform: performChangeHandler)
             removePendingStateSubtrees()
         }
 
@@ -338,12 +342,14 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
+        change.beginRender()
         terminationHandler = nil
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
+            change.finishRender(perform: performChangeHandler)
             removePendingStateSubtrees()
         }
 
@@ -502,6 +508,14 @@ final class StateRuntime {
         lifecycle.register(handler, at: path)
     }
 
+    func registerChangeHandler(_ handler: ChangeHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        change.register(handler, at: path)
+    }
+
     func scrollPoint(at path: [Int]) -> ScrollPoint? {
         scrollViewStates[path]?.point
     }
@@ -639,6 +653,14 @@ final class StateRuntime {
     }
 
     private func performLifecycleHandler(_ handler: LifecycleHandler) {
+        EnvironmentRenderContext.withValues(handler.environment) {
+            withView(at: handler.actionPath) {
+                handler.action()
+            }
+        }
+    }
+
+    private func performChangeHandler(_ handler: ChangeHandler) {
         EnvironmentRenderContext.withValues(handler.environment) {
             withView(at: handler.actionPath) {
                 handler.action()
