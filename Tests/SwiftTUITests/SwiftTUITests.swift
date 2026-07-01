@@ -3709,6 +3709,59 @@ import Testing
     #expect(runtime.block(from: view)?.text == "1")
 }
 
+@Suite(.serialized)
+private struct ParentCallbackStateMutationTests {
+
+@Test func parentCallbackDirectStateMutationFromChildKeyPressUpdatesRenderedState() {
+    let runtime = StateRuntime()
+    let view = ParentCallbackDirectStateMutationKeyPressView()
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "empty"])
+
+    focusParentCallbackKeyPressChild(in: runtime)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
+}
+
+@Test func parentCallbackBindingMutationFromChildKeyPressMatchesDirectStateMutation() {
+    let runtime = StateRuntime()
+    let view = ParentCallbackBindingMutationKeyPressView()
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "empty"])
+
+    focusParentCallbackKeyPressChild(in: runtime)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
+}
+
+@Test func parentCallbackDirectStateMutationFirstRenderedAfterActionUpdatesRenderedState() {
+    let runtime = StateRuntime()
+    let view = DeferredParentStateMutationView()
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "idle"])
+
+    focusParentCallbackKeyPressChild(in: runtime)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
+}
+
+@Test func parentCallbackDeferredStateMutationPromotesOverExistingRenderCell() {
+    let runtime = StateRuntime()
+    let view = DeferredParentStateMutationWithExistingStringCellView()
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "empty"])
+
+    focusParentCallbackKeyPressChild(in: runtime)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
+}
+
+}
+
 @Test func ignoredKeyPressContinuesToAncestorHandler() {
     let runtime = StateRuntime()
     let keyProbe = KeyPressProbe()
@@ -3895,6 +3948,19 @@ import Testing
 
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "1")
+}
+
+@Test func parentCallbackDirectStateMutationFromChildTapUpdatesRenderedState() {
+    let runtime = StateRuntime()
+    let view = ParentCallbackDirectStateMutationTapView()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Tap", "empty"])
+
+    dispatchClick(to: runtime, column: 1, row: 1, at: date)
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Tap", "updated"])
 }
 
 @Test func tapGestureHitTestingUsesStackCoordinates() {
@@ -5032,6 +5098,112 @@ private struct KeyPressStateMutationView: View {
     }
 }
 
+private struct ParentCallbackDirectStateMutationKeyPressView: View {
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackKeyPressChildView {
+                message = "updated"
+            }
+            Text(message.isEmpty ? "empty" : message)
+        }
+    }
+}
+
+private struct ParentCallbackBindingMutationKeyPressView: View {
+
+    @State private var message = ""
+
+    var body: some View {
+        let message = $message
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackKeyPressChildView {
+                message.wrappedValue = "updated"
+            }
+            Text(message.wrappedValue.isEmpty ? "empty" : message.wrappedValue)
+        }
+    }
+}
+
+private struct ParentCallbackKeyPressChildView: View {
+
+    let action: () -> Void
+
+    var body: some View {
+        Text("Press")
+            .focusable()
+            .onKeyPress(.return) {
+                action()
+                return .handled
+            }
+    }
+}
+
+private func focusParentCallbackKeyPressChild(in runtime: StateRuntime) {
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 0, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 0, phase: .up),
+            at: date
+        ) == .ignored
+    )
+}
+
+private struct DeferredParentStateMutationView: View {
+
+    @State private var isOpen = false
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackKeyPressChildView {
+                isOpen = true
+                message = "updated"
+            }
+            if isOpen {
+                Text(message.isEmpty ? "empty" : message)
+            }
+            else {
+                Text("idle")
+            }
+        }
+    }
+}
+
+private struct DeferredParentStateMutationWithExistingStringCellView: View {
+
+    @State private var isOpen = false
+
+    @State private var placeholder = ""
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackKeyPressChildView {
+                isOpen = true
+                message = "updated"
+            }
+            if isOpen {
+                Text(message.isEmpty ? "empty" : message)
+            }
+            else {
+                Text(placeholder.isEmpty ? "empty" : placeholder)
+            }
+        }
+    }
+}
+
 private struct TapGestureStateMutationView: View {
 
     @State var count = 0
@@ -5040,6 +5212,32 @@ private struct TapGestureStateMutationView: View {
         Text(String(count))
             .onTapGesture {
                 count += 1
+            }
+    }
+}
+
+private struct ParentCallbackDirectStateMutationTapView: View {
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackTapChildView {
+                message = "updated"
+            }
+            Text(message.isEmpty ? "empty" : message)
+        }
+    }
+}
+
+private struct ParentCallbackTapChildView: View {
+
+    let action: () -> Void
+
+    var body: some View {
+        Text("Tap")
+            .onTapGesture {
+                action()
             }
     }
 }

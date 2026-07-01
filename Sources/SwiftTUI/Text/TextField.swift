@@ -403,9 +403,17 @@ private enum SubmitContext {
 
     private static let threadKey = "SwiftTUI.SubmitContext"
 
+    private struct TaskAction: @unchecked Sendable {
+
+        var action: SubmitAction?
+    }
+
+    @TaskLocal
+    private static var taskAction = TaskAction(action: nil)
+
     static var currentAction: SubmitAction? {
         get {
-            Thread.current.threadDictionary[threadKey] as? SubmitAction
+            taskAction.action
         }
         set {
             let dictionary = Thread.current.threadDictionary
@@ -422,13 +430,21 @@ private enum SubmitContext {
         _ action: SubmitAction,
         perform operation: () -> Value
     ) -> Value {
-        let previous = currentAction
-        currentAction = action
-        defer {
-            currentAction = previous
-        }
+        $taskAction.withValue(TaskAction(action: action)) {
+            let previous = Thread.current.threadDictionary[threadKey]
+                as? SubmitAction
+            Thread.current.threadDictionary[threadKey] = action
+            defer {
+                if let previous {
+                    Thread.current.threadDictionary[threadKey] = previous
+                }
+                else {
+                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
+                }
+            }
 
-        return operation()
+            return operation()
+        }
     }
 }
 

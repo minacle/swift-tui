@@ -618,18 +618,28 @@ enum LayoutMeasurementContext {
 
     private static let threadKey = "SwiftTUI.LayoutMeasurementContext"
 
+    @TaskLocal
+    private static var taskIsMeasuring = false
+
     static var isMeasuring: Bool {
-        Thread.current.threadDictionary[threadKey] as? Bool ?? false
+        taskIsMeasuring
     }
 
     static func withMeasurement<Value>(_ operation: () -> Value) -> Value {
-        let previous = isMeasuring
-        Thread.current.threadDictionary[threadKey] = true
-        defer {
-            Thread.current.threadDictionary[threadKey] = previous
-        }
+        $taskIsMeasuring.withValue(true) {
+            let previous = Thread.current.threadDictionary[threadKey] as? Bool
+            Thread.current.threadDictionary[threadKey] = true
+            defer {
+                if let previous {
+                    Thread.current.threadDictionary[threadKey] = previous
+                }
+                else {
+                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
+                }
+            }
 
-        return operation()
+            return operation()
+        }
     }
 }
 
@@ -912,7 +922,7 @@ extension ForEach: FlattenableViewContent {
             return content(element)
         }
 
-        return runtime.withView(at: contextPath) {
+        return runtime.withView(at: contextPath, mode: .render) {
             content(element)
         }
     }
@@ -1200,7 +1210,7 @@ enum ViewResolver {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
-        let body = runtime?.withView(at: path) {
+        let body = runtime?.withView(at: path, mode: .render) {
             view.body
         } ?? view.body
         return block(from: body, in: proposal, path: path + [0], runtime: runtime)
@@ -1356,7 +1366,7 @@ enum ViewResolver {
             )
         }
 
-        let body = runtime?.withView(at: path) {
+        let body = runtime?.withView(at: path, mode: .render) {
             view.body
         } ?? view.body
         return element(from: body, in: proposal, path: path + [0], runtime: runtime)

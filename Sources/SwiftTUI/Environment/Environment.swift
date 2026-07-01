@@ -292,10 +292,17 @@ enum EnvironmentRenderContext {
 
     private static let threadKey = "SwiftTUI.EnvironmentRenderContext"
 
+    private struct TaskValues: @unchecked Sendable {
+
+        var values: EnvironmentValues
+    }
+
+    @TaskLocal
+    private static var taskValues = TaskValues(values: EnvironmentValues())
+
     static var current: EnvironmentValues {
         get {
-            Thread.current.threadDictionary[threadKey] as? EnvironmentValues
-                ?? EnvironmentValues()
+            taskValues.values
         }
         set {
             Thread.current.threadDictionary[threadKey] = newValue
@@ -306,13 +313,21 @@ enum EnvironmentRenderContext {
         _ values: EnvironmentValues,
         perform operation: () -> Value
     ) -> Value {
-        let previous = current
-        current = values
-        defer {
-            current = previous
-        }
+        $taskValues.withValue(TaskValues(values: values)) {
+            let previous = Thread.current.threadDictionary[threadKey]
+                as? EnvironmentValues
+            Thread.current.threadDictionary[threadKey] = values
+            defer {
+                if let previous {
+                    Thread.current.threadDictionary[threadKey] = previous
+                }
+                else {
+                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
+                }
+            }
 
-        return operation()
+            return operation()
+        }
     }
 }
 

@@ -277,6 +277,10 @@ final class StateRuntime {
 
     private var cells: [StateKey: Any] = [:]
 
+    private var renderKeysByStorageID: [ObjectIdentifier: StateKey] = [:]
+
+    private var actionKeysByStorageID: [ObjectIdentifier: StateKey] = [:]
+
     private let focus = FocusRuntime()
 
     private let input = InputRuntime()
@@ -409,6 +413,135 @@ final class StateRuntime {
         )
         cells[key] = cell
         return cell
+    }
+
+    fileprivate func renderedKey(
+        for storageID: ObjectIdentifier,
+        kind: StateKey.Kind,
+        valueType: ObjectIdentifier
+    ) -> StateKey? {
+        guard let key = renderKeysByStorageID[storageID],
+              key.kind == kind,
+              key.valueType == valueType else {
+            return nil
+        }
+
+        return key
+    }
+
+    fileprivate func actionKey(
+        for storageID: ObjectIdentifier,
+        kind: StateKey.Kind,
+        valueType: ObjectIdentifier,
+        path: [Int]
+    ) -> StateKey {
+        if let key = actionKeysByStorageID[storageID],
+           key.kind == kind,
+           key.valueType == valueType {
+            return key
+        }
+
+        let key = StateKey(
+            kind: kind,
+            path: path,
+            slot: -1,
+            valueType: valueType,
+            storageID: storageID
+        )
+        actionKeysByStorageID[storageID] = key
+        return key
+    }
+
+    fileprivate func bindRenderKey(
+        _ key: StateKey,
+        to storageID: ObjectIdentifier
+    ) {
+        renderKeysByStorageID[storageID] = key
+    }
+
+    fileprivate func stateCell<Value>(
+        forRenderKey key: StateKey,
+        storageID: ObjectIdentifier,
+        initialValue: @autoclosure () -> Value
+    ) -> StateCell<Value> {
+        guard let actionKey = actionKeysByStorageID.removeValue(forKey: storageID),
+              actionKey != key,
+              let actionCell = cells.removeValue(forKey: actionKey) as? StateCell<Value> else {
+            return cell(for: key, initialValue: initialValue())
+        }
+
+        if let renderCell = cells[key] as? StateCell<Value> {
+            renderCell.value = actionCell.value
+            return renderCell
+        }
+
+        cells[key] = actionCell
+        return actionCell
+    }
+
+    fileprivate func focusCell<Value: Hashable>(
+        forRenderKey key: StateKey,
+        storageID: ObjectIdentifier,
+        initialValue: @autoclosure () -> Value
+    ) -> FocusCell<Value> {
+        guard let actionKey = actionKeysByStorageID.removeValue(forKey: storageID),
+              actionKey != key,
+              let actionCell = cells.removeValue(forKey: actionKey) as? FocusCell<Value> else {
+            return focusCell(for: key, initialValue: initialValue())
+        }
+
+        if let renderCell = cells[key] as? FocusCell<Value> {
+            renderCell.setValue(
+                actionCell.value,
+                invalidates: false,
+                recordsRequest: false
+            )
+            return renderCell
+        }
+
+        cells[key] = actionCell
+        return actionCell
+    }
+
+    fileprivate func stateObjectCell<ObjectType: ObservableObject>(
+        forRenderKey key: StateKey,
+        storageID: ObjectIdentifier,
+        createObject: () -> ObjectType
+    ) -> ObservableObjectCell<ObjectType> {
+        guard let actionKey = actionKeysByStorageID.removeValue(forKey: storageID),
+              actionKey != key,
+              let actionCell = cells.removeValue(forKey: actionKey) as? ObservableObjectCell<ObjectType> else {
+            return stateObjectCell(for: key, createObject: createObject)
+        }
+
+        if let renderCell = cells[key] as? ObservableObjectCell<ObjectType> {
+            renderCell.updateValue(actionCell.value)
+            return renderCell
+        }
+
+        cells[key] = actionCell
+        return actionCell
+    }
+
+    fileprivate func observedObjectCell<ObjectType: ObservableObject>(
+        forRenderKey key: StateKey,
+        storageID: ObjectIdentifier,
+        object: ObjectType
+    ) -> ObservableObjectCell<ObjectType> {
+        guard let actionKey = actionKeysByStorageID.removeValue(forKey: storageID),
+              actionKey != key,
+              let actionCell = cells.removeValue(forKey: actionKey) as? ObservableObjectCell<ObjectType> else {
+            return observedObjectCell(for: key, object: object)
+        }
+
+        actionCell.updateValue(object)
+        if let renderCell = cells[key] as? ObservableObjectCell<ObjectType> {
+            renderCell.updateValue(actionCell.value)
+            return renderCell
+        }
+
+        cells[key] = actionCell
+        return actionCell
     }
 
     fileprivate func stateObjectCell<ObjectType: ObservableObject>(
@@ -685,16 +818,11 @@ final class StateRuntime {
 
     func withView<Value>(
         at path: [Int],
+        mode: StateRenderContextMode = .action,
         perform operation: () -> Value
     ) -> Value {
-        let previous = StateRenderContext.current
-        let context = StateRenderContext(runtime: self, path: path)
-        StateRenderContext.current = context
-        defer {
-            StateRenderContext.current = previous
-        }
-
-        return operation()
+        let context = StateRenderContext(runtime: self, path: path, mode: mode)
+        return StateRenderContext.withCurrent(context, perform: operation)
     }
 
     func withoutRenderRegistrations<Value>(_ operation: () -> Value) -> Value {
@@ -708,8 +836,17 @@ final class StateRuntime {
     }
 
     private func removeStateSubtree(at path: [Int]) {
-        cells = cells.filter {
-            !$0.key.path.starts(with: path)
+        let removedRenderKeys = Set(
+            cells.keys.filter {
+                $0.storageID == nil && $0.path.starts(with: path)
+            }
+        )
+
+        for key in removedRenderKeys {
+            cells.removeValue(forKey: key)
+        }
+        renderKeysByStorageID = renderKeysByStorageID.filter {
+            !removedRenderKeys.contains($0.value)
         }
         textFieldStates = textFieldStates.filter {
             !$0.key.starts(with: path)
@@ -1036,6 +1173,8 @@ private struct StateKey: Hashable {
     var slot: Int
 
     var valueType: ObjectIdentifier
+
+    var storageID: ObjectIdentifier?
 }
 
 private struct ForEachIdentityKey: Hashable {
@@ -1070,120 +1209,218 @@ struct TerminationHandler {
     var action: () -> Void
 }
 
-private final class StateRenderContext {
+enum StateRenderContextMode {
 
-    private static let threadKey = "SwiftTUI.StateRenderContext"
+    case render
+
+    case action
+}
+
+private final class StateRenderContext: @unchecked Sendable {
+
+    @TaskLocal
+    private static var taskCurrent: StateRenderContext?
 
     let runtime: StateRuntime
 
     let path: [Int]
 
+    let mode: StateRenderContextMode
+
     private var nextSlot = 0
 
     static var current: StateRenderContext? {
-        get {
-            Thread.current.threadDictionary[threadKey] as? StateRenderContext
-        }
-        set {
-            let dictionary = Thread.current.threadDictionary
-            if let newValue {
-                dictionary[threadKey] = newValue
-            }
-            else {
-                dictionary.removeObject(forKey: threadKey)
-            }
+        taskCurrent
+    }
+
+    static func withCurrent<Value>(
+        _ context: StateRenderContext,
+        perform operation: () -> Value
+    ) -> Value {
+        $taskCurrent.withValue(context) {
+            operation()
         }
     }
 
-    init(runtime: StateRuntime, path: [Int]) {
+    init(runtime: StateRuntime, path: [Int], mode: StateRenderContextMode) {
         self.runtime = runtime
         self.path = path
+        self.mode = mode
     }
 
     func cell<Value>(for storage: StateStorage<Value>) -> StateCell<Value> {
-        let key: StateKey
-        if let storedKey = storage.key, storedKey.path == path {
-            key = storedKey
-            nextSlot = max(nextSlot, storedKey.slot + 1)
-        }
-        else {
-            key = StateKey(
+        let valueType = ObjectIdentifier(Value.self)
+        let storageID = ObjectIdentifier(storage)
+
+        if mode == .action {
+            let key = actionResolvedKey(
+                storageID: storageID,
                 kind: .state,
-                path: path,
-                slot: nextSlot,
-                valueType: ObjectIdentifier(Value.self)
+                valueType: valueType
             )
             storage.key = key
-            nextSlot += 1
+            return runtime.cell(for: key, initialValue: storage.initialValue)
         }
 
-        return runtime.cell(for: key, initialValue: storage.initialValue)
+        let key = renderResolvedKey(
+            storedKey: storage.key,
+            storageID: storageID,
+            kind: .state,
+            valueType: valueType
+        )
+        storage.key = key
+        return runtime.stateCell(
+            forRenderKey: key,
+            storageID: storageID,
+            initialValue: storage.initialValue
+        )
     }
 
     func focusCell<Value: Hashable>(
         for storage: FocusStateStorage<Value>
     ) -> FocusCell<Value> {
-        let key: StateKey
-        if let storedKey = storage.key, storedKey.path == path {
-            key = storedKey
-            nextSlot = max(nextSlot, storedKey.slot + 1)
-        }
-        else {
-            key = StateKey(
+        let valueType = ObjectIdentifier(Value.self)
+        let storageID = ObjectIdentifier(storage)
+
+        if mode == .action {
+            let key = actionResolvedKey(
+                storageID: storageID,
                 kind: .focus,
-                path: path,
-                slot: nextSlot,
-                valueType: ObjectIdentifier(Value.self)
+                valueType: valueType
             )
             storage.key = key
-            nextSlot += 1
+            return runtime.focusCell(for: key, initialValue: storage.initialValue)
         }
 
-        return runtime.focusCell(for: key, initialValue: storage.initialValue)
+        let key = renderResolvedKey(
+            storedKey: storage.key,
+            storageID: storageID,
+            kind: .focus,
+            valueType: valueType
+        )
+        storage.key = key
+        return runtime.focusCell(
+            forRenderKey: key,
+            storageID: storageID,
+            initialValue: storage.initialValue
+        )
     }
 
     func stateObjectCell<ObjectType: ObservableObject>(
         for storage: StateObjectStorage<ObjectType>
     ) -> ObservableObjectCell<ObjectType> {
-        let key: StateKey
-        if let storedKey = storage.key, storedKey.path == path {
-            key = storedKey
-            nextSlot = max(nextSlot, storedKey.slot + 1)
-        }
-        else {
-            key = StateKey(
+        let valueType = ObjectIdentifier(ObjectType.self)
+        let storageID = ObjectIdentifier(storage)
+
+        if mode == .action {
+            let key = actionResolvedKey(
+                storageID: storageID,
                 kind: .stateObject,
-                path: path,
-                slot: nextSlot,
-                valueType: ObjectIdentifier(ObjectType.self)
+                valueType: valueType
             )
             storage.key = key
-            nextSlot += 1
+            return runtime.stateObjectCell(for: key, createObject: storage.createObject)
         }
 
-        return runtime.stateObjectCell(for: key, createObject: storage.createObject)
+        let key = renderResolvedKey(
+            storedKey: storage.key,
+            storageID: storageID,
+            kind: .stateObject,
+            valueType: valueType
+        )
+        storage.key = key
+        return runtime.stateObjectCell(
+            forRenderKey: key,
+            storageID: storageID,
+            createObject: storage.createObject
+        )
     }
 
     func observedObjectCell<ObjectType: ObservableObject>(
         for storage: ObservedObjectStorage<ObjectType>
     ) -> ObservableObjectCell<ObjectType> {
+        let valueType = ObjectIdentifier(ObjectType.self)
+        let storageID = ObjectIdentifier(storage)
+
+        if mode == .action {
+            let key = actionResolvedKey(
+                storageID: storageID,
+                kind: .observedObject,
+                valueType: valueType
+            )
+            storage.key = key
+            return runtime.observedObjectCell(for: key, object: storage.object)
+        }
+
+        let key = renderResolvedKey(
+            storedKey: storage.key,
+            storageID: storageID,
+            kind: .observedObject,
+            valueType: valueType
+        )
+        storage.key = key
+        return runtime.observedObjectCell(
+            forRenderKey: key,
+            storageID: storageID,
+            object: storage.object
+        )
+    }
+
+    private func renderResolvedKey(
+        storedKey: StateKey?,
+        storageID: ObjectIdentifier,
+        kind: StateKey.Kind,
+        valueType: ObjectIdentifier
+    ) -> StateKey {
         let key: StateKey
-        if let storedKey = storage.key, storedKey.path == path {
+        if let storedKey,
+           storedKey.storageID == nil,
+           storedKey.path == path {
             key = storedKey
             nextSlot = max(nextSlot, storedKey.slot + 1)
         }
         else {
-            key = StateKey(
-                kind: .observedObject,
-                path: path,
-                slot: nextSlot,
-                valueType: ObjectIdentifier(ObjectType.self)
-            )
-            storage.key = key
-            nextSlot += 1
+            key = renderKey(kind: kind, valueType: valueType)
         }
 
-        return runtime.observedObjectCell(for: key, object: storage.object)
+        runtime.bindRenderKey(key, to: storageID)
+        return key
+    }
+
+    private func actionResolvedKey(
+        storageID: ObjectIdentifier,
+        kind: StateKey.Kind,
+        valueType: ObjectIdentifier
+    ) -> StateKey {
+        if let renderedKey = runtime.renderedKey(
+            for: storageID,
+            kind: kind,
+            valueType: valueType
+        ) {
+            return renderedKey
+        }
+
+        return runtime.actionKey(
+            for: storageID,
+            kind: kind,
+            valueType: valueType,
+            path: path
+        )
+    }
+
+    private func renderKey(
+        kind: StateKey.Kind,
+        valueType: ObjectIdentifier
+    ) -> StateKey {
+        let key = StateKey(
+            kind: kind,
+            path: path,
+            slot: nextSlot,
+            valueType: valueType,
+            storageID: nil
+        )
+        nextSlot += 1
+        return key
     }
 }
 
@@ -1397,6 +1634,8 @@ private final class FocusRuntime {
 
     private var requestsForCurrentRender: [FocusRequestRecord] = []
 
+    private var updatedActivePathDuringRender = false
+
     private(set) var activePath: [Int]?
 
     func beginRender(requests: [FocusRequestRecord]) {
@@ -1405,6 +1644,7 @@ private final class FocusRuntime {
         disabledPaths = []
         attachmentsByPath = [:]
         allAttachments = []
+        updatedActivePathDuringRender = false
         requestsForCurrentRender = requests.sorted {
             $0.generation > $1.generation
         }
@@ -1467,6 +1707,12 @@ private final class FocusRuntime {
 
         guard renderedRequests.isEmpty else {
             return nil
+        }
+
+        if updatedActivePathDuringRender,
+           let activePath,
+           let candidate = candidates.first(where: { $0.path == activePath }) {
+            return candidate
         }
 
         guard let activePath,
@@ -1543,6 +1789,7 @@ private final class FocusRuntime {
                         && attachment.matchesValue(request.request.value))
             }) {
             activePath = path
+            updatedActivePathDuringRender = true
             return
         }
     }

@@ -290,6 +290,14 @@ private enum ScrollPositionContext {
 
     private static let threadKey = "SwiftTUI.ScrollPositionContext"
 
+    private struct TaskBinding: @unchecked Sendable {
+
+        var binding: Binding<ScrollPosition>?
+    }
+
+    @TaskLocal
+    private static var taskBinding = TaskBinding(binding: nil)
+
     static var currentPosition: ScrollPosition {
         currentBinding?.wrappedValue ?? ScrollPosition()
     }
@@ -298,13 +306,21 @@ private enum ScrollPositionContext {
         _ position: Binding<ScrollPosition>,
         perform operation: () -> Value
     ) -> Value {
-        let previous = currentBinding
-        currentBinding = position
-        defer {
-            currentBinding = previous
-        }
+        $taskBinding.withValue(TaskBinding(binding: position)) {
+            let previous = Thread.current.threadDictionary[threadKey]
+                as? Binding<ScrollPosition>
+            Thread.current.threadDictionary[threadKey] = position
+            defer {
+                if let previous {
+                    Thread.current.threadDictionary[threadKey] = previous
+                }
+                else {
+                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
+                }
+            }
 
-        return operation()
+            return operation()
+        }
     }
 
     static func updateCurrentPosition(to position: ScrollPosition) {
@@ -316,18 +332,7 @@ private enum ScrollPositionContext {
     }
 
     static var currentBinding: Binding<ScrollPosition>? {
-        get {
-            Thread.current.threadDictionary[threadKey] as? Binding<ScrollPosition>
-        }
-        set {
-            let dictionary = Thread.current.threadDictionary
-            if let newValue {
-                dictionary[threadKey] = newValue
-            }
-            else {
-                dictionary.removeObject(forKey: threadKey)
-            }
-        }
+        taskBinding.binding
     }
 }
 

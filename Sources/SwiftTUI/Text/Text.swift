@@ -204,10 +204,15 @@ enum TextLineLimitContext {
 
     private static let threadKey = "SwiftTUI.TextLineLimitContext"
 
+    @TaskLocal
+    private static var taskCurrent = TextLineLimit(
+        number: nil,
+        reservesSpace: false
+    )
+
     static var current: TextLineLimit {
         get {
-            Thread.current.threadDictionary[threadKey] as? TextLineLimit
-                ?? TextLineLimit(number: nil, reservesSpace: false)
+            taskCurrent
         }
         set {
             Thread.current.threadDictionary[threadKey] = newValue
@@ -218,12 +223,20 @@ enum TextLineLimitContext {
         _ lineLimit: TextLineLimit,
         perform operation: () -> Value
     ) -> Value {
-        let previous = current
-        current = lineLimit
-        defer {
-            current = previous
-        }
+        $taskCurrent.withValue(lineLimit) {
+            let previous = Thread.current.threadDictionary[threadKey]
+                as? TextLineLimit
+            Thread.current.threadDictionary[threadKey] = lineLimit
+            defer {
+                if let previous {
+                    Thread.current.threadDictionary[threadKey] = previous
+                }
+                else {
+                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
+                }
+            }
 
-        return operation()
+            return operation()
+        }
     }
 }
