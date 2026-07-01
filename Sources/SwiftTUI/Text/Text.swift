@@ -1,4 +1,31 @@
 import Foundation
+import Terminal
+
+/// A terminal SGR color.
+public typealias Color = Terminal.SGR.Color
+
+/// A 16-color terminal SGR color.
+public typealias Color16 = Terminal.SGR.Color16
+
+/// A 256-color terminal SGR color.
+public typealias Color256 = Terminal.SGR.Color256
+
+/// A true-color terminal SGR color.
+public typealias TrueColor = Terminal.SGR.TrueColor
+
+/// The default terminal color.
+public enum DefaultColor: Color {
+
+    case `default`
+
+    public var background: String {
+        "49"
+    }
+
+    public var foreground: String {
+        "39"
+    }
+}
 
 /// A view that displays text in the terminal.
 public struct Text: View, Equatable, Sendable {
@@ -12,47 +39,21 @@ public struct Text: View, Equatable, Sendable {
     }
 }
 
-/// A terminal foreground color.
-public enum TerminalColor: Equatable, Sendable {
+struct AnyColor: Color {
 
-    case `default`
+    let background: String
 
-    case black
+    let foreground: String
 
-    case red
-
-    case green
-
-    case yellow
-
-    case blue
-
-    case magenta
-
-    case cyan
-
-    case white
-
-    case brightBlack
-
-    case brightRed
-
-    case brightGreen
-
-    case brightYellow
-
-    case brightBlue
-
-    case brightMagenta
-
-    case brightCyan
-
-    case brightWhite
+    init<C: Color>(_ color: C) {
+        self.background = color.background
+        self.foreground = color.foreground
+    }
 }
 
 struct TextStyle: Equatable, Sendable {
 
-    var color: TerminalColor?
+    var color: AnyColor?
 
     var isBold: Bool
 
@@ -120,7 +121,31 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
 public extension View {
 
     /// Sets the terminal foreground color for text within this view.
-    func color(_ color: TerminalColor) -> some View {
+    func color(_ color: Color16) -> some View {
+        foregroundColor(AnyColor(color))
+    }
+
+    /// Sets the terminal foreground color for text within this view.
+    func color(_ color: Color256) -> some View {
+        foregroundColor(AnyColor(color))
+    }
+
+    /// Sets the terminal foreground color for text within this view.
+    func color(_ color: TrueColor) -> some View {
+        foregroundColor(AnyColor(color))
+    }
+
+    /// Sets the terminal foreground color for text within this view.
+    func color(_ color: DefaultColor) -> some View {
+        foregroundColor(AnyColor(color))
+    }
+
+    /// Sets the terminal foreground color for text within this view.
+    func color<C: Color>(_ color: C) -> some View {
+        foregroundColor(AnyColor(color))
+    }
+
+    private func foregroundColor(_ color: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
             $0.color = color
         }

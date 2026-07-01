@@ -1,5 +1,5 @@
 {
-  "originHash" : "8a11f93dce392187da55e0c6df06a863106d5777f3336fd5bcdeb11714e6a87b",
+  "originHash" : "d20b148d334a88f121366cbdb95d28fa40ef661c1f814bfab75a3e61f49514b4",
   "pins" : [
     {
       "identity" : "opencombine",
@@ -34,7 +34,7 @@
       "location" : "https://github.com/minacle/swift-terminal",
       "state" : {
         "branch" : "main",
-        "revision" : "7a063ee497c5ab22c0f747eb0ec170ffe0ed2951"
+        "revision" : "1f45bc5860f008543cd9a718fb1e66920ef9411d"
       }
     },
     {

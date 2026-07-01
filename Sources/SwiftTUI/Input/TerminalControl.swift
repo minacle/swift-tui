@@ -29,8 +29,6 @@ enum TerminalControl {
 
     static let clearScreenSequence = "\u{001B}[2J"
 
-    static let resetSGRSequence = "\u{001B}[0m"
-
     static let hideCursorSequence = "\u{001B}[?25l"
 
     static let showCursorSequence = "\u{001B}[?25h"
@@ -48,61 +46,37 @@ enum TerminalControl {
     }
 
     static func sgrSequence(for style: TextStyle) -> String {
-        var codes: [Int] = []
+        var sequences: [String] = []
         if style.isBold {
-            codes.append(1)
+            sequences.append(Terminal.SGR.style(.bold))
         }
         if style.isDim {
-            codes.append(2)
+            sequences.append(Terminal.SGR.style(.dim))
         }
         if let color = style.color {
-            codes.append(sgrCode(for: color))
+            sequences.append(foregroundSGRSequence(for: color))
         }
 
-        guard !codes.isEmpty else {
-            return ""
-        }
-
-        return "\u{001B}[\(codes.map(String.init).joined(separator: ";"))m"
+        return sequences.joined()
     }
 
-    private static func sgrCode(for color: TerminalColor) -> Int {
-        switch color {
-        case .default:
-            return 39
-        case .black:
-            return 30
-        case .red:
-            return 31
-        case .green:
-            return 32
-        case .yellow:
-            return 33
-        case .blue:
-            return 34
-        case .magenta:
-            return 35
-        case .cyan:
-            return 36
-        case .white:
-            return 37
-        case .brightBlack:
-            return 90
-        case .brightRed:
-            return 91
-        case .brightGreen:
-            return 92
-        case .brightYellow:
-            return 93
-        case .brightBlue:
-            return 94
-        case .brightMagenta:
-            return 95
-        case .brightCyan:
-            return 96
-        case .brightWhite:
-            return 97
+    static func resetSGRSequence(for style: TextStyle) -> String {
+        var sequences: [String] = []
+        if style.isBold {
+            sequences.append(Terminal.SGR.resetStyle(.bold))
         }
+        else if style.isDim {
+            sequences.append(Terminal.SGR.resetStyle(.dim))
+        }
+        if style.color != nil {
+            sequences.append(Terminal.SGR.resetForegroundColor)
+        }
+
+        return sequences.joined()
+    }
+
+    private static func foregroundSGRSequence(for color: AnyColor) -> String {
+        Terminal.SGR.foregroundColor(color)
     }
 
     static func currentTerminalSize() -> TerminalViewportSize {

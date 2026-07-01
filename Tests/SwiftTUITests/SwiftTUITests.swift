@@ -41,12 +41,12 @@ import Testing
         RenderedRun(
             text: "A",
             row: 0,
-            style: TextStyle(color: .red, isBold: true, isDim: true)
+            style: TextStyle(color: AnyColor(Color16.red), isBold: true, isDim: true)
         ),
         RenderedRun(
             text: "B",
             row: 1,
-            style: TextStyle(color: .default, isBold: false)
+            style: TextStyle(color: AnyColor(DefaultColor.default), isBold: false)
         ),
     ])
     #expect(block?.lines == ["A", "B"])
@@ -65,7 +65,7 @@ import Testing
             text: "A",
             row: 1,
             column: 1,
-            style: TextStyle(color: .blue, isBold: false)
+            style: TextStyle(color: AnyColor(Color16.blue), isBold: false)
         ),
     ])
     #expect(block?.lines == ["    ", " A  ", "    "])
@@ -223,7 +223,11 @@ import Testing
     #expect(ViewResolver.block(from: textField)?.runs == [
         RenderedRun(
             text: "mayu",
-            style: TextStyle(color: .brightGreen, isBold: true, isDim: true)
+            style: TextStyle(
+                color: AnyColor(Color16.brightGreen),
+                isBold: true,
+                isDim: true
+            )
         ),
     ])
 }
@@ -2186,7 +2190,7 @@ import Testing
     #expect(block?.runs == [
         RenderedRun(
             text: "CDE",
-            style: TextStyle(color: .magenta, isBold: false)
+            style: TextStyle(color: AnyColor(Color16.magenta), isBold: false)
         ),
     ])
     #expect(block?.lines == ["CDE"])
@@ -2250,7 +2254,37 @@ import Testing
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
-    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[31mA\u{001B}[0m\u{001B}[?25l")
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[31mA\u{001B}[39m\u{001B}[?25l")
+}
+
+@Test func screenOutputRendersColor256ForegroundSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").color(Color256(rawValue: 196)))!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[38;5;196mA\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func screenOutputRendersTrueColorForegroundSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(
+            from: Text("A").color(TrueColor(red: 1, green: 2, blue: 3))
+        )!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[38;2;1;2;3mA\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
 }
 
 @Test func screenOutputRendersBoldSGR() {
@@ -2259,7 +2293,7 @@ import Testing
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
-    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[1mA\u{001B}[0m\u{001B}[?25l")
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[1mA\u{001B}[22m\u{001B}[?25l")
 }
 
 @Test func screenOutputRendersDimSGR() {
@@ -2268,7 +2302,7 @@ import Testing
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
-    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[2mA\u{001B}[0m\u{001B}[?25l")
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[2mA\u{001B}[22m\u{001B}[?25l")
 }
 
 @Test func screenOutputRendersCombinedStyleInDeterministicOrder() {
@@ -2277,7 +2311,14 @@ import Testing
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
-    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[1;2;96mA\u{001B}[0m\u{001B}[?25l")
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[1m\u{001B}[2m\u{001B}[96m"
+            + "A"
+            + "\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
 }
 
 @Test func screenOutputRendersDefaultForegroundOverride() {
@@ -2300,8 +2341,11 @@ import Testing
     #expect(
         output
             == "\u{001B}[2J"
-            + "\u{001B}[1;1H\u{001B}[1;2;31mA\u{001B}[0m"
-            + "\u{001B}[2;1H\u{001B}[39mB\u{001B}[0m"
+            + "\u{001B}[1;1H"
+            + "\u{001B}[1m\u{001B}[2m\u{001B}[31m"
+            + "A"
+            + "\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[2;1H\u{001B}[39mB\u{001B}[39m"
             + "\u{001B}[?25l"
     )
 }
@@ -2330,7 +2374,14 @@ import Testing
         in: TerminalViewportSize(columns: 3, rows: 1)
     )
 
-    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[2;34mABC\u{001B}[0m\u{001B}[?25l")
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[2m\u{001B}[34m"
+            + "ABC"
+            + "\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
 }
 
 @Test func screenOutputPositionsRenderedCursorAfterWideText() {

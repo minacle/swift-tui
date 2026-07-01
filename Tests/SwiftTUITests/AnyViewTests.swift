@@ -70,7 +70,7 @@ struct AnyViewTests {
         #expect(ViewResolver.block(from: marked)?.runs == [
             RenderedRun(
                 text: "●",
-                style: TextStyle(color: .green, isBold: false)
+                style: TextStyle(color: AnyColor(Color16.green), isBold: false)
             ),
             RenderedRun(text: "title", column: 1),
         ])

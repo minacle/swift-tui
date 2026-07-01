@@ -1430,7 +1430,7 @@ enum TextRenderer {
 
         return TerminalControl.sgrSequence(for: run.style)
             + run.text
-            + TerminalControl.resetSGRSequence
+            + TerminalControl.resetSGRSequence(for: run.style)
     }
 
     private static func cursorSequence(
