@@ -5,6 +5,7 @@ import Combine
 import OpenCombine
 #endif
 import Testing
+import Terminal
 @testable import SwiftTUI
 
 @Test func textPreservesContent() {
@@ -2683,6 +2684,102 @@ import Testing
     #expect(probe.events == ["parent"])
 }
 
+@Test func taskStartsOnceForStableIdentity() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+    let view = Text("A")
+        .task {
+            probe.record("start")
+        }
+
+    #expect(runtime.block(from: view)?.text == "A")
+    await probe.waitForCount(1)
+    #expect(probe.events == ["start"])
+
+    #expect(runtime.block(from: view)?.text == "A")
+    await Task.yield()
+    #expect(probe.events == ["start"])
+}
+
+@Test func taskAcceptsSwiftUILikeMetadataArguments() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+    let view = Text("A")
+        .task(
+            name: "metadata",
+            priority: .userInitiated,
+            file: "SwiftTUITests.swift",
+            line: 1
+        ) {
+            probe.record("metadata")
+        }
+
+    #expect(runtime.block(from: view)?.text == "A")
+    await probe.waitForCount(1)
+    #expect(probe.events == ["metadata"])
+}
+
+@Test func taskIDChangeCancelsAndRestarts() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+
+    #expect(runtime.block(from: IdentifiedTaskView(id: 1, probe: probe))?.text == "1")
+    await probe.waitForCount(1)
+
+    #expect(runtime.block(from: IdentifiedTaskView(id: 1, probe: probe))?.text == "1")
+    await Task.yield()
+    #expect(probe.events == ["start 1"])
+
+    #expect(runtime.block(from: IdentifiedTaskView(id: 2, probe: probe))?.text == "2")
+    await probe.waitForCount(3)
+    let events = probe.events
+    #expect(events.contains("cancel 1"))
+    #expect(events.contains("start 2"))
+
+    _ = runtime.block(from: EmptyView())
+}
+
+@Test func taskIDAcceptsSwiftUILikeMetadataArguments() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+    let view = Text("A")
+        .task(
+            id: 1,
+            name: "metadata-id",
+            priority: .userInitiated,
+            file: "SwiftTUITests.swift",
+            line: 1
+        ) {
+            probe.record("metadata-id")
+        }
+
+    #expect(runtime.block(from: view)?.text == "A")
+    await probe.waitForCount(1)
+    #expect(probe.events == ["metadata-id"])
+}
+
+@Test func taskCancelsWhenViewDisappears() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+
+    #expect(runtime.block(from: ConditionalTaskView(isVisible: true, probe: probe))?.text == "A")
+    await probe.waitForCount(1)
+
+    #expect(runtime.block(from: ConditionalTaskView(isVisible: false, probe: probe)) == nil)
+    await probe.waitForCount(2)
+    #expect(probe.events == ["start", "cancel"])
+}
+
+@Test func taskStateMutationAfterAwaitInvalidatesAndRerenders() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+
+    #expect(runtime.block(from: TaskStateMutationView(probe: probe))?.text == "idle")
+    await probe.waitForCount(1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: TaskStateMutationView(probe: probe))?.text == "done")
+}
+
 @Test func forEachReorderDoesNotTriggerLifecycleActions() {
     let runtime = StateRuntime()
     let probe = LifecycleProbe()
@@ -4163,6 +4260,26 @@ private final class LifecycleProbe {
     var events: [String] = []
 }
 
+@MainActor
+private final class AsyncTaskProbe {
+
+    var events: [String] = []
+
+    func record(_ event: String) {
+        events.append(event)
+    }
+
+    func waitForCount(_ count: Int) async {
+        for _ in 0..<100 {
+            if events.count >= count {
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
+}
+
 private final class TerminateActionProbe {
 
     var action: TerminateAction?
@@ -4283,6 +4400,64 @@ private struct EnvironmentLifecycleView: View {
         Text("marker")
             .onAppear {
                 probe.events.append(marker)
+            }
+    }
+}
+
+private struct IdentifiedTaskView: View {
+
+    let id: Int
+
+    let probe: AsyncTaskProbe
+
+    var body: some View {
+        Text("\(id)")
+            .task(id: id) {
+                probe.record("start \(id)")
+                do {
+                    try await Task.sleep(nanoseconds: 60_000_000_000)
+                }
+                catch {
+                    probe.record("cancel \(id)")
+                }
+            }
+    }
+}
+
+private struct ConditionalTaskView: View {
+
+    let isVisible: Bool
+
+    let probe: AsyncTaskProbe
+
+    var body: some View {
+        if isVisible {
+            Text("A")
+                .task {
+                    probe.record("start")
+                    do {
+                        try await Task.sleep(nanoseconds: 60_000_000_000)
+                    }
+                    catch {
+                        probe.record("cancel")
+                    }
+                }
+        }
+    }
+}
+
+private struct TaskStateMutationView: View {
+
+    let probe: AsyncTaskProbe
+
+    @State private var status = "idle"
+
+    var body: some View {
+        Text(status)
+            .task {
+                await Task.yield()
+                status = "done"
+                probe.record("done")
             }
     }
 }

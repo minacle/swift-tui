@@ -1,5 +1,5 @@
 /// Horizontal alignment for views arranged in a ``VStack``.
-public enum HorizontalAlignment: Equatable, Sendable {
+public nonisolated enum HorizontalAlignment: Equatable, Sendable {
 
     case leading
 
@@ -9,7 +9,7 @@ public enum HorizontalAlignment: Equatable, Sendable {
 }
 
 /// Vertical alignment for views arranged in an ``HStack``.
-public enum VerticalAlignment: Equatable, Sendable {
+public nonisolated enum VerticalAlignment: Equatable, Sendable {
 
     case top
 
@@ -19,7 +19,7 @@ public enum VerticalAlignment: Equatable, Sendable {
 }
 
 /// A view that arranges its children from left to right.
-public struct HStack<Content: View>: View {
+public nonisolated struct HStack<Content: View>: View {
 
     public typealias Body = Never
 
@@ -41,7 +41,7 @@ public struct HStack<Content: View>: View {
 }
 
 /// A view that arranges its children from top to bottom.
-public struct VStack<Content: View>: View {
+public nonisolated struct VStack<Content: View>: View {
 
     public typealias Body = Never
 

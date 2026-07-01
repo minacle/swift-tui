@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// A set of key modifiers that can accompany an input event.
 public struct EventModifiers: OptionSet, Sendable {

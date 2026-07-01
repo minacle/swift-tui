@@ -1,5 +1,5 @@
 /// A proposed terminal-cell size for a view.
-public struct ProposedViewSize: Equatable, Sendable {
+public nonisolated struct ProposedViewSize: Equatable, Sendable {
 
     public var columns: Int?
 
@@ -16,7 +16,7 @@ public struct ProposedViewSize: Equatable, Sendable {
 }
 
 /// The measured dimensions of a layout subview.
-public struct LayoutSubviewDimensions: Equatable, Sendable {
+public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
 
     public let size: GeometrySize
 
@@ -42,7 +42,7 @@ public struct LayoutSubviewDimensions: Equatable, Sendable {
 }
 
 /// A proxy that represents one subview of a layout.
-public struct LayoutSubview {
+public nonisolated struct LayoutSubview: Equatable {
 
     let index: Int
 
@@ -81,7 +81,7 @@ public struct LayoutSubview {
 }
 
 /// A collection of proxies that represent the subviews of a layout view.
-public struct LayoutSubviews: RandomAccessCollection {
+public nonisolated struct LayoutSubviews: Equatable, RandomAccessCollection, @unchecked Sendable {
 
     public typealias Index = Int
 
@@ -100,8 +100,16 @@ public struct LayoutSubviews: RandomAccessCollection {
     }
 }
 
+public extension LayoutSubview {
+
+    nonisolated static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
+        lhs.index == rhs.index
+    }
+}
+
 /// A type that defines the geometry of a collection of views.
-public protocol Layout {
+@preconcurrency
+public nonisolated protocol Layout: Sendable {
 
     associatedtype Cache = Void
 
@@ -127,12 +135,12 @@ public protocol Layout {
 
 public extension Layout where Cache == Void {
 
-    func makeCache(subviews: Subviews) {}
+    nonisolated func makeCache(subviews: Subviews) {}
 }
 
 public extension Layout {
 
-    func updateCache(_ cache: inout Cache, subviews: Subviews) {}
+    nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {}
 
     func callAsFunction<Content: View>(
         @ViewBuilder _ content: () -> Content
@@ -311,7 +319,7 @@ extension LayoutContainer: LayoutRenderable {
     }
 }
 
-final class LayoutPlacementStore {
+nonisolated final class LayoutPlacementStore {
 
     private(set) var placements: [LayoutPlacement] = []
 
@@ -340,14 +348,14 @@ private extension ProposedViewSize {
         self.init(columns: proposal?.columns, rows: proposal?.rows)
     }
 
-    var renderProposal: RenderProposal {
+    nonisolated var renderProposal: RenderProposal {
         RenderProposal(columns: columns, rows: rows)
     }
 }
 
 private extension RenderedElement {
 
-    func layoutSize(proposal: RenderProposal) -> GeometrySize {
+    nonisolated func layoutSize(proposal: RenderProposal) -> GeometrySize {
         switch self {
         case .block(let block):
             return GeometrySize(columns: block.width, rows: block.height)

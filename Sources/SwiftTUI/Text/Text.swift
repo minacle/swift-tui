@@ -1,5 +1,5 @@
 import Foundation
-import Terminal
+public import Terminal
 
 /// A terminal SGR color.
 public typealias Color = Terminal.SGR.Color
@@ -14,7 +14,7 @@ public typealias Color256 = Terminal.SGR.Color256
 public typealias TrueColor = Terminal.SGR.TrueColor
 
 /// The default terminal color.
-public enum DefaultColor: Color {
+public nonisolated enum DefaultColor: Color {
 
     case `default`
 
@@ -28,7 +28,7 @@ public enum DefaultColor: Color {
 }
 
 /// A view that displays text in the terminal.
-public struct Text: View, Equatable, Sendable {
+public nonisolated struct Text: View, Equatable, Sendable {
 
     public typealias Body = Never
 
@@ -39,7 +39,7 @@ public struct Text: View, Equatable, Sendable {
     }
 }
 
-struct AnyColor: Color {
+nonisolated struct AnyColor: Color {
 
     let background: String
 
@@ -51,7 +51,7 @@ struct AnyColor: Color {
     }
 }
 
-struct TextStyle: Equatable, Sendable {
+nonisolated struct TextStyle: Equatable, Sendable {
 
     var color: AnyColor?
 
@@ -66,7 +66,7 @@ struct TextStyle: Equatable, Sendable {
     }
 }
 
-struct TextLineLimit: Equatable, Sendable {
+nonisolated struct TextLineLimit: Equatable, Sendable {
 
     let number: Int?
 
@@ -202,8 +202,6 @@ private struct TextStyleKey: EnvironmentKey {
 
 enum TextLineLimitContext {
 
-    private static let threadKey = "SwiftTUI.TextLineLimitContext"
-
     @TaskLocal
     private static var taskCurrent = TextLineLimit(
         number: nil,
@@ -211,12 +209,7 @@ enum TextLineLimitContext {
     )
 
     static var current: TextLineLimit {
-        get {
-            taskCurrent
-        }
-        set {
-            Thread.current.threadDictionary[threadKey] = newValue
-        }
+        taskCurrent
     }
 
     static func withLineLimit<Value>(
@@ -224,18 +217,6 @@ enum TextLineLimitContext {
         perform operation: () -> Value
     ) -> Value {
         $taskCurrent.withValue(lineLimit) {
-            let previous = Thread.current.threadDictionary[threadKey]
-                as? TextLineLimit
-            Thread.current.threadDictionary[threadKey] = lineLimit
-            defer {
-                if let previous {
-                    Thread.current.threadDictionary[threadKey] = previous
-                }
-                else {
-                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
-                }
-            }
-
             return operation()
         }
     }

@@ -1,4 +1,6 @@
 /// A top-level description of terminal content.
+@MainActor
+@preconcurrency
 public protocol Scene {}
 
 public protocol _LimitedAvailabilitySceneMarker {}
@@ -31,10 +33,11 @@ enum SceneResolver {
 }
 
 /// The single terminal window used by a SwiftTUI app.
-public struct WindowGroup<Content: View>: RootScene {
+public nonisolated struct WindowGroup<Content: View>: RootScene {
 
     let root: Content
 
+    @MainActor
     public init(@ViewBuilder content: () -> Content) {
         self.root = content()
     }
@@ -48,7 +51,7 @@ extension WindowGroup: SceneRootResolving {
 }
 
 /// A scene builder result that marks content from an availability-limited branch.
-public struct LimitedAvailabilityScene<Content: Scene>: Scene, _LimitedAvailabilitySceneMarker {
+public nonisolated struct LimitedAvailabilityScene<Content: Scene>: Scene, _LimitedAvailabilitySceneMarker {
 
     let scene: Content
 
@@ -65,7 +68,7 @@ extension LimitedAvailabilityScene: SceneRootResolving {
 }
 
 /// A scene builder result that includes availability-limited content when available.
-public struct OptionalScene<Content>: Scene where Content: Scene & _LimitedAvailabilitySceneMarker {
+public nonisolated struct OptionalScene<Content>: Scene where Content: Scene & _LimitedAvailabilitySceneMarker {
 
     let scene: Content?
 

@@ -2,10 +2,21 @@
 
 import PackageDescription
 
+let swiftSettings: [SwiftSetting] = [
+    .defaultIsolation(MainActor.self),
+    .strictMemorySafety(),
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("ImmutableWeakCaptures"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
+
 let package = Package(
     name: "swift-tui",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v15),
     ],
     products: [
         .library(
@@ -52,11 +63,13 @@ let package = Package(
                     package: "OpenCombine",
                     condition: .when(platforms: [.linux])
                 ),
-            ]
+            ],
+            swiftSettings: swiftSettings,
         ),
         .testTarget(
             name: "SwiftTUITests",
             dependencies: ["SwiftTUI"],
+            swiftSettings: swiftSettings,
         ),
     ],
     swiftLanguageModes: [.v6],

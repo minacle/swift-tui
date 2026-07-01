@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 #if canImport(Combine)
 public import Combine
 #else
@@ -110,6 +110,19 @@ public extension State where Value: ExpressibleByNilLiteral {
     }
 }
 
+protocol DynamicStateProperty {
+
+    @MainActor
+    func materialize()
+}
+
+extension State: DynamicStateProperty {
+
+    func materialize() {
+        _ = cell
+    }
+}
+
 /// A property wrapper type that instantiates an observable object.
 @propertyWrapper
 public struct StateObject<ObjectType: ObservableObject> {
@@ -138,6 +151,13 @@ public struct StateObject<ObjectType: ObservableObject> {
         }
 
         return context.stateObjectCell(for: storage)
+    }
+}
+
+extension StateObject: DynamicStateProperty {
+
+    func materialize() {
+        _ = cell
     }
 }
 
@@ -202,6 +222,13 @@ public struct ObservedObject<ObjectType: ObservableObject> {
     }
 }
 
+extension ObservedObject: DynamicStateProperty {
+
+    func materialize() {
+        _ = cell
+    }
+}
+
 /// A property wrapper type that can read and write the current focus location.
 @propertyWrapper
 public struct FocusState<Value: Hashable> {
@@ -246,6 +273,13 @@ public struct FocusState<Value: Hashable> {
     }
 }
 
+extension FocusState: DynamicStateProperty {
+
+    func materialize() {
+        _ = cell
+    }
+}
+
 public extension FocusState {
 
     /// A property wrapper type that can read and write a focus state value.
@@ -287,6 +321,8 @@ final class StateRuntime {
 
     private let lifecycle = LifecycleRuntime()
 
+    private let tasks = ViewTaskRuntime()
+
     private let change = ChangeRuntime()
 
     private var textFieldStates: [[Int]: TextFieldState] = [:]
@@ -316,6 +352,7 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
+        tasks.beginRender()
         change.beginRender()
         terminationHandler = nil
         defer {
@@ -324,6 +361,7 @@ final class StateRuntime {
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
             change.finishRender(perform: performChangeHandler)
+            tasks.finishRender(start: startTask)
             removePendingStateSubtrees()
         }
 
@@ -346,6 +384,7 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
+        tasks.beginRender()
         change.beginRender()
         terminationHandler = nil
         defer {
@@ -354,6 +393,7 @@ final class StateRuntime {
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
             change.finishRender(perform: performChangeHandler)
+            tasks.finishRender(start: startTask)
             removePendingStateSubtrees()
         }
 
@@ -641,6 +681,14 @@ final class StateRuntime {
         lifecycle.register(handler, at: path)
     }
 
+    func registerTaskHandler(_ handler: ViewTaskHandler, at path: [Int]) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        tasks.register(handler, at: path)
+    }
+
     func registerChangeHandler(_ handler: ChangeHandler, at path: [Int]) {
         guard !suppressRenderRegistrations else {
             return
@@ -778,6 +826,16 @@ final class StateRuntime {
         input.updateRootFrame(frame)
     }
 
+    func materializeDynamicProperties(in value: Any) {
+        for child in Mirror(reflecting: value).children {
+            guard let property = child.value as? any DynamicStateProperty else {
+                continue
+            }
+
+            property.materialize()
+        }
+    }
+
     private func performKeyPress(
         at path: [Int],
         operation: () -> KeyPress.Result
@@ -799,6 +857,44 @@ final class StateRuntime {
                 handler.action()
             }
         }
+    }
+
+    private func startTask(
+        identity: LifecycleIdentity,
+        handler: ViewTaskHandler
+    ) -> Task<Void, Never> {
+        let operation: @MainActor () async -> Void = {
+            [weak self] in
+
+            guard let self else {
+                return
+            }
+
+            await EnvironmentRenderContext.withValues(handler.environment) {
+                await self.withView(at: handler.actionPath) {
+                    await handler.action()
+                }
+            }
+
+            completeTask(identity, id: handler.id)
+        }
+
+        if let executorPreference = handler.executorPreference {
+            return Task.detached(
+                executorPreference: executorPreference,
+                priority: handler.priority
+            ) {
+                await operation()
+            }
+        }
+
+        return Task.detached(priority: handler.priority) {
+            await operation()
+        }
+    }
+
+    private func completeTask(_ identity: LifecycleIdentity, id: ViewTaskID?) {
+        tasks.complete(identity, id: id)
     }
 
     private func environmentRestoringKeyPressHandler(
@@ -823,6 +919,15 @@ final class StateRuntime {
     ) -> Value {
         let context = StateRenderContext(runtime: self, path: path, mode: mode)
         return StateRenderContext.withCurrent(context, perform: operation)
+    }
+
+    func withView<Value>(
+        at path: [Int],
+        mode: StateRenderContextMode = .action,
+        perform operation: () async -> Value
+    ) async -> Value {
+        let context = StateRenderContext(runtime: self, path: path, mode: mode)
+        return await StateRenderContext.withCurrent(context, perform: operation)
     }
 
     func withoutRenderRegistrations<Value>(_ operation: () -> Value) -> Value {
@@ -1216,7 +1321,7 @@ enum StateRenderContextMode {
     case action
 }
 
-private final class StateRenderContext: @unchecked Sendable {
+private nonisolated final class StateRenderContext: @unchecked Sendable {
 
     @TaskLocal
     private static var taskCurrent: StateRenderContext?
@@ -1229,7 +1334,7 @@ private final class StateRenderContext: @unchecked Sendable {
 
     private var nextSlot = 0
 
-    static var current: StateRenderContext? {
+    nonisolated static var current: StateRenderContext? {
         taskCurrent
     }
 
@@ -1242,12 +1347,22 @@ private final class StateRenderContext: @unchecked Sendable {
         }
     }
 
+    static func withCurrent<Value>(
+        _ context: StateRenderContext,
+        perform operation: () async -> Value
+    ) async -> Value {
+        await $taskCurrent.withValue(context) {
+            await operation()
+        }
+    }
+
     init(runtime: StateRuntime, path: [Int], mode: StateRenderContextMode) {
         self.runtime = runtime
         self.path = path
         self.mode = mode
     }
 
+    @MainActor
     func cell<Value>(for storage: StateStorage<Value>) -> StateCell<Value> {
         let valueType = ObjectIdentifier(Value.self)
         let storageID = ObjectIdentifier(storage)
@@ -1276,6 +1391,7 @@ private final class StateRenderContext: @unchecked Sendable {
         )
     }
 
+    @MainActor
     func focusCell<Value: Hashable>(
         for storage: FocusStateStorage<Value>
     ) -> FocusCell<Value> {
@@ -1306,6 +1422,7 @@ private final class StateRenderContext: @unchecked Sendable {
         )
     }
 
+    @MainActor
     func stateObjectCell<ObjectType: ObservableObject>(
         for storage: StateObjectStorage<ObjectType>
     ) -> ObservableObjectCell<ObjectType> {
@@ -1336,6 +1453,7 @@ private final class StateRenderContext: @unchecked Sendable {
         )
     }
 
+    @MainActor
     func observedObjectCell<ObjectType: ObservableObject>(
         for storage: ObservedObjectStorage<ObjectType>
     ) -> ObservableObjectCell<ObjectType> {
@@ -1366,6 +1484,7 @@ private final class StateRenderContext: @unchecked Sendable {
         )
     }
 
+    @MainActor
     private func renderResolvedKey(
         storedKey: StateKey?,
         storageID: ObjectIdentifier,
@@ -1387,6 +1506,7 @@ private final class StateRenderContext: @unchecked Sendable {
         return key
     }
 
+    @MainActor
     private func actionResolvedKey(
         storageID: ObjectIdentifier,
         kind: StateKey.Kind,
@@ -1408,6 +1528,7 @@ private final class StateRenderContext: @unchecked Sendable {
         )
     }
 
+    @MainActor
     private func renderKey(
         kind: StateKey.Kind,
         valueType: ObjectIdentifier
@@ -1424,7 +1545,7 @@ private final class StateRenderContext: @unchecked Sendable {
     }
 }
 
-enum StateContext {
+nonisolated enum StateContext {
 
     static var currentPath: [Int]? {
         StateRenderContext.current?.path

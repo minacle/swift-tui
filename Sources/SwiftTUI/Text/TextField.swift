@@ -1,7 +1,7 @@
 import Foundation
 
 /// A control that displays editable single-line text in the terminal.
-public struct TextField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
+public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
 
     public typealias Body = Never
 
@@ -401,8 +401,6 @@ final class TextFieldState {
 
 private enum SubmitContext {
 
-    private static let threadKey = "SwiftTUI.SubmitContext"
-
     private struct TaskAction: @unchecked Sendable {
 
         var action: SubmitAction?
@@ -412,18 +410,7 @@ private enum SubmitContext {
     private static var taskAction = TaskAction(action: nil)
 
     static var currentAction: SubmitAction? {
-        get {
-            taskAction.action
-        }
-        set {
-            let dictionary = Thread.current.threadDictionary
-            if let newValue {
-                dictionary[threadKey] = newValue
-            }
-            else {
-                dictionary.removeObject(forKey: threadKey)
-            }
-        }
+        taskAction.action
     }
 
     static func withAction<Value>(
@@ -431,18 +418,6 @@ private enum SubmitContext {
         perform operation: () -> Value
     ) -> Value {
         $taskAction.withValue(TaskAction(action: action)) {
-            let previous = Thread.current.threadDictionary[threadKey]
-                as? SubmitAction
-            Thread.current.threadDictionary[threadKey] = action
-            defer {
-                if let previous {
-                    Thread.current.threadDictionary[threadKey] = previous
-                }
-                else {
-                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
-                }
-            }
-
             return operation()
         }
     }

@@ -1,5 +1,5 @@
 /// A terminal-native size measured in character cells.
-public struct GeometrySize: Equatable, Sendable {
+public nonisolated struct GeometrySize: Equatable, Sendable {
 
     public let columns: Int
 
@@ -12,7 +12,7 @@ public struct GeometrySize: Equatable, Sendable {
 }
 
 /// A terminal-native point measured in character cells.
-public struct GeometryPoint: Equatable, Sendable {
+public nonisolated struct GeometryPoint: Equatable, Sendable {
 
     public let column: Int
 
@@ -25,7 +25,7 @@ public struct GeometryPoint: Equatable, Sendable {
 }
 
 /// A terminal-native rectangle measured in character cells.
-public struct GeometryFrame: Equatable, Sendable {
+public nonisolated struct GeometryFrame: Equatable, Sendable {
 
     public let origin: GeometryPoint
 
@@ -41,7 +41,7 @@ public struct GeometryFrame: Equatable, Sendable {
 }
 
 /// A proxy for access to the terminal size of a geometry reader.
-public struct GeometryProxy: Equatable, Sendable {
+public nonisolated struct GeometryProxy: Equatable, Sendable {
 
     public let size: GeometrySize
 
@@ -67,7 +67,7 @@ public struct GeometryProxy: Equatable, Sendable {
 }
 
 /// A container view that defines its content as a function of its terminal size.
-public struct GeometryReader<Content: View>: View {
+public nonisolated struct GeometryReader<Content: View>: View {
 
     public typealias Body = Never
 

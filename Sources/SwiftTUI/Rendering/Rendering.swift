@@ -1,6 +1,6 @@
 import Foundation
 
-struct TerminalViewportSize: Equatable, Sendable {
+nonisolated struct TerminalViewportSize: Equatable, Sendable {
 
     var columns: Int
 
@@ -12,7 +12,7 @@ struct TerminalViewportSize: Equatable, Sendable {
     }
 }
 
-struct TextFrame: Equatable, Sendable {
+nonisolated struct TextFrame: Equatable, Sendable {
 
     var text: String
 
@@ -21,7 +21,7 @@ struct TextFrame: Equatable, Sendable {
     var column: Int
 }
 
-struct RenderedRun: Equatable, Sendable {
+nonisolated struct RenderedRun: Equatable, Sendable {
 
     var text: String
 
@@ -132,7 +132,7 @@ struct RenderedRun: Equatable, Sendable {
     }
 }
 
-struct RenderedCursor: Equatable, Sendable {
+nonisolated struct RenderedCursor: Equatable, Sendable {
 
     var row: Int
 
@@ -144,7 +144,7 @@ struct RenderedCursor: Equatable, Sendable {
     }
 }
 
-struct RenderedRect: Equatable, Sendable {
+nonisolated struct RenderedRect: Equatable, Sendable {
 
     var x: Int
 
@@ -202,7 +202,7 @@ struct RenderedRect: Equatable, Sendable {
     }
 }
 
-struct RenderedHitRegion: Equatable, Sendable {
+nonisolated struct RenderedHitRegion: Equatable, Sendable {
 
     var path: [Int]
 
@@ -219,7 +219,7 @@ struct RenderedHitRegion: Equatable, Sendable {
     }
 }
 
-struct RenderedScrollRegion: Equatable, Sendable {
+nonisolated struct RenderedScrollRegion: Equatable, Sendable {
 
     var path: [Int]
 
@@ -236,7 +236,7 @@ struct RenderedScrollRegion: Equatable, Sendable {
     }
 }
 
-struct RenderedFocusRegion: Equatable, Sendable {
+nonisolated struct RenderedFocusRegion: Equatable, Sendable {
 
     var path: [Int]
 
@@ -253,7 +253,7 @@ struct RenderedFocusRegion: Equatable, Sendable {
     }
 }
 
-struct RenderedBlock: Equatable, Sendable {
+nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var runs: [RenderedRun]
 
@@ -566,7 +566,7 @@ struct RenderedBlock: Equatable, Sendable {
     }
 }
 
-struct RenderProposal: Equatable, Sendable {
+nonisolated struct RenderProposal: Equatable, Sendable {
 
     var columns: Int?
 
@@ -582,14 +582,14 @@ struct RenderProposal: Equatable, Sendable {
     }
 }
 
-enum RenderedElement: Equatable, Sendable {
+nonisolated enum RenderedElement: Equatable, Sendable {
 
     case block(RenderedBlock)
 
     case spacer(minLength: Int)
 }
 
-struct LayoutTraits: Sendable {
+nonisolated struct LayoutTraits: Sendable {
 
     var flexibleAxes: Axis.Set = []
 
@@ -607,7 +607,7 @@ protocol LayoutTraitRenderable {
     var layoutTraits: LayoutTraits { get }
 }
 
-struct StackChild {
+nonisolated struct StackChild {
 
     var traits: LayoutTraits
 
@@ -615,8 +615,6 @@ struct StackChild {
 }
 
 enum LayoutMeasurementContext {
-
-    private static let threadKey = "SwiftTUI.LayoutMeasurementContext"
 
     @TaskLocal
     private static var taskIsMeasuring = false
@@ -627,17 +625,6 @@ enum LayoutMeasurementContext {
 
     static func withMeasurement<Value>(_ operation: () -> Value) -> Value {
         $taskIsMeasuring.withValue(true) {
-            let previous = Thread.current.threadDictionary[threadKey] as? Bool
-            Thread.current.threadDictionary[threadKey] = true
-            defer {
-                if let previous {
-                    Thread.current.threadDictionary[threadKey] = previous
-                }
-                else {
-                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
-                }
-            }
-
             return operation()
         }
     }
@@ -846,7 +833,7 @@ extension LimitedAvailabilityViewContent: FlattenableViewContent {
     }
 }
 
-extension ForEach: FlattenableViewContent {
+extension ForEach: FlattenableViewContent where Content: View {
 
     func renderedElements(
         in proposal: RenderProposal?,
@@ -1211,7 +1198,8 @@ enum ViewResolver {
         }
 
         let body = runtime?.withView(at: path, mode: .render) {
-            view.body
+            runtime?.materializeDynamicProperties(in: view)
+            return view.body
         } ?? view.body
         return block(from: body, in: proposal, path: path + [0], runtime: runtime)
     }
@@ -1367,7 +1355,8 @@ enum ViewResolver {
         }
 
         let body = runtime?.withView(at: path, mode: .render) {
-            view.body
+            runtime?.materializeDynamicProperties(in: view)
+            return view.body
         } ?? view.body
         return element(from: body, in: proposal, path: path + [0], runtime: runtime)
     }

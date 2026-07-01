@@ -1,7 +1,7 @@
 public extension Edge {
 
     /// An efficient set of terminal rectangle edges.
-    struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
+    nonisolated struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
 
         public let rawValue: Int
 
@@ -45,7 +45,7 @@ public extension Edge {
 }
 
 /// The inset distances for the sides of a terminal rectangle.
-public struct EdgeInsets: Equatable, Sendable {
+public nonisolated struct EdgeInsets: Equatable, Sendable {
 
     public let top: Int
 
@@ -85,7 +85,7 @@ public struct EdgeInsets: Equatable, Sendable {
 }
 
 /// An alignment in both terminal axes.
-public struct Alignment: Equatable, Sendable {
+public nonisolated struct Alignment: Equatable, Sendable {
 
     public let horizontal: HorizontalAlignment
 

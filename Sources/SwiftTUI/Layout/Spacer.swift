@@ -1,5 +1,5 @@
 /// A flexible space that expands along the major axis of its containing stack.
-public struct Spacer: View, Equatable, Sendable {
+public nonisolated struct Spacer: View, Equatable, Sendable {
 
     public typealias Body = Never
 

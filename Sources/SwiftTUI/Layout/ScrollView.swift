@@ -1,7 +1,7 @@
 import Foundation
 
 /// A scrollable axis.
-public enum Axis: Sendable {
+public nonisolated enum Axis: Sendable {
 
     case horizontal
 
@@ -23,7 +23,7 @@ public enum Axis: Sendable {
 }
 
 /// An edge of a terminal rectangle.
-public enum Edge: Equatable, Hashable, Sendable {
+public nonisolated enum Edge: Equatable, Hashable, Sendable {
 
     case top
 
@@ -35,7 +35,7 @@ public enum Edge: Equatable, Hashable, Sendable {
 }
 
 /// A terminal-native point in scrollable content.
-public struct ScrollPoint: Equatable, Sendable {
+public nonisolated struct ScrollPoint: Equatable, Sendable {
 
     public let x: Int
 
@@ -48,7 +48,7 @@ public struct ScrollPoint: Equatable, Sendable {
 }
 
 /// A semantic position within a scroll view.
-public struct ScrollPosition: Equatable, Sendable {
+public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private enum Storage: Equatable, Sendable {
 
@@ -131,7 +131,7 @@ public struct ScrollPosition: Equatable, Sendable {
 }
 
 /// A scrollable view.
-public struct ScrollView<Content: View>: View {
+public nonisolated struct ScrollView<Content: View>: View {
 
     public typealias Body = Never
 
@@ -288,8 +288,6 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
 
 private enum ScrollPositionContext {
 
-    private static let threadKey = "SwiftTUI.ScrollPositionContext"
-
     private struct TaskBinding: @unchecked Sendable {
 
         var binding: Binding<ScrollPosition>?
@@ -307,18 +305,6 @@ private enum ScrollPositionContext {
         perform operation: () -> Value
     ) -> Value {
         $taskBinding.withValue(TaskBinding(binding: position)) {
-            let previous = Thread.current.threadDictionary[threadKey]
-                as? Binding<ScrollPosition>
-            Thread.current.threadDictionary[threadKey] = position
-            defer {
-                if let previous {
-                    Thread.current.threadDictionary[threadKey] = previous
-                }
-                else {
-                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
-                }
-            }
-
             return operation()
         }
     }

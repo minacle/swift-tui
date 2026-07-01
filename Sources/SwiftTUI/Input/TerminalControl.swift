@@ -184,7 +184,7 @@ enum TerminalControl {
         let milliseconds = timeout.map {
             max(Int32(($0 * 1_000).rounded(.up)), 0)
         } ?? -1
-        let result = poll(&descriptor, 1, milliseconds)
+        let result = unsafe poll(&descriptor, 1, milliseconds)
         if result < 0, errno == EINTR {
             return false
         }
@@ -456,5 +456,5 @@ final class TerminalSession {
     }
 }
 
-private func handleTerminalWindowChangeSignal(_: Int32) {
+private nonisolated func handleTerminalWindowChangeSignal(_: Int32) {
 }

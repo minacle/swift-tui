@@ -1,4 +1,4 @@
-enum TerminalText {
+nonisolated enum TerminalText {
 
     static func columnWidth(_ text: String) -> Int {
         text.unicodeScalars.reduce(into: 0) { width, scalar in
@@ -136,7 +136,7 @@ enum TerminalText {
 
 extension String {
 
-    func sliceCharacters(lowerBound: Int, upperBound: Int) -> String {
+    nonisolated func sliceCharacters(lowerBound: Int, upperBound: Int) -> String {
         let lowerOffset = max(min(lowerBound, count), 0)
         let upperOffset = max(min(max(upperBound, lowerOffset), count), 0)
         let lowerIndex = index(startIndex, offsetBy: lowerOffset)

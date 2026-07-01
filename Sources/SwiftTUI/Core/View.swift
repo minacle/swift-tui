@@ -1,4 +1,6 @@
 /// A type that represents a terminal user interface fragment.
+@MainActor
+@preconcurrency
 public protocol View {
 
     associatedtype Body: View = Never
@@ -78,7 +80,7 @@ public enum ViewBuilder {
 }
 
 /// A view builder result that renders optional content when present.
-public struct OptionalViewContent<Content: View>: View {
+public nonisolated struct OptionalViewContent<Content: View>: View {
 
     public typealias Body = Never
 
@@ -90,7 +92,7 @@ public struct OptionalViewContent<Content: View>: View {
 }
 
 /// A view builder result that renders one branch of conditional content.
-public struct ConditionalViewContent<TrueContent: View, FalseContent: View>: View {
+public nonisolated struct ConditionalViewContent<TrueContent: View, FalseContent: View>: View {
 
     public typealias Body = Never
 
@@ -113,7 +115,7 @@ public struct ConditionalViewContent<TrueContent: View, FalseContent: View>: Vie
 }
 
 /// A view builder result that marks content from an availability-limited branch.
-public struct LimitedAvailabilityViewContent<Content: View>: View {
+public nonisolated struct LimitedAvailabilityViewContent<Content: View>: View {
 
     public typealias Body = Never
 
@@ -125,7 +127,7 @@ public struct LimitedAvailabilityViewContent<Content: View>: View {
 }
 
 /// A view with no visible terminal output.
-public struct EmptyView: View {
+public nonisolated struct EmptyView: View {
 
     public typealias Body = Never
 
@@ -133,7 +135,7 @@ public struct EmptyView: View {
 }
 
 /// A view that collects multiple child views without adding layout of its own.
-public struct Group<Content: View>: View {
+public nonisolated struct Group<Content: View>: View {
 
     public typealias Body = Never
 
@@ -145,11 +147,9 @@ public struct Group<Content: View>: View {
 }
 
 /// A view that creates child views from identified collection data.
-public struct ForEach<Data, ID, Content>: View
-    where Data: RandomAccessCollection, ID: Hashable, Content: View
+public struct ForEach<Data, ID, Content>
+    where Data: RandomAccessCollection, ID: Hashable
 {
-
-    public typealias Body = Never
 
     public let data: Data
 
@@ -158,8 +158,16 @@ public struct ForEach<Data, ID, Content>: View
     public let content: (Data.Element) -> Content
 
     let contextPath: [Int]?
+}
 
-    public init(
+extension ForEach: View where Content: View {
+
+    public typealias Body = Never
+}
+
+public extension ForEach where Content: View {
+
+    init(
         _ data: Data,
         id: KeyPath<Data.Element, ID>,
         @ViewBuilder content: @escaping (Data.Element) -> Content
@@ -171,7 +179,8 @@ public struct ForEach<Data, ID, Content>: View
     }
 }
 
-public extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID {
+public extension ForEach
+where Data.Element: Identifiable, ID == Data.Element.ID, Content: View {
 
     init(
         _ data: Data,
@@ -181,7 +190,7 @@ public extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID
     }
 }
 
-public extension ForEach where Data == Range<Int>, ID == Int {
+public extension ForEach where Data == Range<Int>, ID == Int, Content: View {
 
     init(
         _ data: Range<Int>,
@@ -192,7 +201,7 @@ public extension ForEach where Data == Range<Int>, ID == Int {
 }
 
 /// A type-erased view.
-public struct AnyView: View {
+public nonisolated struct AnyView: View {
 
     public typealias Body = Never
 
@@ -203,7 +212,7 @@ public struct AnyView: View {
     }
 }
 
-struct ViewGroup: View {
+nonisolated struct ViewGroup: View {
 
     typealias Body = Never
 
@@ -214,20 +223,21 @@ struct ViewGroup: View {
     }
 }
 
-struct AnyViewStorage {
+nonisolated struct AnyViewStorage {
 
-    private let element: (RenderProposal?, [Int], StateRuntime?) -> RenderedElement?
+    private let element: @MainActor (RenderProposal?, [Int], StateRuntime?) -> RenderedElement?
 
-    private let elements: (RenderProposal?, [Int], StateRuntime?) -> [RenderedElement]
+    private let elements: @MainActor (RenderProposal?, [Int], StateRuntime?) -> [RenderedElement]
 
-    private let stackChildElements: (RenderProposal?, [Int], StateRuntime?) -> [StackChild]
+    private let stackChildElements: @MainActor (RenderProposal?, [Int], StateRuntime?) -> [StackChild]
 
-    private let traits: () -> LayoutTraits
+    private let traits: @MainActor () -> LayoutTraits
 
-    init<Content: View>(_ content: Content) {
+    nonisolated init<Content: View>(_ content: Content) {
+        let box = AnyViewStorageBox(content)
         self.element = { proposal, path, runtime in
             ViewResolver.element(
-                from: content,
+                from: box.content,
                 in: proposal,
                 path: path,
                 runtime: runtime
@@ -235,7 +245,7 @@ struct AnyViewStorage {
         }
         self.stackChildElements = { proposal, path, runtime in
             ViewResolver.stackChildren(
-                from: content,
+                from: box.content,
                 in: proposal,
                 path: path,
                 runtime: runtime
@@ -243,21 +253,23 @@ struct AnyViewStorage {
         }
         self.elements = { proposal, path, runtime in
             ViewResolver.elements(
-                from: content,
+                from: box.content,
                 in: proposal,
                 path: path,
                 runtime: runtime
             )
         }
         self.traits = {
-            ViewResolver.layoutTraits(from: content)
+            ViewResolver.layoutTraits(from: box.content)
         }
     }
 
+    @MainActor
     func renderedElement(in proposal: RenderProposal? = nil) -> RenderedElement? {
         renderedElement(in: proposal, path: [], runtime: nil)
     }
 
+    @MainActor
     func renderedElement(
         in proposal: RenderProposal?,
         path: [Int],
@@ -266,6 +278,7 @@ struct AnyViewStorage {
         element(proposal, path, runtime)
     }
 
+    @MainActor
     func renderedElements(
         in proposal: RenderProposal?,
         path: [Int],
@@ -274,6 +287,7 @@ struct AnyViewStorage {
         elements(proposal, path, runtime)
     }
 
+    @MainActor
     func stackChildren(
         in proposal: RenderProposal?,
         path: [Int],
@@ -282,19 +296,31 @@ struct AnyViewStorage {
         stackChildElements(proposal, path, runtime)
     }
 
+    @MainActor
     var layoutTraits: LayoutTraits {
         traits()
     }
 
+    @MainActor
     func renderedBlock() -> RenderedBlock? {
         renderedBlock(in: nil)
     }
 
+    @MainActor
     func renderedBlock(in proposal: RenderProposal?) -> RenderedBlock? {
         guard case .block(let block) = renderedElement(in: proposal) else {
             return nil
         }
 
         return block
+    }
+}
+
+private nonisolated final class AnyViewStorageBox<Content: View>: @unchecked Sendable {
+
+    let content: Content
+
+    init(_ content: Content) {
+        self.content = content
     }
 }

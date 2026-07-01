@@ -290,8 +290,6 @@ public extension View {
 
 enum EnvironmentRenderContext {
 
-    private static let threadKey = "SwiftTUI.EnvironmentRenderContext"
-
     private struct TaskValues: @unchecked Sendable {
 
         var values: EnvironmentValues
@@ -301,12 +299,7 @@ enum EnvironmentRenderContext {
     private static var taskValues = TaskValues(values: EnvironmentValues())
 
     static var current: EnvironmentValues {
-        get {
-            taskValues.values
-        }
-        set {
-            Thread.current.threadDictionary[threadKey] = newValue
-        }
+        taskValues.values
     }
 
     static func withValues<Value>(
@@ -314,19 +307,16 @@ enum EnvironmentRenderContext {
         perform operation: () -> Value
     ) -> Value {
         $taskValues.withValue(TaskValues(values: values)) {
-            let previous = Thread.current.threadDictionary[threadKey]
-                as? EnvironmentValues
-            Thread.current.threadDictionary[threadKey] = values
-            defer {
-                if let previous {
-                    Thread.current.threadDictionary[threadKey] = previous
-                }
-                else {
-                    Thread.current.threadDictionary.removeObject(forKey: threadKey)
-                }
-            }
-
             return operation()
+        }
+    }
+
+    static func withValues<Value>(
+        _ values: EnvironmentValues,
+        perform operation: () async -> Value
+    ) async -> Value {
+        await $taskValues.withValue(TaskValues(values: values)) {
+            await operation()
         }
     }
 }

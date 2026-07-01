@@ -1,6 +1,8 @@
 import Foundation
 
 /// The entry point for a SwiftTUI application.
+@MainActor
+@preconcurrency
 public protocol App {
 
     associatedtype Body: Scene
