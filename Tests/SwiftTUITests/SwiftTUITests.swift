@@ -1228,6 +1228,53 @@ import Terminal
     )
 }
 
+@Test func geometryReaderRouteTransitionKeepsFocusAndKeyDispatch() {
+    let runtime = StateRuntime()
+    let view = GeometryReaderRouteHost()
+    let proposal = RenderProposal(columns: 12, rows: 7)
+
+    #expect(runtime.block(from: view, in: proposal)?.lines == [
+        "Menu",
+    ])
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let configurationBlock = runtime.block(from: view, in: proposal)
+    #expect(configurationBlock?.lines == [
+        "Size 12x7   ",
+        "> Row0      ",
+        "  Row1      ",
+        "  Row2      ",
+        "  Row3      ",
+        "Desc        ",
+        "Footer      ",
+    ])
+    #expect(configurationBlock?.scrollRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 1, width: 12, height: 4),
+    ])
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view, in: proposal)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 2, phase: .down)
+        ) == .handled
+    )
+    _ = runtime.consumeInvalidation()
+    #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view, in: proposal)?.lines == [
+        "Size 12x7   ",
+        "  Row0      ",
+        "> Row1      ",
+        "  Row2      ",
+        "  Row3      ",
+        "Desc        ",
+        "Footer      ",
+    ])
+}
+
 @Test func scrollViewClipsHorizontally() {
     let scrollView = ScrollView(.horizontal) {
         Text("ABCDE")
@@ -5081,6 +5128,92 @@ private struct RetortFediLikeConfigurationScreen: View {
                 Spacer()
             }
         }
+    }
+}
+
+private enum GeometryReaderRoute {
+
+    case menu
+
+    case configuration
+}
+
+private struct GeometryReaderRouteHost: View {
+
+    @State private var route = GeometryReaderRoute.menu
+
+    @FocusState private var menuFocused = true
+
+    var body: some View {
+        switch route {
+        case .menu:
+            Text("Menu")
+                .focusable()
+                .focused($menuFocused)
+                .onKeyPress(.return) {
+                    route = .configuration
+                    return .handled
+                }
+        case .configuration:
+            GeometryReaderRouteConfigurationScreen()
+        }
+    }
+}
+
+private struct GeometryReaderRouteConfigurationScreen: View {
+
+    @State private var selectedRow = 0
+
+    @FocusState private var focusedRow: Int?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let listRows = max(proxy.rows - 3, 1)
+
+            VStack(alignment: .leading) {
+                Text("Size \(proxy.columns)x\(proxy.rows)")
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        ForEach(0..<6) { row in
+                            GeometryReaderRouteRow(
+                                row: row,
+                                isSelected: row == selectedRow,
+                                focusedRow: $focusedRow
+                            )
+                        }
+                    }
+                }
+                .frame(height: listRows)
+                Text("Desc")
+                Text("Footer")
+            }
+            .onAppear {
+                focusedRow = selectedRow
+            }
+            .onKeyPress(.downArrow) {
+                selectedRow = min(selectedRow + 1, 5)
+                focusedRow = selectedRow
+                return .handled
+            }
+        }
+    }
+}
+
+private struct GeometryReaderRouteRow: View {
+
+    let row: Int
+
+    let isSelected: Bool
+
+    let focusedRow: FocusState<Int?>.Binding
+
+    var body: some View {
+        Text("\(isSelected ? ">" : " ") Row\(row)")
+            .focusable()
+            .focused(focusedRow, equals: row)
+            .onKeyPress(.downArrow) {
+                .ignored
+            }
     }
 }
 

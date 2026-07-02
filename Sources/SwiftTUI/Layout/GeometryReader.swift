@@ -73,8 +73,11 @@ public nonisolated struct GeometryReader<Content: View>: View {
 
     public let content: (GeometryProxy) -> Content
 
+    let statePath: [Int]?
+
     public init(@ViewBuilder content: @escaping (GeometryProxy) -> Content) {
         self.content = content
+        self.statePath = StateContext.currentPath
     }
 }
 
@@ -108,8 +111,17 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
             columns: proposal?.columns ?? 0,
             rows: proposal?.rows ?? 0
         )
+        let resolvedContent: Content
+        if let statePath, let runtime {
+            resolvedContent = runtime.withView(at: statePath, mode: .render) {
+                content(proxy)
+            }
+        }
+        else {
+            resolvedContent = content(proxy)
+        }
         guard let block = ViewResolver.block(
-            from: content(proxy),
+            from: resolvedContent,
             in: proposal,
             path: path + [0],
             runtime: runtime
