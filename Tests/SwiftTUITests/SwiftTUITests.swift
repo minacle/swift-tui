@@ -185,6 +185,15 @@ import Terminal
     #expect(block?.lines == ["A", "B", "C"])
 }
 
+@Test func unicodeLineBreakDataLoadsEmbeddedRanges() {
+    #expect(UnicodeLineBreakClass.lineBreakDataRangeCount == 3654)
+    #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x0A)!) == .lineFeed)
+    #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x20)!) == .space)
+    #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0xA0)!) == .glue)
+    #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x200B)!) == .zeroWidthSpace)
+    #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x4E00)!) == .ideographic)
+}
+
 @Test func textWrapsAfterSlash() {
     let block = ViewResolver.block(
         from: Text("aa/bb"),
@@ -661,24 +670,12 @@ import Terminal
     #expect(ViewResolver.block(from: ContentView(usesFirstBranch: false))?.lines == ["C", "D"])
 }
 
-@Test func viewBuilderAvailabilityConditionsRenderSelectedBranch() {
-    struct ContentView: View {
-        var body: some View {
-            VStack(alignment: .leading) {
-                if #available(macOS 11, *) {
-                    Text("available")
-                }
-                if #available(macOS 9999, *) {
-                    Text("future")
-                }
-                else {
-                    Text("fallback")
-                }
-            }
-        }
+@Test func viewBuilderLimitedAvailabilityContentRenders() {
+    let view = VStack(alignment: .leading) {
+        ViewBuilder.buildLimitedAvailability(Text("limited"))
     }
 
-    #expect(ViewResolver.block(from: ContentView())?.lines == ["available", "fallback "])
+    #expect(ViewResolver.block(from: view)?.lines == ["limited"])
 }
 
 @Test func groupFlattensChildrenInsideVStack() {
@@ -833,37 +830,24 @@ import Terminal
     }
 }
 
-@Test func sceneBuilderAvailabilityConditionResolvesRootSceneWhenAvailable() {
-    struct ContentScene {
-        @SceneBuilder var body: some Scene {
-            if #available(macOS 11, *) {
-                WindowGroup {
-                    Text("Available scene")
-                }
-            }
+@Test func sceneBuilderLimitedAvailabilityResolvesRootScene() {
+    let scene = SceneBuilder.buildLimitedAvailability(
+        WindowGroup {
+            Text("Limited scene")
         }
-    }
-
-    let root = SceneResolver.rootScene(from: ContentScene().body)
+    )
+    let root = SceneResolver.rootScene(from: scene)
 
     #expect(root != nil)
     if let root {
-        #expect(ViewResolver.text(from: root.root) == "Available scene")
+        #expect(ViewResolver.text(from: root.root) == "Limited scene")
     }
 }
 
-@Test func sceneBuilderAvailabilityConditionResolvesNoRootSceneWhenUnavailable() {
-    struct ContentScene {
-        @SceneBuilder var body: some Scene {
-            if #available(macOS 9999, *) {
-                WindowGroup {
-                    Text("Future scene")
-                }
-            }
-        }
-    }
+@Test func sceneBuilderOptionalLimitedAvailabilityResolvesNoRootSceneWhenAbsent() {
+    let scene: LimitedAvailabilityScene<WindowGroup<Text>>? = nil
 
-    #expect(SceneResolver.rootScene(from: ContentScene().body) == nil)
+    #expect(SceneResolver.rootScene(from: SceneBuilder.buildOptional(scene)) == nil)
 }
 
 @Test func hStackDefaultSpacingPlacesTextSideBySide() {
