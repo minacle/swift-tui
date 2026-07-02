@@ -1068,8 +1068,8 @@ import Terminal
         in: RenderProposal(columns: 6, rows: 2)
     )
 
-    #expect(verticalBlock?.lines == ["6x0   "])
-    #expect(horizontalBlock?.lines == ["0x2", "   "])
+    #expect(verticalBlock?.lines == ["6x2   ", "      "])
+    #expect(horizontalBlock?.lines == ["6x2   ", "      "])
 }
 
 @Test func geometryReaderClipsAndPadsKnownProposedAxes() {
@@ -1134,6 +1134,18 @@ import Terminal
     #expect(block?.lines == ["A", " ", " ", " ", "B"])
 }
 
+@Test func plainVStackKeepsNaturalHeightWhenRowsAreProposed() {
+    let stack = VStack {
+        Text("A")
+        Text("B")
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 4, rows: 5))
+
+    #expect(block?.height == 2)
+    #expect(block?.lines == ["A", "B"])
+}
+
 @Test func scrollViewClipsVerticallyByDefault() {
     let scrollView = ScrollView {
         VStack {
@@ -1146,6 +1158,74 @@ import Terminal
     let block = ViewResolver.block(from: scrollView, in: RenderProposal(rows: 2))
 
     #expect(block?.lines == ["A", "B"])
+}
+
+@Test func verticalScrollViewInsideVStackReceivesRemainingViewport() {
+    let stack = VStack(alignment: .leading) {
+        Text("H")
+        ScrollView {
+            VStack(alignment: .leading) {
+                Text("A")
+                Text("B")
+                Text("C")
+                Text("D")
+            }
+        }
+        Text("F")
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 4, rows: 5))
+
+    #expect(block?.lines == [
+        "H   ",
+        "A   ",
+        "B   ",
+        "C   ",
+        "F   ",
+    ])
+    #expect(block?.scrollRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 1, width: 4, height: 3),
+    ])
+}
+
+@Test func retortFediLikeScreenKeepsScrollViewportFooterAndInputRegions() {
+    let runtime = StateRuntime()
+    let view = RetortFediLikeConfigurationScreen()
+
+    let block = runtime.block(from: view, in: RenderProposal(columns: 10, rows: 7))
+
+    #expect(block?.lines == [
+        "Title     ",
+        "Name      ",
+        "Row2      ",
+        "Row3      ",
+        "Row4      ",
+        "Desc      ",
+        "Footer    ",
+    ])
+    #expect(block?.scrollRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 1, width: 10, height: 4),
+    ])
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 2, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(
+        runtime.block(from: view, in: RenderProposal(columns: 10, rows: 7))?.lines == [
+            "Title     ",
+            "x         ",
+            "Row2      ",
+            "Row3      ",
+            "Row4      ",
+            "Desc      ",
+            "Footer    ",
+        ]
+    )
 }
 
 @Test func scrollViewClipsHorizontally() {
@@ -4970,6 +5050,36 @@ private struct PaddedFramedClickFocusView: View {
             CapturedFocusableText(binding: $isFocused, probe: probe)
                 .padding(.leading, 1)
                 .frame(width: 3, alignment: .leading)
+        }
+    }
+}
+
+private struct RetortFediLikeConfigurationScreen: View {
+
+    @State private var text = ""
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Title")
+                Spacer()
+            }
+            ScrollView {
+                VStack(alignment: .leading) {
+                    TextField("Name", text: $text)
+                    Text("Row2")
+                    Text("Row3")
+                    Text("Row4")
+                    Text("Row5")
+                }
+            }
+            Text("Desc")
+                .lineLimit(3)
+            Spacer()
+            HStack {
+                Text("Footer")
+                Spacer()
+            }
         }
     }
 }

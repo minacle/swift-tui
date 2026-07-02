@@ -93,7 +93,11 @@ protocol GeometryReaderRenderable {
     ) -> RenderedElement?
 }
 
-extension GeometryReader: GeometryReaderRenderable {
+extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
+
+    var layoutTraits: LayoutTraits {
+        LayoutTraits(flexibleAxes: [.horizontal, .vertical])
+    }
 
     func renderedBlock(
         in proposal: RenderProposal?,
