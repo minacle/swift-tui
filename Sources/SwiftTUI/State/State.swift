@@ -1073,6 +1073,12 @@ private final class StateStorage<Value> {
         self.initialValue = initialValue
         self.fallback = StateCell(value: initialValue, invalidate: {})
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 }
 
 private final class FocusStateStorage<Value: Hashable> {
@@ -1093,6 +1099,12 @@ private final class FocusStateStorage<Value: Hashable> {
             }
         )
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 }
 
 private final class StateObjectStorage<ObjectType: ObservableObject> {
@@ -1116,6 +1128,12 @@ private final class StateObjectStorage<ObjectType: ObservableObject> {
     init(createObject: @escaping () -> ObjectType) {
         self.createObject = createObject
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 }
 
 private final class ObservedObjectStorage<ObjectType: ObservableObject> {
@@ -1140,6 +1158,12 @@ private final class ObservedObjectStorage<ObjectType: ObservableObject> {
     init(object: ObjectType) {
         self.object = object
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 }
 
 private final class StateCell<Value> {
@@ -1156,6 +1180,12 @@ private final class StateCell<Value> {
         self.value = value
         self.invalidate = invalidate
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 }
 
 private final class ObservableObjectCell<ObjectType: ObservableObject> {
@@ -1171,6 +1201,12 @@ private final class ObservableObjectCell<ObjectType: ObservableObject> {
         self.invalidate = invalidate
         subscribe(to: value)
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 
     func updateValue(_ newValue: ObjectType) {
         guard value !== newValue else {
@@ -1210,6 +1246,12 @@ private final class FocusCell<Value: Hashable> {
         self.invalidate = invalidate
         self.nextGeneration = nextGeneration
     }
+
+    #if !compiler(>=6.4)
+    // Swift 6.3.3's release optimizer crashes in this synthesized deinit.
+    @_optimize(none)
+    deinit {}
+    #endif
 
     @discardableResult
     func setValue(
