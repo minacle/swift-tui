@@ -517,7 +517,10 @@ final class StateRuntime {
             return
         }
 
-        input.register(handler, at: path)
+        input.register(
+            environmentRestoringTapGestureHandler(handler),
+            at: path
+        )
     }
 
     func registerTerminationHandler(_ handler: TerminationHandler) {
@@ -817,6 +820,21 @@ final class StateRuntime {
             action: { keyPress in
                 EnvironmentRenderContext.withValues(environment) {
                     handler.action(keyPress)
+                }
+            }
+        )
+    }
+
+    private func environmentRestoringTapGestureHandler(
+        _ handler: TapGestureHandler
+    ) -> TapGestureHandler {
+        let environment = EnvironmentRenderContext.current
+        return TapGestureHandler(
+            actionPath: handler.actionPath,
+            count: handler.count,
+            action: {
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action()
                 }
             }
         )

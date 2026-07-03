@@ -42,6 +42,26 @@ public nonisolated struct EnvironmentValues {
 
 public extension EnvironmentValues {
 
+    /// An action that pops the current navigation stack.
+    var pop: PopAction {
+        get {
+            self[PopActionKey.self]
+        }
+        set {
+            self[PopActionKey.self] = newValue
+        }
+    }
+
+    /// An action that pushes a value or destination onto the current navigation stack.
+    var push: PushAction {
+        get {
+            self[PushActionKey.self]
+        }
+        set {
+            self[PushActionKey.self] = newValue
+        }
+    }
+
     /// An action that terminates the running SwiftTUI app.
     var terminate: TerminateAction {
         get {
@@ -328,6 +348,20 @@ enum EnvironmentRenderContext {
         await $taskValues.withValue(TaskValues(values: values)) {
             await operation()
         }
+    }
+}
+
+private struct PopActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: PopAction {
+        PopAction()
+    }
+}
+
+private struct PushActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: PushAction {
+        PushAction()
     }
 }
 

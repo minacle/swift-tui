@@ -24,6 +24,59 @@ public extension Text {
     }
 }
 
+/// An action that pops the current navigation stack.
+public nonisolated struct PopAction {
+
+    private let action: @MainActor () -> Void
+
+    public init(_ action: @escaping @MainActor () -> Void = {}) {
+        self.action = action
+    }
+
+    @MainActor public func callAsFunction() {
+        action()
+    }
+}
+
+/// An action that pushes a value or destination onto the current navigation stack.
+public nonisolated struct PushAction {
+
+    private let pushValue: @MainActor (AnyNavigationValue) -> Void
+
+    private let pushDestination: @MainActor (NavigationDestination) -> Void
+
+    public init() {
+        self.pushValue = { _ in }
+        self.pushDestination = { _ in }
+    }
+
+    init(
+        value: @escaping @MainActor (AnyNavigationValue) -> Void,
+        destination: @escaping @MainActor (NavigationDestination) -> Void
+    ) {
+        self.pushValue = value
+        self.pushDestination = destination
+    }
+
+    @MainActor public func callAsFunction<Value>(_ value: Value)
+        where Value: Decodable, Value: Encodable, Value: Hashable
+    {
+        pushValue(AnyNavigationValue(value))
+    }
+
+    @MainActor public func callAsFunction<Destination>(
+        @ViewBuilder _ destination: @escaping () -> Destination
+    ) where Destination: View {
+        pushDestination(
+            NavigationDestination(
+                environment: EnvironmentRenderContext.current,
+                contextPath: StateContext.currentPath,
+                destination: destination
+            )
+        )
+    }
+}
+
 /// A type-erased list of data representing the content of a navigation stack.
 public struct NavigationPath: Equatable {
 
@@ -549,37 +602,69 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
         let accessor = makePathAccessor(runtime, path)
         runtime?.registerNavigationStack(at: path, accessor: accessor)
         registerBackHandler(in: runtime, path: path)
-        let destinations = collectDestinations(
-            in: proposal,
-            path: path,
-            runtime: runtime
-        )
-        runtime?.updateNavigationDestinationTypes(
-            destinations.typeIDs,
-            at: path
-        )
+        return EnvironmentRenderContext.withValues(
+            navigationEnvironment(in: runtime, path: path)
+        ) {
+            let destinations = collectDestinations(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+            runtime?.updateNavigationDestinationTypes(
+                destinations.typeIDs,
+                at: path
+            )
 
-        return NavigationStackContext.withStack(path: path, runtime: runtime) {
-            if let directDestination = runtime?.topDirectNavigationDestination(at: path) {
-                return renderDestination(
-                    directDestination.destination,
-                    [1, directDestination.id]
-                )
+            return NavigationStackContext.withStack(path: path, runtime: runtime) {
+                if let directDestination = runtime?.topDirectNavigationDestination(at: path) {
+                    return renderDestination(
+                        directDestination.destination,
+                        [1, directDestination.id]
+                    )
+                }
+
+                let values = accessor.values()
+                runtime?.updateNavigationValues(values, at: path)
+                if let value = values.last,
+                   let destination = destinations.destination(for: value) {
+                    let index = values.count - 1
+                    return renderDestination(
+                        destination,
+                        [2, index]
+                    )
+                }
+
+                return renderRoot()
             }
-
-            let values = accessor.values()
-            runtime?.updateNavigationValues(values, at: path)
-            if let value = values.last,
-               let destination = destinations.destination(for: value) {
-                let index = values.count - 1
-                return renderDestination(
-                    destination,
-                    [2, index]
-                )
-            }
-
-            return renderRoot()
         }
+    }
+
+    private func navigationEnvironment(
+        in runtime: StateRuntime?,
+        path: [Int]
+    ) -> EnvironmentValues {
+        var environment = EnvironmentRenderContext.current
+        environment.pop = PopAction {
+            [weak runtime] in
+
+            _ = runtime?.popNavigationStack(at: path)
+        }
+        environment.push = PushAction(
+            value: {
+                [weak runtime] value in
+
+                _ = runtime?.pushNavigationValue(value, at: path)
+            },
+            destination: {
+                [weak runtime] destination in
+
+                runtime?.pushDirectNavigationDestination(
+                    destination,
+                    at: path
+                )
+            }
+        )
+        return environment
     }
 
     private func registerBackHandler(in runtime: StateRuntime?, path: [Int]) {
