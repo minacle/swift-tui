@@ -244,6 +244,8 @@ final class StateRuntime {
 
     private let change = ChangeRuntime()
 
+    let navigation = NavigationRuntime()
+
     private var textFieldStates: [[Int]: TextFieldState] = [:]
 
     private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
@@ -550,6 +552,61 @@ final class StateRuntime {
         change.register(handler, at: path)
     }
 
+    func managedNavigationPathAccessor(at path: [Int]) -> NavigationPathAccessor {
+        navigation.managedPathAccessor(at: path)
+    }
+
+    func registerNavigationStack(at path: [Int], accessor: NavigationPathAccessor) {
+        navigation.registerStack(at: path, accessor: accessor)
+    }
+
+    func updateNavigationDestinationTypes(
+        _ destinationTypes: Set<ObjectIdentifier>,
+        at path: [Int]
+    ) {
+        navigation.updateDestinationTypes(destinationTypes, at: path)
+    }
+
+    func updateNavigationValues(_ values: [AnyNavigationValue], at path: [Int]) {
+        let removedPaths = navigation.updateValues(values, at: path)
+        for removedPath in removedPaths {
+            removeStateSubtree(at: removedPath)
+        }
+    }
+
+    func pushNavigationValue(_ value: AnyNavigationValue, at path: [Int]) -> Bool {
+        guard navigation.pushValue(value, at: path) else {
+            return false
+        }
+
+        invalidated = true
+        return true
+    }
+
+    func pushDirectNavigationDestination(
+        _ destination: NavigationDestination,
+        at path: [Int]
+    ) {
+        navigation.pushDirectDestination(destination, at: path)
+        invalidated = true
+    }
+
+    func topDirectNavigationDestination(at path: [Int]) -> NavigationDirectDestination? {
+        navigation.topDirectDestination(at: path)
+    }
+
+    func popNavigationStack(at path: [Int]) -> Bool {
+        guard let removedPaths = navigation.pop(at: path) else {
+            return false
+        }
+
+        for removedPath in removedPaths {
+            removeStateSubtree(at: removedPath)
+        }
+        invalidated = true
+        return true
+    }
+
     func scrollPoint(at path: [Int]) -> ScrollPoint? {
         scrollViewStates[path]?.point
     }
@@ -821,6 +878,7 @@ final class StateRuntime {
         scrollViewStates = scrollViewStates.filter {
             !$0.key.starts(with: path)
         }
+        navigation.removeStateSubtree(at: path)
     }
 
     private func removePendingStateSubtrees() {

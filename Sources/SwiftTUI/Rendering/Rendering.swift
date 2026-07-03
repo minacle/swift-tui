@@ -1138,6 +1138,10 @@ enum ViewResolver {
             return layout.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let navigation = view as? any NavigationRenderable {
+            return navigation.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let group = view as? ViewGroup {
             return StackRenderer.vertical(
                 group.elements.enumerated().flatMap { index, element in
@@ -1255,6 +1259,14 @@ enum ViewResolver {
 
         if let layout = view as? any LayoutRenderable {
             return layout.renderedElement(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+
+        if let navigation = view as? any NavigationRenderable {
+            return navigation.renderedElement(
                 in: proposal,
                 path: path,
                 runtime: runtime

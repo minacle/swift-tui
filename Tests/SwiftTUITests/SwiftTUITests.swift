@@ -3892,6 +3892,183 @@ import Terminal
     #expect(runtime.block(from: view)?.text == "1")
 }
 
+@Test("Navigation link direct destination activates with Return, Space, and tap")
+func NavigationLinkDirectDestinationActivatesWithReturnSpaceAndTap() {
+    let runtime = StateRuntime()
+    let view = FocusedDirectNavigationLinkView()
+
+    #expect(runtime.block(from: view)?.text == "Open")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Open")
+
+    #expect(runtime.dispatch(KeyPress(key: .space, characters: " ")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Open")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+}
+
+@Test("Navigation link value appends to bound path and renders destination")
+func NavigationLinkValueAppendsToBoundPathAndRendersDestination() {
+    var path: [Int] = []
+    let runtime = StateRuntime()
+    let view = FocusedValueNavigationLinkView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "One")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(path == [1])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1")
+}
+
+@Test("Navigation stack reflects programmatic path changes and pops binding")
+func NavigationStackReflectsProgrammaticPathChangesAndPopsBinding() {
+    var path = [1, 2]
+    let runtime = StateRuntime()
+    let view = ValueNavigationPathView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Value 2")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(path == [1])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1")
+
+    #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
+    #expect(path.isEmpty)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("NavigationPath supports heterogeneous destinations")
+func NavigationPathSupportsHeterogeneousDestinations() {
+    var path = NavigationPath()
+    path.append(1)
+    path.append("two")
+
+    let runtime = StateRuntime()
+    let view = HeterogeneousNavigationPathView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "String two")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Int 1")
+}
+
+@Test("Navigation link nil value is inactive")
+func NavigationLinkNilValueIsInactive() {
+    let runtime = StateRuntime()
+    let view = NilValueNavigationLinkView()
+
+    #expect(runtime.block(from: view)?.text == "Missing")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+    #expect(!runtime.consumeInvalidation())
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.block(from: view)?.text == "Missing")
+}
+
+@Test("Navigation destination action can mutate parent state")
+func NavigationDestinationActionCanMutateParentState() {
+    let runtime = StateRuntime()
+    let view = NavigationStateMutationView()
+
+    #expect(runtime.block(from: view)?.lines == ["Open ", "empty"])
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Destination empty")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Destination updated")
+}
+
+@Test("Navigation destination state resets after pop and re-push")
+func NavigationDestinationStateResetsAfterPopAndRepush() {
+    var path: [Int] = []
+    let runtime = StateRuntime()
+    let view = NavigationDestinationStateResetView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Open")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1 count 0")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1 count 1")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Open")
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1 count 0")
+}
+
 @Suite(.serialized)
 private struct ParentCallbackStateMutationTests {
 
@@ -4253,6 +4430,146 @@ private struct ParentCallbackStateMutationTests {
     )
 
     #expect(tapProbe.events.isEmpty)
+}
+
+private struct FocusedDirectNavigationLinkView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink("Open") {
+                Text("Detail")
+            }
+            .focused($isFocused)
+        }
+    }
+}
+
+private struct FocusedValueNavigationLinkView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let path: Binding<[Int]>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationLink("One", value: 1)
+                .focused($isFocused)
+                .navigationDestination(for: Int.self) { value in
+                    Text("Value \(value)")
+                }
+        }
+    }
+}
+
+private struct ValueNavigationPathView: View {
+
+    let path: Binding<[Int]>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            Text("Root")
+                .navigationDestination(for: Int.self) { value in
+                    Text("Value \(value)")
+                }
+        }
+    }
+}
+
+private struct HeterogeneousNavigationPathView: View {
+
+    let path: Binding<NavigationPath>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            Text("Root")
+                .navigationDestination(for: Int.self) { value in
+                    Text("Int \(value)")
+                }
+                .navigationDestination(for: String.self) { value in
+                    Text("String \(value)")
+                }
+        }
+    }
+}
+
+private struct NilValueNavigationLinkView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink("Missing", value: Optional<Int>.none)
+                .focused($isFocused)
+                .navigationDestination(for: Int.self) { value in
+                    Text("Value \(value)")
+                }
+        }
+    }
+}
+
+private struct NavigationStateMutationView: View {
+
+    @State var status = "empty"
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading) {
+                NavigationLink("Open") {
+                    NavigationStateMutationDestination(status: $status)
+                }
+                .focused($isFocused)
+
+                Text(status)
+            }
+        }
+    }
+}
+
+private struct NavigationStateMutationDestination: View {
+
+    let status: Binding<String>
+
+    var body: some View {
+        Text("Destination \(status.wrappedValue)")
+            .onTapGesture {
+                status.wrappedValue = "updated"
+            }
+    }
+}
+
+private struct NavigationDestinationStateResetView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let path: Binding<[Int]>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationLink("Open", value: 1)
+                .focused($isFocused)
+                .navigationDestination(for: Int.self) { value in
+                    NavigationStatefulDestination(value: value)
+                }
+        }
+    }
+}
+
+private struct NavigationStatefulDestination: View {
+
+    let value: Int
+
+    @State var count = 0
+
+    var body: some View {
+        Text("Value \(value) count \(count)")
+            .onTapGesture {
+                count += 1
+            }
+    }
 }
 
 private final class BindingProbe<Value> {
