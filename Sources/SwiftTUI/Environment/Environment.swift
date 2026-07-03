@@ -1,7 +1,7 @@
 import Foundation
 
 /// An action that terminates the running SwiftTUI app.
-public struct TerminateAction {
+public nonisolated struct TerminateAction {
 
     private let action: () -> Void
 
@@ -20,17 +20,17 @@ public protocol EnvironmentKey {
     associatedtype Value
 
     /// The default value for the environment key.
-    static var defaultValue: Value { get }
+    nonisolated static var defaultValue: Value { get }
 }
 
 /// A collection of environment values propagated through a view hierarchy.
-public struct EnvironmentValues {
+public nonisolated struct EnvironmentValues {
 
     private var storage: [ObjectIdentifier: Any] = [:]
 
     public init() {}
 
-    public subscript<Key: EnvironmentKey>(_ key: Key.Type) -> Key.Value {
+    public nonisolated subscript<Key: EnvironmentKey>(_ key: Key.Type) -> Key.Value {
         get {
             storage[ObjectIdentifier(key)] as? Key.Value ?? Key.defaultValue
         }
@@ -68,8 +68,8 @@ public struct Environment<Value> {
     }
 }
 
-struct EnvironmentValueView<Content: View, Value>: View, EnvironmentModifierRenderable,
-    LayoutTraitRenderable
+nonisolated struct EnvironmentValueView<Content: View, Value>: View,
+    EnvironmentModifierRenderable, LayoutTraitRenderable
 {
 
     typealias Body = Never
@@ -81,7 +81,12 @@ struct EnvironmentValueView<Content: View, Value>: View, EnvironmentModifierRend
     let value: Value
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
+        render(
+            path: keyPath,
+            transform: { $0 = value }
+        ) {
+            ViewResolver.layoutTraits(from: content)
+        }
     }
 
     func renderedBlock(
@@ -111,7 +116,7 @@ struct EnvironmentValueView<Content: View, Value>: View, EnvironmentModifierRend
     }
 }
 
-struct TransformedEnvironmentView<Content: View, Value>: View,
+nonisolated struct TransformedEnvironmentView<Content: View, Value>: View,
     EnvironmentModifierRenderable, LayoutTraitRenderable
 {
 
@@ -124,7 +129,12 @@ struct TransformedEnvironmentView<Content: View, Value>: View,
     let transform: (inout Value) -> Void
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
+        render(
+            path: keyPath,
+            transform: transform
+        ) {
+            ViewResolver.layoutTraits(from: content)
+        }
     }
 
     func renderedBlock(
@@ -323,7 +333,7 @@ enum EnvironmentRenderContext {
 
 private struct TerminateActionKey: EnvironmentKey {
 
-    static var defaultValue: TerminateAction {
+    nonisolated static var defaultValue: TerminateAction {
         TerminateAction()
     }
 }

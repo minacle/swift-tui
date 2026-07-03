@@ -809,6 +809,27 @@ import Terminal
     #expect(tapProbe.events == ["b", "a"])
 }
 
+@Test func forEachButtonDispatchesToRenderedRow() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let firstOrder = [
+        ForEachTestItem(id: "a", label: "A"),
+        ForEachTestItem(id: "b", label: "B"),
+    ]
+    let secondOrder = [
+        ForEachTestItem(id: "b", label: "B"),
+        ForEachTestItem(id: "a", label: "A"),
+    ]
+
+    _ = runtime.block(from: ForEachButtonView(items: firstOrder, tapProbe: tapProbe))
+    dispatchClick(to: runtime, column: 1, row: 2)
+
+    _ = runtime.block(from: ForEachButtonView(items: secondOrder, tapProbe: tapProbe))
+    dispatchClick(to: runtime, column: 1, row: 2)
+
+    #expect(tapProbe.events == ["b", "a"])
+}
+
 @Test func windowGroupStoresRootView() {
     let scene = WindowGroup {
         Text("Hello, SwiftTUI")
@@ -2701,6 +2722,20 @@ import Terminal
     #expect(runtime.block(from: view)?.text == "updated")
 }
 
+@Test func buttonSizingEnvironmentDefaultsToAutomatic() {
+    #expect(EnvironmentValues().buttonSizing == .automatic)
+    #expect(ViewResolver.text(from: ButtonSizingMarkerText()) == "automatic")
+}
+
+@Test func buttonSizingEnvironmentPropagatesToChildren() {
+    let view = VStack(alignment: .leading) {
+        ButtonSizingMarkerText()
+    }
+    .buttonSizing(.flexible)
+
+    #expect(ViewResolver.text(from: view) == "flexible")
+}
+
 @Test func onAppearRunsOnceForStableIdentity() {
     let runtime = StateRuntime()
     let probe = LifecycleProbe()
@@ -4432,6 +4467,151 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events.isEmpty)
 }
 
+@Test func buttonRendersLabelWithoutPerformingAction() {
+    var didRun = false
+    let custom = Button(action: { didRun = true }) {
+        Text("Run")
+    }
+    let titled = Button("Save") {
+        didRun = true
+    }
+
+    #expect(ViewResolver.text(from: custom) == "Run")
+    #expect(ViewResolver.text(from: titled) == "Save")
+    #expect(!didRun)
+}
+
+@Test func buttonClickPerformsActionOnMouseUpInsideSameRegion() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = Button("Run") {
+        tapProbe.record("run")
+    }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(tapProbe.events.isEmpty)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date
+        ) == .handled
+    )
+    #expect(tapProbe.events == ["run"])
+}
+
+@Test func buttonIgnoresClicksOutsideHitRegion() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let view = Button("Run") {
+        tapProbe.record("run")
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 4, row: 1, expecting: .ignored)
+
+    #expect(tapProbe.events.isEmpty)
+}
+
+@Test func focusedButtonPerformsActionWithReturnAndSpace() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let view = FocusedButtonView(tapProbe: tapProbe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .space, characters: " ")) == .handled)
+    #expect(tapProbe.events == ["go", "go"])
+}
+
+@Test func buttonActionMutatesStateAndInvalidatesView() {
+    let runtime = StateRuntime()
+    let view = ButtonStateMutationView()
+
+    #expect(runtime.block(from: view)?.text == "0")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "1")
+}
+
+@Test func buttonActionRestoresEnvironmentForKeyAndTapActivation() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let view = ButtonEnvironmentActionView(tapProbe: tapProbe)
+        .environment(\.testMarker, "button")
+
+    _ = runtime.block(from: view)
+    dispatchClick(to: runtime, column: 1, row: 1)
+
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+
+    #expect(tapProbe.events == ["button", "button"])
+}
+
+@Test func automaticAndFittedButtonSizingUseIntrinsicWidthInStacks() {
+    let automatic = HStack {
+        Button("A") {}
+        Text("B")
+    }
+    let fitted = HStack {
+        Button("A") {}
+            .buttonSizing(.fitted)
+        Text("B")
+    }
+
+    #expect(ViewResolver.block(from: automatic, in: RenderProposal(columns: 5))?.lines == ["AB"])
+    #expect(ViewResolver.block(from: fitted, in: RenderProposal(columns: 5))?.lines == ["AB"])
+}
+
+@Test func flexibleButtonSizingExpandsToProposedWidth() {
+    let view = Button("Open") {}
+        .buttonSizing(.flexible)
+
+    #expect(ViewResolver.block(from: view, in: RenderProposal(columns: 8))?.lines == ["Open    "])
+}
+
+@Test func flexibleButtonSizingReceivesRemainingHorizontalStackWidth() {
+    let view = HStack {
+        Button("A") {}
+            .buttonSizing(.flexible)
+        Text("B")
+    }
+
+    #expect(ViewResolver.block(from: view, in: RenderProposal(columns: 5))?.lines == ["A   B"])
+}
+
+@Test func flexibleButtonBlankAreaIsClickable() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let view = Button("A") {
+        tapProbe.record("tap")
+    }
+    .buttonSizing(.flexible)
+
+    #expect(runtime.block(from: view, in: RenderProposal(columns: 5))?.lines == ["A    "])
+
+    dispatchClick(to: runtime, column: 5, row: 1)
+
+    #expect(tapProbe.events == ["tap"])
+}
+
 private struct FocusedDirectNavigationLinkView: View {
 
     @FocusState var isFocused: Bool = true
@@ -4704,7 +4884,7 @@ private struct ForEachTestItem: Identifiable {
 
 private struct TestMarkerKey: EnvironmentKey {
 
-    static let defaultValue = "default"
+    nonisolated static let defaultValue = "default"
 }
 
 private extension EnvironmentValues {
@@ -4725,6 +4905,23 @@ private struct EnvironmentMarkerText: View {
 
     var body: some View {
         Text(marker)
+    }
+}
+
+private struct ButtonSizingMarkerText: View {
+
+    @Environment(\.buttonSizing) private var sizing
+
+    var body: some View {
+        if sizing == .flexible {
+            Text("flexible")
+        }
+        else if sizing == .fitted {
+            Text("fitted")
+        }
+        else {
+            Text("automatic")
+        }
     }
 }
 
@@ -5118,6 +5315,68 @@ private struct ForEachTapView: View {
                     }
             }
         }
+    }
+}
+
+private struct ForEachButtonView: View {
+
+    let items: [ForEachTestItem]
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            ForEach(items, id: \.id) { item in
+                Button(action: {
+                    tapProbe.record(item.id)
+                }) {
+                    Text(item.label)
+                }
+            }
+        }
+    }
+}
+
+private struct FocusedButtonView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        Button("Go") {
+            tapProbe.record("go")
+        }
+        .focused($isFocused)
+    }
+}
+
+private struct ButtonStateMutationView: View {
+
+    @State var count = 0
+
+    var body: some View {
+        Button(action: {
+            count += 1
+        }) {
+            Text("\(count)")
+        }
+    }
+}
+
+private struct ButtonEnvironmentActionView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    @Environment(\.testMarker) private var marker
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        Button("Read") {
+            tapProbe.record(marker)
+        }
+        .focused($isFocused)
     }
 }
 

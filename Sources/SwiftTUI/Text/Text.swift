@@ -197,7 +197,7 @@ extension EnvironmentValues {
 
 private struct TextStyleKey: EnvironmentKey {
 
-    static let defaultValue = TextStyle.plain
+    nonisolated static let defaultValue = TextStyle.plain
 }
 
 enum TextLineLimitContext {

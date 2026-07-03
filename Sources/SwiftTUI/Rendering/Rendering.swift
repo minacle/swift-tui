@@ -1130,6 +1130,10 @@ enum ViewResolver {
             return textField.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let button = view as? any ButtonRenderable {
+            return button.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let geometryReader = view as? any GeometryReaderRenderable {
             return geometryReader.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
@@ -1243,6 +1247,14 @@ enum ViewResolver {
 
         if let textField = view as? any TextFieldRenderable {
             return textField.renderedBlock(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            ).map { .block($0) }
+        }
+
+        if let button = view as? any ButtonRenderable {
+            return button.renderedBlock(
                 in: proposal,
                 path: path,
                 runtime: runtime

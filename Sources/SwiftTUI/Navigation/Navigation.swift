@@ -591,7 +591,7 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
             KeyPressHandler(
                 actionPath: path,
                 matches: {
-                    ($0.key == .escape || $0.key == .leftArrow)
+                    ($0.key == .escape)
                         && [.down, .repeat].contains($0.phase)
                 },
                 action: { _ in
@@ -677,8 +677,7 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
             KeyPressHandler(
                 actionPath: path,
                 matches: {
-                    ($0.key == .return || $0.key == .space)
-                        && [.down, .repeat].contains($0.phase)
+                    $0.key == .return && [.down, .repeat].contains($0.phase)
                 },
                 action: { _ in
                     activate(
