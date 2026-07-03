@@ -1,8 +1,13 @@
 import Foundation
 
 /// A control that displays editable single-line text in the terminal.
+///
+/// `TextField` binds its editable string to a source of truth, renders one
+/// terminal row, scrolls horizontally when the text is wider than the proposed
+/// width, and shows a cursor while focused.
 public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
 
+    /// The body type for this primitive view.
     public typealias Body = Never
 
     let text: Binding<String>
@@ -15,6 +20,13 @@ public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, Lay
         LayoutTraits(flexibleAxes: .horizontal)
     }
 
+    /// Creates a text field with a custom label view.
+    ///
+    /// - Parameters:
+    ///   - text: A binding to the editable string.
+    ///   - prompt: Placeholder text shown when `text` is empty.
+    ///   - label: A view builder that creates the field label. SwiftTUI uses
+    ///     the label's text as fallback placeholder text when `prompt` is `nil`.
     public init(
         text: Binding<String>,
         prompt: Text? = nil,
@@ -29,11 +41,20 @@ public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, Lay
 public extension TextField where Label == Text {
 
     /// Creates a text field with a text label generated from a title string.
+    ///
+    /// - Parameters:
+    ///   - title: The field label and fallback placeholder text.
+    ///   - text: A binding to the editable string.
     init(_ title: String, text: Binding<String>) {
         self.init(title, text: text, prompt: nil)
     }
 
     /// Creates a text field with a text label generated from a title string.
+    ///
+    /// - Parameters:
+    ///   - title: The field label.
+    ///   - text: A binding to the editable string.
+    ///   - prompt: Placeholder text shown when `text` is empty.
     init(_ title: String, text: Binding<String>, prompt: Text?) {
         self.init(text: text, prompt: prompt) {
             Text(title)
@@ -118,6 +139,13 @@ protocol SubmitModifierRenderable {
 public extension View {
 
     /// Performs an action when the user submits a text field within this view.
+    ///
+    /// The action runs when a focused `TextField` receives Return. If multiple
+    /// `onSubmit` modifiers are nested, the innermost submit action visible to
+    /// the text field handles the submission.
+    ///
+    /// - Parameter action: The action to run on submit.
+    /// - Returns: A view that supplies the submit action to descendant text fields.
     func onSubmit(_ action: @escaping () -> Void) -> some View {
         SubmitView(
             content: self,

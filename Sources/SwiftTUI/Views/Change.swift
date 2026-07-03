@@ -120,6 +120,15 @@ protocol ChangeModifierRenderable {
 public extension View {
 
     /// Adds a modifier for this view that fires an action when a specific value changes.
+    ///
+    /// SwiftTUI compares the current value to the value registered for the same
+    /// rendered identity path during the previous render pass.
+    ///
+    /// - Parameters:
+    ///   - value: The equatable value to observe.
+    ///   - initial: Whether to run the action on the first render pass.
+    ///   - action: The action to run when the value changes.
+    /// - Returns: A view with a change handler attached.
     func onChange<Value: Equatable>(
         of value: Value,
         initial: Bool = false,

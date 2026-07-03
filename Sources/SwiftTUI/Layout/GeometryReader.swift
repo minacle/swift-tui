@@ -1,10 +1,15 @@
 /// A terminal-native size measured in character cells.
 public nonisolated struct GeometrySize: Equatable, Sendable {
 
+    /// The width in terminal columns.
     public let columns: Int
 
+    /// The height in terminal rows.
     public let rows: Int
 
+    /// Creates a terminal-cell size.
+    ///
+    /// Negative values are clamped to zero.
     public init(columns: Int = 0, rows: Int = 0) {
         self.columns = max(columns, 0)
         self.rows = max(rows, 0)
@@ -14,10 +19,15 @@ public nonisolated struct GeometrySize: Equatable, Sendable {
 /// A terminal-native point measured in character cells.
 public nonisolated struct GeometryPoint: Equatable, Sendable {
 
+    /// The zero-based terminal column.
     public let column: Int
 
+    /// The zero-based terminal row.
     public let row: Int
 
+    /// Creates a terminal-cell point.
+    ///
+    /// Negative values are clamped to zero.
     public init(column: Int = 0, row: Int = 0) {
         self.column = max(column, 0)
         self.row = max(row, 0)
@@ -27,10 +37,17 @@ public nonisolated struct GeometryPoint: Equatable, Sendable {
 /// A terminal-native rectangle measured in character cells.
 public nonisolated struct GeometryFrame: Equatable, Sendable {
 
+    /// The frame origin in terminal-cell coordinates.
     public let origin: GeometryPoint
 
+    /// The frame size in terminal cells.
     public let size: GeometrySize
 
+    /// Creates a terminal-cell frame.
+    ///
+    /// - Parameters:
+    ///   - origin: The frame origin.
+    ///   - size: The frame size.
     public init(
         origin: GeometryPoint = GeometryPoint(),
         size: GeometrySize = GeometrySize()
@@ -43,38 +60,53 @@ public nonisolated struct GeometryFrame: Equatable, Sendable {
 /// A proxy for access to the terminal size of a geometry reader.
 public nonisolated struct GeometryProxy: Equatable, Sendable {
 
+    /// The size proposed to the geometry reader.
     public let size: GeometrySize
 
+    /// The proposed width in terminal columns.
     public var columns: Int {
         size.columns
     }
 
+    /// The proposed height in terminal rows.
     public var rows: Int {
         size.rows
     }
 
+    /// A frame with zero origin and this proxy's size.
     public var frame: GeometryFrame {
         GeometryFrame(size: size)
     }
 
+    /// Creates a geometry proxy from a terminal-cell size.
     public init(size: GeometrySize = GeometrySize()) {
         self.size = size
     }
 
+    /// Creates a geometry proxy from terminal columns and rows.
     public init(columns: Int = 0, rows: Int = 0) {
         self.init(size: GeometrySize(columns: columns, rows: rows))
     }
 }
 
 /// A container view that defines its content as a function of its terminal size.
+///
+/// `GeometryReader` expands flexibly in both axes and passes the proposed
+/// terminal-cell size to its content closure.
 public nonisolated struct GeometryReader<Content: View>: View {
 
+    /// The body type for this primitive view.
     public typealias Body = Never
 
+    /// The content builder evaluated with the current geometry proxy.
     public let content: (GeometryProxy) -> Content
 
     let statePath: [Int]?
 
+    /// Creates a geometry reader.
+    ///
+    /// - Parameter content: A view builder that receives the current terminal
+    ///   geometry proxy.
     public init(@ViewBuilder content: @escaping (GeometryProxy) -> Content) {
         self.content = content
         self.statePath = StateContext.currentPath

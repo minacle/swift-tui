@@ -1,41 +1,62 @@
 /// A proposed terminal-cell size for a view.
+///
+/// `nil` means the corresponding terminal-cell dimension is unspecified.
 public nonisolated struct ProposedViewSize: Equatable, Sendable {
 
+    /// The proposed width in terminal columns, or `nil` when unspecified.
     public var columns: Int?
 
+    /// The proposed height in terminal rows, or `nil` when unspecified.
     public var rows: Int?
 
+    /// Creates a proposed size.
+    ///
+    /// Negative values are clamped to zero.
+    ///
+    /// - Parameters:
+    ///   - columns: The proposed width in terminal columns.
+    ///   - rows: The proposed height in terminal rows.
     public init(columns: Int? = nil, rows: Int? = nil) {
         self.columns = columns.map { max($0, 0) }
         self.rows = rows.map { max($0, 0) }
     }
 
+    /// A proposal with both dimensions unspecified.
     public static let unspecified = ProposedViewSize()
 
+    /// A proposal with zero columns and zero rows.
     public static let zero = ProposedViewSize(columns: 0, rows: 0)
 }
 
 /// The measured dimensions of a layout subview.
 public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
 
+    /// The measured size of the subview.
     public let size: GeometrySize
 
+    /// The measured width in terminal columns.
     public var columns: Int {
         size.columns
     }
 
+    /// The measured height in terminal rows.
     public var rows: Int {
         size.rows
     }
 
+    /// The measured width in terminal columns.
     public var width: Int {
         size.columns
     }
 
+    /// The measured height in terminal rows.
     public var height: Int {
         size.rows
     }
 
+    /// Creates measured dimensions from a geometry size.
+    ///
+    /// - Parameter size: The measured terminal-cell size.
     public init(size: GeometrySize) {
         self.size = size
     }
@@ -50,20 +71,35 @@ public nonisolated struct LayoutSubview: Equatable {
 
     let placements: LayoutPlacementStore
 
+    /// The layout priority assigned to this subview.
     public var priority: Double {
         child.traits.priority
     }
 
+    /// Measures this subview with a proposed terminal-cell size.
+    ///
+    /// - Parameter proposal: The size proposal to pass to the subview.
+    /// - Returns: The subview's measured terminal-cell size.
     public func sizeThatFits(_ proposal: ProposedViewSize) -> GeometrySize {
         child.render(proposal.renderProposal, true)?.layoutSize(
             proposal: proposal.renderProposal
         ) ?? GeometrySize()
     }
 
+    /// Measures this subview and returns layout dimensions.
+    ///
+    /// - Parameter proposal: The size proposal to pass to the subview.
+    /// - Returns: The subview's measured dimensions.
     public func dimensions(in proposal: ProposedViewSize) -> LayoutSubviewDimensions {
         LayoutSubviewDimensions(size: sizeThatFits(proposal))
     }
 
+    /// Places this subview within the layout's bounds.
+    ///
+    /// - Parameters:
+    ///   - point: The placement point in terminal-cell coordinates.
+    ///   - anchor: The anchor within the subview aligned to `point`.
+    ///   - proposal: The proposal used when rendering the placed subview.
     public func place(
         at point: GeometryPoint,
         anchor: Alignment = .topLeading,
@@ -83,18 +119,22 @@ public nonisolated struct LayoutSubview: Equatable {
 /// A collection of proxies that represent the subviews of a layout view.
 public nonisolated struct LayoutSubviews: Equatable, RandomAccessCollection, @unchecked Sendable {
 
+    /// The collection index type.
     public typealias Index = Int
 
     let elements: [LayoutSubview]
 
+    /// The index of the first subview.
     public var startIndex: Int {
         elements.startIndex
     }
 
+    /// The index one past the last subview.
     public var endIndex: Int {
         elements.endIndex
     }
 
+    /// Accesses a layout subview by position.
     public subscript(position: Int) -> LayoutSubview {
         elements[position]
     }
@@ -102,25 +142,45 @@ public nonisolated struct LayoutSubviews: Equatable, RandomAccessCollection, @un
 
 public extension LayoutSubview {
 
+    /// Compares subviews by their identity within the current layout pass.
     nonisolated static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
         lhs.index == rhs.index
     }
 }
 
 /// A type that defines the geometry of a collection of views.
+///
+/// Implement `Layout` to measure and place child views in terminal-cell
+/// coordinates. SwiftTUI calls measurement before placement during rendering.
 @preconcurrency
 public nonisolated protocol Layout: Sendable {
 
+    /// The mutable cache type used across a layout pass.
     associatedtype Cache = Void
 
+    /// The collection type passed to layout methods.
     typealias Subviews = LayoutSubviews
 
+    /// Returns the size required by the layout.
+    ///
+    /// - Parameters:
+    ///   - proposal: The size proposed by the parent.
+    ///   - subviews: The child subviews to measure.
+    ///   - cache: Mutable layout cache for this pass.
+    /// - Returns: The layout's terminal-cell size.
     func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout Cache
     ) -> GeometrySize
 
+    /// Places child subviews within the resolved layout bounds.
+    ///
+    /// - Parameters:
+    ///   - bounds: The terminal-cell rectangle assigned to the layout.
+    ///   - proposal: The original size proposed by the parent.
+    ///   - subviews: The child subviews to place.
+    ///   - cache: Mutable layout cache for this pass.
     func placeSubviews(
         in bounds: GeometryFrame,
         proposal: ProposedViewSize,
@@ -128,20 +188,35 @@ public nonisolated protocol Layout: Sendable {
         cache: inout Cache
     )
 
+    /// Creates an initial cache for the current child collection.
+    ///
+    /// - Parameter subviews: The child subviews available to the layout.
+    /// - Returns: The cache value used by subsequent layout calls.
     func makeCache(subviews: Subviews) -> Cache
 
+    /// Updates an existing cache for the current child collection.
+    ///
+    /// - Parameters:
+    ///   - cache: The cache value to update.
+    ///   - subviews: The child subviews available to the layout.
     func updateCache(_ cache: inout Cache, subviews: Subviews)
 }
 
 public extension Layout where Cache == Void {
 
+    /// Creates the default empty cache for layouts that do not define one.
     nonisolated func makeCache(subviews: Subviews) {}
 }
 
 public extension Layout {
 
+    /// Default cache update for layouts that do not need cache maintenance.
     nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {}
 
+    /// Creates a view that arranges content using this layout.
+    ///
+    /// - Parameter content: The child views to measure and place.
+    /// - Returns: A view backed by this custom layout value.
     func callAsFunction<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> some View {
@@ -182,6 +257,10 @@ struct LayoutPriorityView<Content: View>: View, LayoutModifierRenderable,
 public extension View {
 
     /// Sets the priority that custom layouts can read for this child.
+    ///
+    /// - Parameter value: The priority value exposed through
+    ///   ``LayoutSubview/priority``.
+    /// - Returns: A view with the given layout priority.
     func layoutPriority(_ value: Double) -> some View {
         LayoutPriorityView(content: self, priority: value)
     }

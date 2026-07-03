@@ -164,6 +164,12 @@ protocol LifecycleModifierRenderable {
 public extension View {
 
     /// Adds an action to perform before this view appears.
+    ///
+    /// The action runs after SwiftTUI renders the view for the first time at a
+    /// stable identity path.
+    ///
+    /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
+    /// - Returns: A view with an appear handler attached.
     func onAppear(perform action: (() -> Void)? = nil) -> some View {
         LifecycleView(
             content: self,
@@ -174,6 +180,12 @@ public extension View {
     }
 
     /// Adds an action to perform after this view disappears.
+    ///
+    /// The action runs when a previously rendered identity path is no longer
+    /// present in the rendered view hierarchy.
+    ///
+    /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
+    /// - Returns: A view with a disappear handler attached.
     func onDisappear(perform action: (() -> Void)? = nil) -> some View {
         LifecycleView(
             content: self,
@@ -184,6 +196,17 @@ public extension View {
     }
 
     /// Adds an asynchronous task to perform while this view is visible.
+    ///
+    /// SwiftTUI starts the task when the view appears and cancels it when the
+    /// view disappears.
+    ///
+    /// - Parameters:
+    ///   - name: An optional diagnostic name.
+    ///   - priority: The task priority.
+    ///   - file: The source file identifier used for diagnostics.
+    ///   - line: The source line used for diagnostics.
+    ///   - action: The asynchronous operation to run.
+    /// - Returns: A view with a visibility-scoped task attached.
     nonisolated func task(
         name: String? = nil,
         priority: TaskPriority = .userInitiated,
@@ -203,6 +226,18 @@ public extension View {
     }
 
     /// Adds an asynchronous task to perform while this view is visible.
+    ///
+    /// SwiftTUI starts the task on the supplied executor preference when the
+    /// view appears and cancels it when the view disappears.
+    ///
+    /// - Parameters:
+    ///   - name: An optional diagnostic name.
+    ///   - taskExecutor: The executor preference for the task.
+    ///   - priority: The task priority.
+    ///   - file: The source file identifier used for diagnostics.
+    ///   - line: The source line used for diagnostics.
+    ///   - action: The asynchronous operation to run.
+    /// - Returns: A view with a visibility-scoped task attached.
     nonisolated func task(
         name: String? = nil,
         executorPreference taskExecutor: any TaskExecutor,
@@ -223,6 +258,18 @@ public extension View {
     }
 
     /// Adds an asynchronous task that restarts when the given value changes.
+    ///
+    /// SwiftTUI cancels the current task and starts a new one when `value`
+    /// changes while the view remains visible.
+    ///
+    /// - Parameters:
+    ///   - value: The equatable task identity value.
+    ///   - name: An optional diagnostic name.
+    ///   - priority: The task priority.
+    ///   - file: The source file identifier used for diagnostics.
+    ///   - line: The source line used for diagnostics.
+    ///   - action: The asynchronous operation to run.
+    /// - Returns: A view with an identity-scoped task attached.
     nonisolated func task<ID: Equatable>(
         id value: ID,
         name: String? = nil,
@@ -243,6 +290,19 @@ public extension View {
     }
 
     /// Adds an asynchronous task that restarts when the given value changes.
+    ///
+    /// SwiftTUI cancels the current task and starts a new one on the supplied
+    /// executor preference when `value` changes while the view remains visible.
+    ///
+    /// - Parameters:
+    ///   - value: The equatable task identity value.
+    ///   - name: An optional diagnostic name.
+    ///   - taskExecutor: The executor preference for the task.
+    ///   - priority: The task priority.
+    ///   - file: The source file identifier used for diagnostics.
+    ///   - line: The source line used for diagnostics.
+    ///   - action: The asynchronous operation to run.
+    /// - Returns: A view with an identity-scoped task attached.
     nonisolated func task<ID: Equatable>(
         id value: ID,
         name: String? = nil,

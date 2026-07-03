@@ -3,12 +3,15 @@ public extension Edge {
     /// An efficient set of terminal rectangle edges.
     nonisolated struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
 
+        /// The raw option-set storage value.
         public let rawValue: Int
 
+        /// Creates an edge set from a raw option-set value.
         public init(rawValue: Int) {
             self.rawValue = rawValue
         }
 
+        /// Creates a set containing one edge.
         public init(_ edge: Edge) {
             switch edge {
             case .top:
@@ -22,24 +25,32 @@ public extension Edge {
             }
         }
 
+        /// Creates a set from an array literal of edge sets.
         public init(arrayLiteral elements: Edge.Set...) {
             self = elements.reduce(Edge.Set(rawValue: 0)) {
                 $0.union($1)
             }
         }
 
+        /// The top edge.
         public static let top = Edge.Set(rawValue: 1 << 0)
 
+        /// The leading edge.
         public static let leading = Edge.Set(rawValue: 1 << 1)
 
+        /// The bottom edge.
         public static let bottom = Edge.Set(rawValue: 1 << 2)
 
+        /// The trailing edge.
         public static let trailing = Edge.Set(rawValue: 1 << 3)
 
+        /// The leading and trailing edges.
         public static let horizontal: Edge.Set = [.leading, .trailing]
 
+        /// The top and bottom edges.
         public static let vertical: Edge.Set = [.top, .bottom]
 
+        /// All edges.
         public static let all: Edge.Set = [.horizontal, .vertical]
     }
 }
@@ -47,18 +58,32 @@ public extension Edge {
 /// The inset distances for the sides of a terminal rectangle.
 public nonisolated struct EdgeInsets: Equatable, Sendable {
 
+    /// The inset from the top edge in terminal rows.
     public let top: Int
 
+    /// The inset from the leading edge in terminal columns.
     public let leading: Int
 
+    /// The inset from the bottom edge in terminal rows.
     public let bottom: Int
 
+    /// The inset from the trailing edge in terminal columns.
     public let trailing: Int
 
+    /// Creates zero insets.
     public init() {
         self.init(top: 0, leading: 0, bottom: 0, trailing: 0)
     }
 
+    /// Creates explicit terminal-cell insets.
+    ///
+    /// Negative values are clamped to zero.
+    ///
+    /// - Parameters:
+    ///   - top: The top inset in rows.
+    ///   - leading: The leading inset in columns.
+    ///   - bottom: The bottom inset in rows.
+    ///   - trailing: The trailing inset in columns.
     public init(top: Int, leading: Int, bottom: Int, trailing: Int) {
         self.top = max(top, 0)
         self.leading = max(leading, 0)
@@ -87,31 +112,43 @@ public nonisolated struct EdgeInsets: Equatable, Sendable {
 /// An alignment in both terminal axes.
 public nonisolated struct Alignment: Equatable, Sendable {
 
+    /// The horizontal alignment component.
     public let horizontal: HorizontalAlignment
 
+    /// The vertical alignment component.
     public let vertical: VerticalAlignment
 
+    /// Creates an alignment from horizontal and vertical components.
     public init(horizontal: HorizontalAlignment, vertical: VerticalAlignment) {
         self.horizontal = horizontal
         self.vertical = vertical
     }
 
+    /// Top-leading alignment.
     public static let topLeading = Alignment(horizontal: .leading, vertical: .top)
 
+    /// Top-center alignment.
     public static let top = Alignment(horizontal: .center, vertical: .top)
 
+    /// Top-trailing alignment.
     public static let topTrailing = Alignment(horizontal: .trailing, vertical: .top)
 
+    /// Center-leading alignment.
     public static let leading = Alignment(horizontal: .leading, vertical: .center)
 
+    /// Center alignment in both axes.
     public static let center = Alignment(horizontal: .center, vertical: .center)
 
+    /// Center-trailing alignment.
     public static let trailing = Alignment(horizontal: .trailing, vertical: .center)
 
+    /// Bottom-leading alignment.
     public static let bottomLeading = Alignment(horizontal: .leading, vertical: .bottom)
 
+    /// Bottom-center alignment.
     public static let bottom = Alignment(horizontal: .center, vertical: .bottom)
 
+    /// Bottom-trailing alignment.
     public static let bottomTrailing = Alignment(horizontal: .trailing, vertical: .bottom)
 }
 
@@ -421,6 +458,11 @@ extension LayoutModifierRenderable {
 public extension View {
 
     /// Adds padding to specific terminal-cell edges of this view.
+    ///
+    /// - Parameters:
+    ///   - edges: The edges that receive padding.
+    ///   - length: The number of terminal cells to add. `nil` uses one cell.
+    /// - Returns: A view padded on the selected edges.
     func padding(_ edges: Edge.Set = .all, _ length: Int? = nil) -> some View {
         PaddingView(
             content: self,
@@ -429,16 +471,28 @@ public extension View {
     }
 
     /// Adds equal terminal-cell padding to all edges of this view.
+    ///
+    /// - Parameter length: The number of terminal cells to add on every edge.
+    /// - Returns: A view padded on all edges.
     func padding(_ length: Int) -> some View {
         padding(.all, length)
     }
 
     /// Adds terminal-cell padding using explicit edge insets.
+    ///
+    /// - Parameter insets: The explicit insets to add around the view.
+    /// - Returns: A view padded by the given insets.
     func padding(_ insets: EdgeInsets) -> some View {
         PaddingView(content: self, insets: insets)
     }
 
     /// Positions this view within an invisible terminal-cell frame.
+    ///
+    /// - Parameters:
+    ///   - width: The fixed frame width in terminal columns.
+    ///   - height: The fixed frame height in terminal rows.
+    ///   - alignment: The alignment used when the child is smaller than the frame.
+    /// - Returns: A view rendered within the requested frame.
     func frame(
         width: Int? = nil,
         height: Int? = nil,
@@ -453,6 +507,16 @@ public extension View {
     }
 
     /// Positions this view within an invisible constrained terminal-cell frame.
+    ///
+    /// - Parameters:
+    ///   - minWidth: The minimum frame width in terminal columns.
+    ///   - idealWidth: The proposed ideal width in terminal columns.
+    ///   - maxWidth: The maximum frame width in terminal columns.
+    ///   - minHeight: The minimum frame height in terminal rows.
+    ///   - idealHeight: The proposed ideal height in terminal rows.
+    ///   - maxHeight: The maximum frame height in terminal rows.
+    ///   - alignment: The alignment used when the child is smaller than the frame.
+    /// - Returns: A view rendered within the resolved constrained frame.
     func frame(
         minWidth: Int? = nil,
         idealWidth: Int? = nil,
@@ -475,11 +539,18 @@ public extension View {
     }
 
     /// Fixes this view at its ideal terminal-cell size.
+    ///
+    /// - Returns: A view that ignores proposed width and height while measuring.
     func fixedSize() -> some View {
         fixedSize(horizontal: true, vertical: true)
     }
 
     /// Fixes this view at its ideal terminal-cell size in selected dimensions.
+    ///
+    /// - Parameters:
+    ///   - horizontal: Whether to ignore proposed width.
+    ///   - vertical: Whether to ignore proposed height.
+    /// - Returns: A view that ignores selected proposed dimensions while measuring.
     func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
         FixedSizeView(content: self, horizontal: horizontal, vertical: vertical)
     }

@@ -1,26 +1,36 @@
 /// Horizontal alignment for views arranged in a ``VStack``.
 public nonisolated enum HorizontalAlignment: Equatable, Sendable {
 
+    /// Align children to the leading terminal column.
     case leading
 
+    /// Center children horizontally.
     case center
 
+    /// Align children to the trailing terminal column.
     case trailing
 }
 
 /// Vertical alignment for views arranged in an ``HStack``.
 public nonisolated enum VerticalAlignment: Equatable, Sendable {
 
+    /// Align children to the top terminal row.
     case top
 
+    /// Center children vertically.
     case center
 
+    /// Align children to the bottom terminal row.
     case bottom
 }
 
 /// A view that arranges its children from left to right.
+///
+/// `HStack` measures its children in terminal cells and inserts a fixed number
+/// of blank columns between adjacent children.
 public nonisolated struct HStack<Content: View>: View {
 
+    /// The body type for this primitive view.
     public typealias Body = Never
 
     let alignment: VerticalAlignment
@@ -29,6 +39,12 @@ public nonisolated struct HStack<Content: View>: View {
 
     let content: Content
 
+    /// Creates a horizontal stack.
+    ///
+    /// - Parameters:
+    ///   - alignment: The vertical alignment used for children with different heights.
+    ///   - spacing: The number of blank terminal columns between children.
+    ///   - content: A view builder that creates the stack's children.
     public init(
         alignment: VerticalAlignment = .center,
         spacing: Int = 0,
@@ -41,8 +57,12 @@ public nonisolated struct HStack<Content: View>: View {
 }
 
 /// A view that arranges its children from top to bottom.
+///
+/// `VStack` measures its children in terminal cells and inserts a fixed number
+/// of blank rows between adjacent children.
 public nonisolated struct VStack<Content: View>: View {
 
+    /// The body type for this primitive view.
     public typealias Body = Never
 
     let alignment: HorizontalAlignment
@@ -51,6 +71,12 @@ public nonisolated struct VStack<Content: View>: View {
 
     let content: Content
 
+    /// Creates a vertical stack.
+    ///
+    /// - Parameters:
+    ///   - alignment: The horizontal alignment used for children with different widths.
+    ///   - spacing: The number of blank terminal rows between children.
+    ///   - content: A view builder that creates the stack's children.
     public init(
         alignment: HorizontalAlignment = .center,
         spacing: Int = 0,

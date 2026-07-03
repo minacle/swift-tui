@@ -1,14 +1,21 @@
 import Foundation
 
 /// An action that terminates the running SwiftTUI app.
+///
+/// Read this action from `Environment(\.terminate)` and call it to request a
+/// graceful exit from the app's terminal event loop.
 public nonisolated struct TerminateAction {
 
     private let action: () -> Void
 
+    /// Creates a terminate action.
+    ///
+    /// - Parameter action: The closure to run when the action is called.
     public init(_ action: @escaping () -> Void = {}) {
         self.action = action
     }
 
+    /// Requests termination by invoking the stored action.
     public func callAsFunction() {
         action()
     }
@@ -17,6 +24,7 @@ public nonisolated struct TerminateAction {
 /// A key for accessing values in the environment.
 public protocol EnvironmentKey {
 
+    /// The value type stored for this environment key.
     associatedtype Value
 
     /// The default value for the environment key.
@@ -24,12 +32,19 @@ public protocol EnvironmentKey {
 }
 
 /// A collection of environment values propagated through a view hierarchy.
+///
+/// Environment values are copied and transformed as SwiftTUI resolves the view
+/// tree for rendering and event handling.
 public nonisolated struct EnvironmentValues {
 
     private var storage: [ObjectIdentifier: Any] = [:]
 
+    /// Creates an environment value collection with default values.
     public init() {}
 
+    /// Accesses the value associated with an environment key.
+    ///
+    /// - Parameter key: The key type that identifies the value.
     public nonisolated subscript<Key: EnvironmentKey>(_ key: Key.Type) -> Key.Value {
         get {
             storage[ObjectIdentifier(key)] as? Key.Value ?? Key.defaultValue
@@ -43,6 +58,8 @@ public nonisolated struct EnvironmentValues {
 public extension EnvironmentValues {
 
     /// An action that pops the current navigation stack.
+    ///
+    /// The default action does nothing outside a navigation stack.
     var pop: PopAction {
         get {
             self[PopActionKey.self]
@@ -53,6 +70,8 @@ public extension EnvironmentValues {
     }
 
     /// An action that pushes a value or destination onto the current navigation stack.
+    ///
+    /// The default action does nothing outside a navigation stack.
     var push: PushAction {
         get {
             self[PushActionKey.self]
@@ -63,6 +82,8 @@ public extension EnvironmentValues {
     }
 
     /// An action that terminates the running SwiftTUI app.
+    ///
+    /// The default action does nothing until the root app runner installs one.
     var terminate: TerminateAction {
         get {
             self[TerminateActionKey.self]
@@ -79,10 +100,14 @@ public struct Environment<Value> {
 
     private let keyPath: KeyPath<EnvironmentValues, Value>
 
+    /// The current environment value at the wrapped key path.
     public var wrappedValue: Value {
         EnvironmentRenderContext.current[keyPath: keyPath]
     }
 
+    /// Creates an environment reader for a key path.
+    ///
+    /// - Parameter keyPath: A key path into ``EnvironmentValues``.
     public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
         self.keyPath = keyPath
     }
@@ -285,6 +310,11 @@ extension EnvironmentModifierRenderable {
 public extension View {
 
     /// Sets the environment value of the specified key path to the given value.
+    ///
+    /// - Parameters:
+    ///   - keyPath: A writable key path into ``EnvironmentValues``.
+    ///   - value: The value to expose to descendant views.
+    /// - Returns: A view with the updated environment value.
     func environment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         _ value: Value
@@ -297,6 +327,12 @@ public extension View {
     }
 
     /// Transforms the environment value of the specified key path.
+    ///
+    /// - Parameters:
+    ///   - keyPath: A writable key path into ``EnvironmentValues``.
+    ///   - transform: A closure that mutates the environment value before
+    ///     descendant views are resolved.
+    /// - Returns: A view with the transformed environment value.
     func transformEnvironment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         transform: @escaping (inout Value) -> Void
@@ -309,6 +345,12 @@ public extension View {
     }
 
     /// Performs an action when the user requests app termination.
+    ///
+    /// The action is registered with the currently rendered view hierarchy and
+    /// runs when SwiftTUI dispatches a termination request.
+    ///
+    /// - Parameter action: The action to run before termination completes.
+    /// - Returns: A view with a termination handler attached.
     func onTerminate(perform action: @escaping () -> Void) -> some View {
         OnTerminateView(
             content: self,

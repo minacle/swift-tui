@@ -3,21 +3,27 @@ import Foundation
 /// A scrollable axis.
 public nonisolated enum Axis: Sendable {
 
+    /// Horizontal scrolling over terminal columns.
     case horizontal
 
+    /// Vertical scrolling over terminal rows.
     case vertical
 
     /// A set of scrollable axes.
     public struct Set: OptionSet, Sendable {
 
+        /// The raw option-set storage value.
         public let rawValue: Int
 
+        /// Creates a set from a raw option-set value.
         public init(rawValue: Int) {
             self.rawValue = rawValue
         }
 
+        /// Enables horizontal scrolling.
         public static let horizontal = Set(rawValue: 1 << 0)
 
+        /// Enables vertical scrolling.
         public static let vertical = Set(rawValue: 1 << 1)
     }
 }
@@ -25,22 +31,31 @@ public nonisolated enum Axis: Sendable {
 /// An edge of a terminal rectangle.
 public nonisolated enum Edge: Equatable, Hashable, Sendable {
 
+    /// The top row.
     case top
 
+    /// The bottom row.
     case bottom
 
+    /// The leading column.
     case leading
 
+    /// The trailing column.
     case trailing
 }
 
 /// A terminal-native point in scrollable content.
 public nonisolated struct ScrollPoint: Equatable, Sendable {
 
+    /// The horizontal content offset in terminal columns.
     public let x: Int
 
+    /// The vertical content offset in terminal rows.
     public let y: Int
 
+    /// Creates a scroll point.
+    ///
+    /// Negative values are clamped to zero.
     public init(x: Int = 0, y: Int = 0) {
         self.x = max(x, 0)
         self.y = max(y, 0)
@@ -48,6 +63,9 @@ public nonisolated struct ScrollPoint: Equatable, Sendable {
 }
 
 /// A semantic position within a scroll view.
+///
+/// A scroll position can be automatic, a concrete content point, or an edge
+/// request that the renderer resolves for the current viewport.
 public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private enum Storage: Equatable, Sendable {
@@ -61,6 +79,7 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private var storage: Storage
 
+    /// The concrete content point, if this position stores one.
     public var point: ScrollPoint? {
         guard case .point(let point) = storage else {
             return nil
@@ -69,14 +88,17 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
         return point
     }
 
+    /// The horizontal content offset, if this position stores a point.
     public var x: Int? {
         point?.x
     }
 
+    /// The vertical content offset, if this position stores a point.
     public var y: Int? {
         point?.y
     }
 
+    /// The requested edge, if this position stores an edge.
     public var edge: Edge? {
         guard case .edge(let edge) = storage else {
             return nil
@@ -85,60 +107,80 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
         return edge
     }
 
+    /// Creates an automatic scroll position.
     public init() {
         self.storage = .automatic
     }
 
+    /// Creates a position at a concrete content point.
     public init(point: ScrollPoint) {
         self.storage = .point(point)
     }
 
+    /// Creates a position with a horizontal content offset.
     public init(x: Int) {
         self.init(point: ScrollPoint(x: x))
     }
 
+    /// Creates a position with a vertical content offset.
     public init(y: Int) {
         self.init(point: ScrollPoint(y: y))
     }
 
+    /// Creates a position with horizontal and vertical content offsets.
     public init(x: Int, y: Int) {
         self.init(point: ScrollPoint(x: x, y: y))
     }
 
+    /// Creates a position that requests an edge of the scrollable content.
     public init(edge: Edge) {
         self.storage = .edge(edge)
     }
 
+    /// Updates the position to a concrete content point.
     public mutating func scrollTo(point: ScrollPoint) {
         storage = .point(point)
     }
 
+    /// Updates the position to a horizontal content offset.
     public mutating func scrollTo(x: Int) {
         storage = .point(ScrollPoint(x: x))
     }
 
+    /// Updates the position to a vertical content offset.
     public mutating func scrollTo(y: Int) {
         storage = .point(ScrollPoint(y: y))
     }
 
+    /// Updates the position to horizontal and vertical content offsets.
     public mutating func scrollTo(x: Int, y: Int) {
         storage = .point(ScrollPoint(x: x, y: y))
     }
 
+    /// Updates the position to request an edge of the scrollable content.
     public mutating func scrollTo(edge: Edge) {
         storage = .edge(edge)
     }
 }
 
 /// A scrollable view.
+///
+/// `ScrollView` clips its content to the proposed terminal-cell viewport and
+/// allows horizontal, vertical, or two-axis scrolling.
 public nonisolated struct ScrollView<Content: View>: View {
 
+    /// The body type for this primitive view.
     public typealias Body = Never
 
     let axes: Axis.Set
 
     let content: Content
 
+    /// Creates a scroll view.
+    ///
+    /// - Parameters:
+    ///   - axes: The axes that can scroll. The default is vertical.
+    ///   - content: A view builder that creates the scrollable content.
     public init(
         _ axes: Axis.Set = .vertical,
         @ViewBuilder content: () -> Content
@@ -220,6 +262,9 @@ protocol ScrollPositionModifierRenderable {
 public extension View {
 
     /// Associates a binding to a scroll position with scroll views within this view.
+    ///
+    /// - Parameter position: A binding read and updated by descendant scroll views.
+    /// - Returns: A view that supplies scroll position state to descendant scroll views.
     func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
         ScrollPositionView(content: self, position: position)
     }

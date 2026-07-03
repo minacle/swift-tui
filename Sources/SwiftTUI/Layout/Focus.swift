@@ -117,16 +117,31 @@ protocol FocusModifierRenderable {
 public extension View {
 
     /// Specifies whether this view can receive focus.
+    ///
+    /// Focusable views register their rendered terminal frame as a focus region.
+    ///
+    /// - Parameter isFocusable: Pass `true` to allow focus, or `false` to
+    ///   explicitly disable focus registration.
+    /// - Returns: A view with focus registration behavior.
     func focusable(_ isFocusable: Bool = true) -> some View {
         FocusableView(content: self, isFocusable: isFocusable)
     }
 
     /// Binds this view's focus state to a Boolean focus state value.
+    ///
+    /// - Parameter condition: The focus binding that becomes `true` while this
+    ///   view has focus.
+    /// - Returns: A view connected to the supplied focus binding.
     func focused(_ condition: FocusState<Bool>.Binding) -> some View {
         FocusedView(content: self, attachment: condition.focusAttachment())
     }
 
     /// Binds this view's focus state to the given focus state value.
+    ///
+    /// - Parameters:
+    ///   - binding: The optional focus binding that stores the focused value.
+    ///   - value: The value assigned while this view has focus.
+    /// - Returns: A view connected to the supplied focus binding.
     func focused<Value>(
         _ binding: FocusState<Value?>.Binding,
         equals value: Value
