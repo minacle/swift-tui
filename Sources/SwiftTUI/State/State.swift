@@ -1372,6 +1372,35 @@ nonisolated enum StateContext {
     static var currentPath: [Int]? {
         StateRenderContext.current?.path
     }
+
+    @MainActor
+    static func captureActionContext() -> StateActionContext? {
+        StateActionContext(StateRenderContext.current)
+    }
+}
+
+final class StateActionContext {
+
+    private weak var runtime: StateRuntime?
+
+    private let path: [Int]
+
+    fileprivate init?(_ context: StateRenderContext?) {
+        guard let context else {
+            return nil
+        }
+
+        self.runtime = context.runtime
+        self.path = context.path
+    }
+
+    func perform<Value>(_ operation: () -> Value) -> Value {
+        guard let runtime else {
+            return operation()
+        }
+
+        return runtime.withView(at: path, perform: operation)
+    }
 }
 
 struct FocusRequest: Equatable {

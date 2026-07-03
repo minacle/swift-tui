@@ -145,8 +145,9 @@ public struct NavigationStack<Data, Root: View>: View {
         @ViewBuilder root: () -> Root
     ) where Data == NavigationPath {
         self.root = root()
+        let context = StateContext.captureActionContext()
         self.makePathAccessor = { _, _ in
-            NavigationPathAccessor(path)
+            NavigationPathAccessor(path, context: context)
         }
     }
 
@@ -162,8 +163,9 @@ public struct NavigationStack<Data, Root: View>: View {
         Data.Element: Hashable
     {
         self.root = root()
+        let context = StateContext.captureActionContext()
         self.makePathAccessor = { _, _ in
-            NavigationPathAccessor(path)
+            NavigationPathAccessor(path, context: context)
         }
     }
 }
@@ -311,72 +313,100 @@ struct NavigationPathAccessor {
         self.count = count
     }
 
-    init(_ path: Binding<NavigationPath>) {
+    init(_ path: Binding<NavigationPath>, context: StateActionContext? = nil) {
+        func withContext<Value>(_ operation: () -> Value) -> Value {
+            context?.perform(operation) ?? operation()
+        }
+
         self.init(
             values: {
-                path.wrappedValue.values
+                withContext {
+                    path.wrappedValue.values
+                }
             },
             topValue: {
-                path.wrappedValue.lastValue
+                withContext {
+                    path.wrappedValue.lastValue
+                }
             },
             append: { value in
-                var pathValue = path.wrappedValue
-                pathValue.append(value)
-                path.wrappedValue = pathValue
-                return true
+                withContext {
+                    var pathValue = path.wrappedValue
+                    pathValue.append(value)
+                    path.wrappedValue = pathValue
+                    return true
+                }
             },
             removeLast: {
-                var pathValue = path.wrappedValue
-                guard !pathValue.isEmpty else {
-                    return false
-                }
+                withContext {
+                    var pathValue = path.wrappedValue
+                    guard !pathValue.isEmpty else {
+                        return false
+                    }
 
-                pathValue.removeLast()
-                path.wrappedValue = pathValue
-                return true
+                    pathValue.removeLast()
+                    path.wrappedValue = pathValue
+                    return true
+                }
             },
             count: {
-                path.wrappedValue.count
+                withContext {
+                    path.wrappedValue.count
+                }
             }
         )
     }
 
-    init<Data>(_ path: Binding<Data>)
+    init<Data>(_ path: Binding<Data>, context: StateActionContext? = nil)
         where
             Data: MutableCollection,
             Data: RandomAccessCollection,
             Data: RangeReplaceableCollection,
             Data.Element: Hashable
     {
+        func withContext<Value>(_ operation: () -> Value) -> Value {
+            context?.perform(operation) ?? operation()
+        }
+
         self.init(
             values: {
-                path.wrappedValue.map(AnyNavigationValue.init)
+                withContext {
+                    path.wrappedValue.map(AnyNavigationValue.init)
+                }
             },
             topValue: {
-                path.wrappedValue.last.map(AnyNavigationValue.init)
+                withContext {
+                    path.wrappedValue.last.map(AnyNavigationValue.init)
+                }
             },
             append: { value in
-                guard let element = value.base as? Data.Element else {
-                    return false
-                }
+                withContext {
+                    guard let element = value.base as? Data.Element else {
+                        return false
+                    }
 
-                var pathValue = path.wrappedValue
-                pathValue.append(element)
-                path.wrappedValue = pathValue
-                return true
+                    var pathValue = path.wrappedValue
+                    pathValue.append(element)
+                    path.wrappedValue = pathValue
+                    return true
+                }
             },
             removeLast: {
-                var pathValue = path.wrappedValue
-                guard !pathValue.isEmpty else {
-                    return false
-                }
+                withContext {
+                    var pathValue = path.wrappedValue
+                    guard !pathValue.isEmpty else {
+                        return false
+                    }
 
-                pathValue.removeLast()
-                path.wrappedValue = pathValue
-                return true
+                    pathValue.removeLast()
+                    path.wrappedValue = pathValue
+                    return true
+                }
             },
             count: {
-                path.wrappedValue.count
+                withContext {
+                    path.wrappedValue.count
+                }
             }
         )
     }
@@ -862,8 +892,7 @@ final class NavigationRuntime {
 
     func pushValue(_ value: AnyNavigationValue, at path: [Int]) -> Bool {
         let state = state(at: path)
-        guard state.destinationTypeIDs.contains(value.typeID),
-              state.pathAccessor?.append(value) == true else {
+        guard state.pathAccessor?.append(value) == true else {
             return false
         }
 

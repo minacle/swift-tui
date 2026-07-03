@@ -4121,6 +4121,81 @@ func NavigationPushActionAppendsValueToBoundPath() {
     #expect(runtime.block(from: view)?.text == "Value 1")
 }
 
+@Test("Navigation push action appends child enum value to root bound path")
+func NavigationPushActionAppendsChildEnumValueToRootBoundPath() {
+    var path: [NavigationPushDestination] = []
+    let runtime = StateRuntime()
+    let view = NavigationPushChildRootDestinationView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(path == [.detail])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+}
+
+@Test("Navigation push action appends value to observable object bound path")
+func NavigationPushActionAppendsValueToObservableObjectBoundPath() {
+    let runtime = StateRuntime()
+    let view = NavigationPushObservableObjectPathView()
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+}
+
+@Test("Navigation push action preserves initialized observable object bound path")
+func NavigationPushActionPreservesInitializedObservableObjectBoundPath() {
+    let runtime = StateRuntime()
+    let view = NavigationPushInitializedObservableObjectPathRootView()
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+}
+
+@Test("Navigation runtime value push appends before destination types are registered")
+func NavigationRuntimeValuePushAppendsBeforeDestinationTypesAreRegistered() {
+    var path: [NavigationPushDestination] = []
+    let runtime = NavigationRuntime()
+    runtime.registerStack(
+        at: [],
+        accessor: NavigationPathAccessor(
+            Binding(
+                get: {
+                    path
+                },
+                set: {
+                    path = $0
+                }
+            )
+        )
+    )
+
+    #expect(runtime.pushValue(AnyNavigationValue(NavigationPushDestination.detail), at: []))
+    #expect(path == [.detail])
+}
+
 @Test("Navigation push action presents direct destination")
 func NavigationPushActionPresentsDirectDestination() {
     let runtime = StateRuntime()
@@ -4888,6 +4963,114 @@ private struct NavigationPushValueView: View {
                     Text("Value \(value)")
                 }
         }
+    }
+}
+
+private enum NavigationPushDestination: Codable, Hashable, Sendable {
+
+    case detail
+}
+
+private struct NavigationPushChildRootDestinationView: View {
+
+    let path: Binding<[NavigationPushDestination]>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationPushChildButton()
+                .navigationDestination(for: NavigationPushDestination.self) { destination in
+                    switch destination {
+                    case .detail:
+                        Text("Detail")
+                    }
+                }
+        }
+    }
+}
+
+private struct NavigationPushChildButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        Button {
+            push(NavigationPushDestination.detail)
+        } label: {
+            Text("Push")
+        }
+        .focused($isFocused)
+    }
+}
+
+@Observable
+private final class NavigationPushObservablePathModel {
+
+    var path: [NavigationPushDestination] = []
+}
+
+private struct NavigationPushObservableObjectPathView: View {
+
+    @State private var model = NavigationPushObservablePathModel()
+
+    var body: some View {
+        NavigationStack(path: $model.path) {
+            NavigationPushChildButton()
+                .navigationDestination(for: NavigationPushDestination.self) { destination in
+                    switch destination {
+                    case .detail:
+                        Text("Detail")
+                    }
+                }
+        }
+    }
+}
+
+private struct NavigationPushInitializedObservableObjectPathRootView: View {
+
+    @State private var route = true
+
+    var body: some View {
+        Group {
+            if route {
+                NavigationPushInitializedObservableObjectPathView(
+                    model: NavigationPushObservablePathModel()
+                )
+            }
+        }
+    }
+}
+
+private struct NavigationPushInitializedObservableObjectPathView: View {
+
+    @State private var model: NavigationPushObservablePathModel
+
+    init(model: NavigationPushObservablePathModel) {
+        self._model = State(wrappedValue: model)
+    }
+
+    var body: some View {
+        NavigationStack(path: navigationPath) {
+            NavigationPushChildButton()
+                .navigationDestination(for: NavigationPushDestination.self) { destination in
+                    switch destination {
+                    case .detail:
+                        Text("Detail")
+                    }
+                }
+        }
+    }
+
+    private var navigationPath: Binding<[NavigationPushDestination]> {
+        Binding(
+            get: {
+                model.path
+            },
+            set: {
+                model.path = $0
+            }
+        )
     }
 }
 
