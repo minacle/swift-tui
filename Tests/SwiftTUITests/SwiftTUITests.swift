@@ -650,6 +650,160 @@ import Terminal
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
+@Test func emptyTextEditorRendersFocusableRowsAndCursor() {
+    let runtime = StateRuntime()
+    let view = TextEditorEditingView()
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 5, rows: 2))
+    _ = runtime.consumeInvalidation()
+    let block = runtime.block(from: view, in: RenderProposal(columns: 5, rows: 2))
+
+    #expect(block?.lines == ["     ", "     "])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 0))
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 0, width: 5, height: 2),
+    ])
+}
+
+@Test func focusedTextEditorEditsBoundTextContinuously() {
+    let runtime = StateRuntime()
+    let view = TextEditorEditingView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.lines == ["a", "b"])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func textEditorReturnInsertsNewlineAndDoesNotSubmit() {
+    let runtime = StateRuntime()
+    let view = TextEditorSubmitView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.lines == ["    ", "    ", "none"])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
+}
+
+@Test func focusedTextEditorDeletionWorksAcrossLineBoundaries() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "ab\ncd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.lines == ["ab"])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
+}
+
+@Test func focusedTextEditorMovesCaretAcrossVisualLines() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "abcdef")
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3))
+    _ = runtime.consumeInvalidation()
+    var block = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(block?.lines == ["abc", "def"])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+
+    #expect(runtime.dispatch(KeyPress(key: .upArrow, characters: "\u{F700}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    block = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
+
+    #expect(runtime.dispatch(KeyPress(key: .home, characters: "\u{F729}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    block = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: .end, characters: "\u{F72B}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    block = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+}
+
+@Test func focusedTextEditorCursorUsesTerminalColumnWidth() {
+    let runtime = StateRuntime()
+    let view = TextEditorEditingView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "한", characters: "한")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "A", characters: "A")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == ["한A"])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 3))
+}
+
+@Test func focusedTextEditorScrollsVerticallyToKeepCaretVisible() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "a\nb\nc\nd")
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+    _ = runtime.consumeInvalidation()
+    let block = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+
+    #expect(block?.lines == ["c  ", "d  "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func clickingTextEditorBlankAreaRequestsFocus() {
+    let runtime = StateRuntime()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let view = FramedTextEditorClickFocusView(focusProbe: focusProbe)
+
+    #expect(runtime.block(from: view)?.lines == ["     ", "     ", "     "])
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 3, row: 2, phase: .down)
+        ) == .handled
+    )
+    #expect(focusProbe.binding?.wrappedValue == true)
+}
+
+@Test func textEditorSynchronizesExternalBindingChangesAndClampsCaret() {
+    let runtime = StateRuntime()
+    let probe = BindingProbe<String>()
+    let view = CapturedTextEditorView(text: "abc", probe: probe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    probe.binding?.wrappedValue = "x"
+    #expect(runtime.consumeInvalidation())
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == ["x"])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 1))
+}
+
 @Test func dynamicTextFieldFocusWithOptionalRowFocusShowsCursorAndEdits() {
     let runtime = StateRuntime()
     let view = DynamicTextFieldFocusWithOptionalRowFocusView()
@@ -7145,6 +7299,129 @@ private struct TextFieldEditingView: View {
     var body: some View {
         TextField("Name", text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct TextEditorEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .focused($isFocused)
+    }
+}
+
+private struct TextEditorInitialTextView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .focused($isFocused)
+    }
+}
+
+private struct TextEditorSubmitView: View {
+
+    @State var text = ""
+
+    @State var submitted = "none"
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextEditor(text: $text)
+                .focused($isFocused)
+                .onSubmit {
+                    submitted = text
+                }
+            Text(submitted)
+        }
+    }
+}
+
+private struct FramedTextEditorClickFocusView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused: Bool
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedFramedTextEditor(
+            text: $text,
+            binding: $isFocused,
+            focusProbe: focusProbe
+        )
+    }
+}
+
+private struct CapturedFramedTextEditor: View {
+
+    let text: Binding<String>
+
+    let binding: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        binding: FocusState<Bool>.Binding,
+        focusProbe: FocusBindingProbe<Bool>
+    ) {
+        self.text = text
+        self.binding = binding
+        focusProbe.capture(binding)
+    }
+
+    var body: some View {
+        TextEditor(text: text)
+            .frame(width: 5, height: 3, alignment: .topLeading)
+            .focused(binding)
+    }
+}
+
+private struct CapturedTextEditorView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    let probe: BindingProbe<String>
+
+    var body: some View {
+        CapturedTextEditor(
+            text: $text,
+            isFocused: $isFocused,
+            probe: probe
+        )
+    }
+}
+
+private struct CapturedTextEditor: View {
+
+    let text: Binding<String>
+
+    let isFocused: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        isFocused: FocusState<Bool>.Binding,
+        probe: BindingProbe<String>
+    ) {
+        self.text = text
+        self.isFocused = isFocused
+        probe.capture(text)
+    }
+
+    var body: some View {
+        TextEditor(text: text)
+            .focused(isFocused)
     }
 }
 

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `TextEditor` for terminal-native multi-line text editing with
+  binding-backed text, focus, cursor movement, Unicode-width-aware rendering,
+  and vertical scrolling.
 - Added `SecureField` for single-line secure text input that shares
   `TextField` focus, editing, scrolling, styling, and `onSubmit` behavior while
   masking entered text in terminal output.

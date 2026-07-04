@@ -919,13 +919,13 @@ enum TextLayoutRenderer {
 
     static func block(for text: Text, in proposal: RenderProposal?) -> RenderedBlock {
         let lineLimit = TextLineLimitContext.current
-        var lines = wrappedLines(for: text.content, maxWidth: proposal?.columns)
+        var lines = TextLineWrapper.wrappedLines(for: text.content, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
 
         if let number = lineLimit.number {
             lines = Array(lines.prefix(number))
             if isTruncated, !lines.isEmpty {
-                lines[lines.count - 1] = truncatedLine(
+                lines[lines.count - 1] = TextLineWrapper.truncatedLine(
                     lines[lines.count - 1],
                     maxWidth: proposal?.columns
                 )
@@ -940,8 +940,11 @@ enum TextLayoutRenderer {
             style: EnvironmentRenderContext.current.textStyle
         )
     }
+}
 
-    private static func wrappedLines(for text: String, maxWidth: Int?) -> [String] {
+enum TextLineWrapper {
+
+    static func wrappedLines(for text: String, maxWidth: Int?) -> [String] {
         let paragraphs = UnicodeLineBreak.lineSegments(in: text).map(String.init)
         guard let maxWidth else {
             return paragraphs
@@ -1067,7 +1070,7 @@ enum TextLayoutRenderer {
         return index
     }
 
-    private static func truncatedLine(_ line: String, maxWidth: Int?) -> String {
+    static func truncatedLine(_ line: String, maxWidth: Int?) -> String {
         guard let maxWidth else {
             return line + "..."
         }
@@ -1128,6 +1131,10 @@ enum ViewResolver {
 
         if let textField = view as? any TextFieldRenderable {
             return textField.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
+        if let textEditor = view as? any TextEditorRenderable {
+            return textEditor.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
         if let button = view as? any ButtonRenderable {
@@ -1247,6 +1254,14 @@ enum ViewResolver {
 
         if let textField = view as? any TextFieldRenderable {
             return textField.renderedBlock(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            ).map { .block($0) }
+        }
+
+        if let textEditor = view as? any TextEditorRenderable {
+            return textEditor.renderedBlock(
                 in: proposal,
                 path: path,
                 runtime: runtime

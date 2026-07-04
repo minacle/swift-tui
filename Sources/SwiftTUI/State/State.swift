@@ -321,6 +321,8 @@ final class StateRuntime {
 
     private var textFieldStates: [[Int]: TextFieldState] = [:]
 
+    private var textEditorStates: [[Int]: TextEditorState] = [:]
+
     private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
 
     private var scrollViewStates: [[Int]: ScrollViewState] = [:]
@@ -736,6 +738,20 @@ final class StateRuntime {
         return cursor
     }
 
+    func textEditorState(at path: [Int], initialText: String) -> TextEditorState {
+        if let state = textEditorStates[path] {
+            return state
+        }
+
+        let state = TextEditorState(initialText: initialText) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        textEditorStates[path] = state
+        return state
+    }
+
     func forEachChildIndex(at path: [Int], id: AnyHashable) -> Int {
         let key = ForEachIdentityKey(path: path)
         var state = forEachIdentityStates[key] ?? ForEachIdentityState()
@@ -973,6 +989,9 @@ final class StateRuntime {
             !removedRenderKeys.contains($0.value)
         }
         textFieldStates = textFieldStates.filter {
+            !$0.key.starts(with: path)
+        }
+        textEditorStates = textEditorStates.filter {
             !$0.key.starts(with: path)
         }
         forEachIdentityStates = forEachIdentityStates.filter {
