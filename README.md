@@ -100,8 +100,11 @@ wrapping, but the final output is still terminal text and SGR styling.
   vertical axes.
 - `@State`, `Binding`, `@Bindable`, `@FocusState`, `focused`, and `focusable`
   manage local state and keyboard focus.
+- `@Environment` and `View.environment(_:)` pass key-path values and
+  Observation objects through the view tree, including bindings such as
+  `$appState.token` for typed observable environment objects.
 - `NavigationStack`, `NavigationLink`, `NavigationPath`, `navigationDestination`,
-  `Environment(\.push)`, and `Environment(\.pop)` provide stack navigation.
+  `@Environment(\.push)`, and `@Environment(\.pop)` provide stack navigation.
 - `onAppear`, `onDisappear`, `task`, `onChange`, `onSubmit`, and `onTerminate`
   provide lifecycle and event hooks.
 

@@ -1,4 +1,5 @@
 import Foundation
+public import Observation
 
 /// An action that terminates the running SwiftTUI app.
 ///
@@ -39,6 +40,8 @@ public nonisolated struct EnvironmentValues {
 
     private var storage: [ObjectIdentifier: Any] = [:]
 
+    private var observableObjects: [ObjectIdentifier: AnyObject] = [:]
+
     /// Creates an environment value collection with default values.
     public init() {}
 
@@ -52,6 +55,18 @@ public nonisolated struct EnvironmentValues {
         set {
             storage[ObjectIdentifier(key)] = newValue
         }
+    }
+
+    nonisolated func observableObject<Value>(
+        for valueType: Value.Type
+    ) -> Value? where Value: AnyObject & Observable {
+        observableObjects[ObjectIdentifier(valueType)] as? Value
+    }
+
+    nonisolated mutating func setObservableObject<Value>(
+        _ value: Value
+    ) where Value: AnyObject & Observable {
+        observableObjects[ObjectIdentifier(Value.self)] = value
     }
 }
 
@@ -98,19 +113,81 @@ public extension EnvironmentValues {
 @propertyWrapper
 public struct Environment<Value> {
 
-    private let keyPath: KeyPath<EnvironmentValues, Value>
+    private let readValue: (EnvironmentValues) -> Value
 
     /// The current environment value at the wrapped key path.
     public var wrappedValue: Value {
-        EnvironmentRenderContext.current[keyPath: keyPath]
+        readValue(EnvironmentRenderContext.current)
+    }
+
+    /// A bindable projection of the environment value.
+    public var projectedValue: EnvironmentBindable<Value> {
+        EnvironmentBindable(wrappedValue)
     }
 
     /// Creates an environment reader for a key path.
     ///
     /// - Parameter keyPath: A key path into ``EnvironmentValues``.
     public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
-        self.keyPath = keyPath
+        self.readValue = {
+            $0[keyPath: keyPath]
+        }
     }
+
+    /// Creates an environment reader for an observable object type.
+    ///
+    /// - Parameter objectType: The observable object type to read from the
+    ///   current environment.
+    public init(_ objectType: Value.Type) where Value: AnyObject & Observable {
+        self.readValue = {
+            values in
+
+            guard let object = values.observableObject(for: objectType) else {
+                fatalError(missingObservableObjectMessage(for: objectType))
+            }
+
+            return object
+        }
+    }
+}
+
+/// A dynamic-member projection that creates bindings to observable environment objects.
+@dynamicMemberLookup
+public struct EnvironmentBindable<Value> {
+
+    private let wrappedValue: Value
+
+    /// Creates a projection around an environment value.
+    ///
+    /// - Parameter wrappedValue: The value read from the current environment.
+    public init(_ wrappedValue: Value) {
+        self.wrappedValue = wrappedValue
+    }
+
+    /// Creates a binding to a writable property of an observable environment object.
+    ///
+    /// - Parameter keyPath: A reference-writable key path into the object.
+    /// - Returns: A binding that reads and writes the selected property.
+    public subscript<Subject>(
+        dynamicMember keyPath: ReferenceWritableKeyPath<Value, Subject>
+    ) -> Binding<Subject> where Value: AnyObject & Observable {
+        Binding(
+            get: {
+                wrappedValue[keyPath: keyPath]
+            },
+            set: { newValue in
+                wrappedValue[keyPath: keyPath] = newValue
+            }
+        )
+    }
+}
+
+func missingObservableObjectMessage<Value>(
+    for objectType: Value.Type
+) -> String where Value: AnyObject & Observable {
+    "No observable object of type \(String(reflecting: objectType)) found. " +
+        "A View.environment(_:) for \(String(reflecting: objectType)) " +
+        "may be missing as an ancestor of this view."
 }
 
 nonisolated struct EnvironmentValueView<Content: View, Value>: View,
@@ -204,6 +281,44 @@ nonisolated struct TransformedEnvironmentView<Content: View, Value>: View,
             path: keyPath,
             transform: transform
         ) {
+            ViewResolver.element(from: content, in: proposal, path: path, runtime: runtime)
+        }
+    }
+}
+
+nonisolated struct TypedEnvironmentObjectView<Content: View, Value>: View,
+    EnvironmentModifierRenderable, LayoutTraitRenderable
+    where Value: AnyObject & Observable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let object: Value
+
+    var layoutTraits: LayoutTraits {
+        render(object) {
+            ViewResolver.layoutTraits(from: content)
+        }
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        render(object) {
+            ViewResolver.block(from: content, in: proposal, path: path, runtime: runtime)
+        }
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        render(object) {
             ViewResolver.element(from: content, in: proposal, path: path, runtime: runtime)
         }
     }
@@ -305,6 +420,15 @@ extension EnvironmentModifierRenderable {
         transform(&values[keyPath: keyPath])
         return EnvironmentRenderContext.withValues(values, perform: operation)
     }
+
+    func render<Value, Result>(
+        _ object: Value,
+        perform operation: () -> Result
+    ) -> Result where Value: AnyObject & Observable {
+        var values = EnvironmentRenderContext.current
+        values.setObservableObject(object)
+        return EnvironmentRenderContext.withValues(values, perform: operation)
+    }
 }
 
 public extension View {
@@ -324,6 +448,16 @@ public extension View {
             keyPath: keyPath,
             value: value
         )
+    }
+
+    /// Sets an observable object in the environment by its type.
+    ///
+    /// - Parameter object: The observable object to expose to descendant views.
+    /// - Returns: A view with the observable object in its environment.
+    func environment<Value>(
+        _ object: Value
+    ) -> some View where Value: AnyObject & Observable {
+        TypedEnvironmentObjectView(content: self, object: object)
     }
 
     /// Transforms the environment value of the specified key path.

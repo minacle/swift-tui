@@ -2734,6 +2734,99 @@ import Terminal
     #expect(runtime.block(from: view)?.text == "updated")
 }
 
+@Test func typedEnvironmentObjectIsInheritedByChildBody() {
+    let model = TestObservableModel(count: 1)
+    let objectProbe = ObjectProbe<TestObservableModel>()
+    let view = TypedEnvironmentObjectMarkerText(objectProbe: objectProbe)
+        .environment(model)
+
+    #expect(ViewResolver.text(from: view) == "1")
+    #expect(objectProbe.object === model)
+}
+
+@Test func nearestTypedEnvironmentObjectOverridesParentObject() {
+    let parent = TestObservableModel(count: 1)
+    let child = TestObservableModel(count: 2)
+    let view = VStack(alignment: .leading) {
+        TypedEnvironmentObjectMarkerText()
+        TypedEnvironmentObjectMarkerText()
+            .environment(child)
+    }
+    .environment(parent)
+
+    #expect(ViewResolver.block(from: view)?.lines == ["1", "2"])
+}
+
+@Test func typedEnvironmentObjectDoesNotLeakToSibling() {
+    let parent = TestObservableModel(count: 1)
+    let child = TestObservableModel(count: 2)
+    let view = VStack(alignment: .leading) {
+        TypedEnvironmentObjectMarkerText()
+            .environment(child)
+        TypedEnvironmentObjectMarkerText()
+    }
+    .environment(parent)
+
+    #expect(ViewResolver.block(from: view)?.lines == ["2", "1"])
+}
+
+@Test func typedEnvironmentObjectComposesWithKeyPathEnvironment() {
+    let model = TestObservableModel(count: 3)
+    let view = TypedAndKeyPathEnvironmentMarkerText()
+        .environment(\.testMarker, "marker")
+        .environment(model)
+
+    #expect(ViewResolver.text(from: view) == "marker:3")
+}
+
+@Test func typedEnvironmentObjectProjectionCreatesPropertyBinding() {
+    let model = TestObservableModel(token: "initial")
+    let probe = BindingProbe<String>()
+    let objectProbe = ObjectProbe<TestObservableModel>()
+    let view = TypedEnvironmentObjectProjectionMarkerText(
+        bindingProbe: probe,
+        objectProbe: objectProbe
+    )
+    .environment(model)
+
+    #expect(ViewResolver.text(from: view) == "initial")
+    #expect(objectProbe.object === model)
+
+    probe.binding?.wrappedValue = "updated"
+    #expect(model.token == "updated")
+    #expect(probe.binding?.wrappedValue == "updated")
+}
+
+@Test func missingTypedEnvironmentObjectDiagnosticNamesType() {
+    let message = missingObservableObjectMessage(for: TestObservableModel.self)
+
+    #expect(message.contains("TestObservableModel"))
+    #expect(message.contains("View.environment(_:)"))
+}
+
+@Test func typedEnvironmentTextFieldTracksObservableObjectChanges() {
+    let runtime = StateRuntime()
+    let objectProbe = ObjectProbe<TestObservableModel>()
+    let view = TypedEnvironmentTextFieldRootView(
+        initialToken: "",
+        objectProbe: objectProbe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Token")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Token")
+
+    objectProbe.object?.token = "abc"
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "abc")
+
+    #expect(runtime.dispatch(KeyPress(key: .end, characters: "\u{F72B}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "d", characters: "d")) == .handled)
+    #expect(objectProbe.object?.token == "abcd")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "abcd")
+}
+
 @Test func buttonSizingEnvironmentDefaultsToAutomatic() {
     #expect(EnvironmentValues().buttonSizing == .automatic)
     #expect(ViewResolver.text(from: ButtonSizingMarkerText()) == "automatic")
@@ -5289,10 +5382,13 @@ private final class ObjectCreationProbe {
 
     var unreadCount: Int
 
-    init(count: Int = 0, creationProbe: ObjectCreationProbe? = nil) {
+    var token: String
+
+    init(count: Int = 0, token: String = "", creationProbe: ObjectCreationProbe? = nil) {
         self.id = creationProbe?.nextID() ?? 0
         self.count = count
         self.unreadCount = 0
+        self.token = token
     }
 }
 
@@ -5387,6 +5483,148 @@ private struct EnvironmentMarkerText: View {
 
     var body: some View {
         Text(marker)
+    }
+}
+
+private struct TypedEnvironmentObjectMarkerText: View {
+
+    @Environment(TestObservableModel.self) private var model
+
+    let objectProbe: ObjectProbe<TestObservableModel>?
+
+    init(objectProbe: ObjectProbe<TestObservableModel>? = nil) {
+        self.objectProbe = objectProbe
+    }
+
+    var body: some View {
+        CapturedTypedEnvironmentObjectMarker(
+            model: model,
+            objectProbe: objectProbe
+        )
+    }
+}
+
+private struct CapturedTypedEnvironmentObjectMarker: View {
+
+    let model: TestObservableModel
+
+    init(
+        model: TestObservableModel,
+        objectProbe: ObjectProbe<TestObservableModel>?
+    ) {
+        self.model = model
+        objectProbe?.capture(model)
+    }
+
+    var body: some View {
+        Text("\(model.count)")
+    }
+}
+
+private struct TypedAndKeyPathEnvironmentMarkerText: View {
+
+    @Environment(\.testMarker) private var marker
+
+    @Environment(TestObservableModel.self) private var model
+
+    var body: some View {
+        Text("\(marker):\(model.count)")
+    }
+}
+
+private struct TypedEnvironmentObjectProjectionMarkerText: View {
+
+    @Environment(TestObservableModel.self) private var model
+
+    let bindingProbe: BindingProbe<String>
+
+    let objectProbe: ObjectProbe<TestObservableModel>
+
+    var body: some View {
+        CapturedTypedEnvironmentObjectProjectionMarker(
+            text: $model.token,
+            model: model,
+            bindingProbe: bindingProbe,
+            objectProbe: objectProbe
+        )
+    }
+}
+
+private struct CapturedTypedEnvironmentObjectProjectionMarker: View {
+
+    let text: Binding<String>
+
+    init(
+        text: Binding<String>,
+        model: TestObservableModel,
+        bindingProbe: BindingProbe<String>,
+        objectProbe: ObjectProbe<TestObservableModel>
+    ) {
+        self.text = text
+        bindingProbe.capture(text)
+        objectProbe.capture(model)
+    }
+
+    var body: some View {
+        Text(text.wrappedValue)
+    }
+}
+
+private struct TypedEnvironmentTextFieldRootView: View {
+
+    @State private var model: TestObservableModel
+
+    let objectProbe: ObjectProbe<TestObservableModel>
+
+    init(initialToken: String, objectProbe: ObjectProbe<TestObservableModel>) {
+        _model = State(wrappedValue: TestObservableModel(token: initialToken))
+        self.objectProbe = objectProbe
+    }
+
+    var body: some View {
+        TypedEnvironmentTextField(objectProbe: objectProbe)
+            .environment(model)
+    }
+}
+
+private struct TypedEnvironmentTextField: View {
+
+    @Environment(TestObservableModel.self) private var model
+
+    @FocusState private var isFocused = true
+
+    let objectProbe: ObjectProbe<TestObservableModel>
+
+    var body: some View {
+        CapturedTypedEnvironmentTextField(
+            text: $model.token,
+            model: model,
+            focus: $isFocused,
+            objectProbe: objectProbe
+        )
+    }
+}
+
+private struct CapturedTypedEnvironmentTextField: View {
+
+    let text: Binding<String>
+
+    let focus: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        model: TestObservableModel,
+        focus: FocusState<Bool>.Binding,
+        objectProbe: ObjectProbe<TestObservableModel>
+    ) {
+        self.text = text
+        self.focus = focus
+        objectProbe.capture(model)
+    }
+
+    var body: some View {
+        TextField("Token", text: text)
+            .focused(focus)
     }
 }
 

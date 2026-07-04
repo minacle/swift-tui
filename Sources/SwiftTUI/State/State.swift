@@ -179,6 +179,13 @@ public struct Bindable<Value: Observable> {
         self.wrappedValue = wrappedValue
     }
 
+    /// Creates a bindable wrapper around an observable object.
+    ///
+    /// - Parameter wrappedValue: The observable object to expose.
+    public init(_ wrappedValue: Value) {
+        self.wrappedValue = wrappedValue
+    }
+
     /// Creates a binding to a writable property of the observable object.
     ///
     /// - Parameter keyPath: A reference-writable key path into the object.
@@ -322,6 +329,8 @@ final class StateRuntime {
 
     private var invalidated = false
 
+    private var isObservingRender = false
+
     private var focusGeneration = 0
 
     private var suppressRenderRegistrations = false
@@ -352,12 +361,14 @@ final class StateRuntime {
             removePendingStateSubtrees()
         }
 
-        let block = ViewResolver.block(
-            from: view,
-            in: ViewResolver.rootProposal(for: view, proposal: proposal),
-            path: [],
-            runtime: self
-        )
+        let block = observeRender {
+            ViewResolver.block(
+                from: view,
+                in: ViewResolver.rootProposal(for: view, proposal: proposal),
+                path: [],
+                runtime: self
+            )
+        }
         input.updateHitRegions(block?.hitRegions ?? [])
         input.updateScrollRegions(block?.scrollRegions ?? [])
         input.updateFocusRegions(block?.focusRegions ?? [])
@@ -365,7 +376,13 @@ final class StateRuntime {
     }
 
     func observeRender<Value>(_ operation: () -> Value) -> Value {
-        withObservationTracking {
+        let wasObservingRender = isObservingRender
+        isObservingRender = true
+        defer {
+            isObservingRender = wasObservingRender
+        }
+
+        return withObservationTracking {
             operation()
         } onChange: {
             MainActor.assumeIsolated {
@@ -394,7 +411,9 @@ final class StateRuntime {
             removePendingStateSubtrees()
         }
 
-        return ViewResolver.element(from: view, in: proposal, path: [], runtime: self)
+        return observeRender {
+            ViewResolver.element(from: view, in: proposal, path: [], runtime: self)
+        }
     }
 
     func consumeInvalidation() -> Bool {
@@ -913,7 +932,7 @@ final class StateRuntime {
     ) -> Value {
         let context = StateRenderContext(runtime: self, path: path, mode: mode)
         return StateRenderContext.withCurrent(context) {
-            if mode == .render {
+            if mode == .render, !isObservingRender {
                 return observeRender(operation)
             }
 

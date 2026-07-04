@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added Observation-based environment object injection and lookup with
+  `View.environment(_:)` and `@Environment(Type.self)`, including
+  `@Environment` binding projections like `$appState.token` for observable
+  object properties.
+
 ### Fixed
 
 - Fixed `onTerminate` handlers that update observable `NavigationStack(path:)`
