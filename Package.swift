@@ -31,11 +31,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/minacle/swift-terminal",
-            branch: "main"
+            revision: "1f45bc5860f008543cd9a718fb1e66920ef9411d"
         ),
         .package(
             url: "https://github.com/minacle/swift-termios",
-            branch: "main"
+            from: "1.0.0"
         ),
     ],
     targets: [

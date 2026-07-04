@@ -1,5 +1,5 @@
 {
-  "originHash" : "01945312ba9d910cea2202f58932d083c4f91b961f4ef55de5400f1457f6a922",
+  "originHash" : "2c474e784a987710c1eff13f55ce1151e4ac28b65dd547b5672d31d3c991772a",
   "pins" : [
     {
       "identity" : "swift-numerics",
@@ -24,7 +24,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/minacle/swift-terminal",
       "state" : {
-        "branch" : "main",
         "revision" : "1f45bc5860f008543cd9a718fb1e66920ef9411d"
       }
     },
@@ -33,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/minacle/swift-termios",
       "state" : {
-        "branch" : "main",
-        "revision" : "e21d00bd0d3640af26e0a849928e2e6e9d44ba74"
+        "revision" : "ea47a4863d918fb6acfc9ab285344a8185045d80",
+        "version" : "1.0.0"
       }
     }
   ],

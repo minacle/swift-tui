@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@Environment` binding projections like `$appState.token` for observable
   object properties.
 
+### Changed
+
+- Pinned SwiftPM dependencies to stable versions or fixed revisions so builds no
+  longer depend on mutable branch heads.
+
 ### Fixed
 
 - Fixed `onTerminate` handlers that update observable `NavigationStack(path:)`
