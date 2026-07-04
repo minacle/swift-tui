@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `onTerminate` handlers that update observable `NavigationStack(path:)`
   state so they trigger an immediate redraw instead of waiting for the next
   input event.
+- Fixed standalone Escape key input so it is dispatched immediately when no
+  escape-sequence bytes are already buffered.
 
 ## [0.1.0] - 2026-07-04
 

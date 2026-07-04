@@ -111,7 +111,14 @@ enum TerminalControl {
         var bytes = [firstByte]
 
         if firstByte == 27 {
-            bytes.append(contentsOf: readEscapeSequenceBytes(readByte: readByte))
+            guard let nextByte = readByte(0) else {
+                return input(for: bytes)
+            }
+
+            bytes.append(contentsOf: readEscapeSequenceBytes(
+                startingWith: [nextByte],
+                readByte: readByte
+            ))
         }
         else {
             switch readUTF8ContinuationBytes(after: firstByte, readByte: readByte) {
@@ -229,9 +236,14 @@ enum TerminalControl {
     }
 
     private static func readEscapeSequenceBytes(
+        startingWith bytes: [UInt8],
         readByte: (TimeInterval?) -> UInt8?
     ) -> [UInt8] {
-        var bytes: [UInt8] = []
+        var bytes = bytes
+        if escapeSequenceIsComplete([27] + bytes) {
+            return bytes
+        }
+
         while bytes.count < 64,
               let byte = readByte(escapeSequenceByteTimeout) {
             bytes.append(byte)

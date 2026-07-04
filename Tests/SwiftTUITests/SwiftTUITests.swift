@@ -3725,6 +3725,82 @@ import Terminal
     )
 }
 
+@Test func terminalReadInputReturnsEscapeImmediatelyWhenBufferIsEmptyAfterEscapeByte() {
+    var bytes: [UInt8] = [27]
+    var requestedTimeouts: [TimeInterval?] = []
+
+    let input = TerminalControl.readInput {
+        timeout in
+
+        requestedTimeouts.append(timeout)
+        guard !bytes.isEmpty else {
+            return nil
+        }
+
+        return bytes.removeFirst()
+    }
+
+    #expect(input == .keyPress(KeyPress(key: .escape, characters: "\u{001B}")))
+    #expect(requestedTimeouts == [nil, 0])
+}
+
+@Test func terminalReadInputParsesEscapeSequenceWhenBufferHasByteAfterEscape() {
+    var bytes: [UInt8] = [27, 91, 65]
+    var requestedTimeouts: [TimeInterval?] = []
+
+    let input = TerminalControl.readInput {
+        timeout in
+
+        requestedTimeouts.append(timeout)
+        guard !bytes.isEmpty else {
+            return nil
+        }
+
+        return bytes.removeFirst()
+    }
+
+    #expect(input == .keyPress(KeyPress(key: .upArrow, characters: "\u{F700}")))
+    #expect(requestedTimeouts == [nil, 0, 0.1])
+}
+
+@Test func terminalReadInputKeepsEscapeSequenceTimeoutAfterSecondByte() {
+    var bytes: [UInt8] = [27, 91]
+    var requestedTimeouts: [TimeInterval?] = []
+
+    let input = TerminalControl.readInput {
+        timeout in
+
+        requestedTimeouts.append(timeout)
+        guard !bytes.isEmpty else {
+            return nil
+        }
+
+        return bytes.removeFirst()
+    }
+
+    #expect(input == .none)
+    #expect(requestedTimeouts == [nil, 0, 0.1])
+}
+
+@Test func terminalReadInputTreatsEscapeThenPrintableAsUnknownEscapeSequence() {
+    var bytes: [UInt8] = [27, 97]
+    var requestedTimeouts: [TimeInterval?] = []
+
+    let input = TerminalControl.readInput {
+        timeout in
+
+        requestedTimeouts.append(timeout)
+        guard !bytes.isEmpty else {
+            return nil
+        }
+
+        return bytes.removeFirst()
+    }
+
+    #expect(input == .none)
+    #expect(requestedTimeouts == [nil, 0])
+}
+
 @Test func terminalParsesControlLettersWithControlModifier() {
     #expect(
         TerminalControl.input(for: 1)
