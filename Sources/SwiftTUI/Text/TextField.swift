@@ -62,6 +62,69 @@ public extension TextField where Label == Text {
     }
 }
 
+/// A control that displays editable single-line secure text in the terminal.
+///
+/// `SecureField` binds its editable string to a source of truth, renders one
+/// terminal row, scrolls horizontally when the masked text is wider than the
+/// proposed width, and shows a cursor while focused. Non-empty input is masked
+/// with bullet characters in rendered output.
+public nonisolated struct SecureField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let text: Binding<String>
+
+    let prompt: Text?
+
+    let label: Label
+
+    var layoutTraits: LayoutTraits {
+        LayoutTraits(flexibleAxes: .horizontal)
+    }
+
+    /// Creates a secure field with a custom label view.
+    ///
+    /// - Parameters:
+    ///   - text: A binding to the editable string.
+    ///   - prompt: Placeholder text shown when `text` is empty.
+    ///   - label: A view builder that creates the field label. SwiftTUI uses
+    ///     the label's text as fallback placeholder text when `prompt` is `nil`.
+    public init(
+        text: Binding<String>,
+        prompt: Text? = nil,
+        @ViewBuilder label: () -> Label
+    ) {
+        self.text = text
+        self.prompt = prompt
+        self.label = label()
+    }
+}
+
+public extension SecureField where Label == Text {
+
+    /// Creates a secure field with a text label generated from a title string.
+    ///
+    /// - Parameters:
+    ///   - title: The field label and fallback placeholder text.
+    ///   - text: A binding to the editable string.
+    init(_ title: String, text: Binding<String>) {
+        self.init(title, text: text, prompt: nil)
+    }
+
+    /// Creates a secure field with a text label generated from a title string.
+    ///
+    /// - Parameters:
+    ///   - title: The field label.
+    ///   - text: A binding to the editable string.
+    ///   - prompt: Placeholder text shown when `text` is empty.
+    init(_ title: String, text: Binding<String>, prompt: Text?) {
+        self.init(text: text, prompt: prompt) {
+            Text(title)
+        }
+    }
+}
+
 struct SubmitView<Content: View>: View, SubmitModifierRenderable, LayoutTraitRenderable {
 
     typealias Body = Never
@@ -164,6 +227,48 @@ extension TextField {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        TextInputRenderer.renderedBlock(
+            text: text,
+            prompt: prompt,
+            label: label,
+            displayMode: .plain,
+            proposal: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
+extension SecureField {
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        TextInputRenderer.renderedBlock(
+            text: text,
+            prompt: prompt,
+            label: label,
+            displayMode: .secure,
+            proposal: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
+private enum TextInputRenderer {
+
+    static func renderedBlock<Label: View>(
+        text: Binding<String>,
+        prompt: Text?,
+        label: Label,
+        displayMode: TextFieldDisplayMode,
+        proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
         let submitAction = SubmitContext.currentAction
         let fieldState = runtime?.textFieldState(
             at: path,
@@ -179,25 +284,39 @@ extension TextField {
                     TextFieldInput.matches($0)
                 },
                 action: {
-                    handle($0, state: fieldState, submitAction: submitAction)
+                    handle(
+                        $0,
+                        text: text,
+                        state: fieldState,
+                        submitAction: submitAction
+                    )
                 }
             ),
             at: path
         )
 
-        let text = fieldState?.text ?? text.wrappedValue
+        let currentText = fieldState?.text ?? text.wrappedValue
+        let layoutText = displayMode.layoutText(for: currentText)
         let isFocused = runtime?.isFocused(at: path) == true
         if let maxWidth = proposal?.columns {
-            fieldState?.updateHorizontalScrollOffset(maxWidth: maxWidth)
+            fieldState?.updateHorizontalScrollOffset(
+                maxWidth: maxWidth,
+                layoutText: layoutText
+            )
         }
         let horizontalScrollOffset = proposal?.columns == nil
             ? 0
             : fieldState?.horizontalScrollOffset ?? 0
         let scrollColumn = TerminalText.columnWidth(
-            text,
+            layoutText,
             upToCharacterOffset: horizontalScrollOffset
         )
-        let displayText = displayText(using: text)
+        let displayText = displayText(
+            using: currentText,
+            layoutText: layoutText,
+            prompt: prompt,
+            label: label
+        )
         let content = RenderedBlock(
             runs: [
                 RenderedRun(
@@ -207,7 +326,11 @@ extension TextField {
             ],
             width: max(TerminalText.columnWidth(displayText), 1),
             height: 1,
-            cursor: renderedCursor(state: fieldState, isFocused: isFocused)
+            cursor: renderedCursor(
+                state: fieldState,
+                isFocused: isFocused,
+                layoutText: layoutText
+            )
         )
 
         var block = ScrollViewRenderer.render(
@@ -220,9 +343,14 @@ extension TextField {
         return block
     }
 
-    private func displayText(using text: String) -> String {
+    private static func displayText<Label: View>(
+        using text: String,
+        layoutText: String,
+        prompt: Text?,
+        label: Label
+    ) -> String {
         if !text.isEmpty {
-            return text
+            return layoutText
         }
         if let prompt {
             return prompt.content
@@ -231,9 +359,10 @@ extension TextField {
         return ViewResolver.text(from: label) ?? ""
     }
 
-    private func renderedCursor(
+    private static func renderedCursor(
         state: TextFieldState?,
-        isFocused: Bool
+        isFocused: Bool,
+        layoutText: String
     ) -> RenderedCursor? {
         guard isFocused, let state else {
             return nil
@@ -241,14 +370,15 @@ extension TextField {
 
         return RenderedCursor(
             column: TerminalText.columnWidth(
-                state.text,
+                layoutText,
                 upToCharacterOffset: state.offset
             )
         )
     }
 
-    private func handle(
+    private static func handle(
         _ keyPress: KeyPress,
+        text: Binding<String>,
         state: TextFieldState?,
         submitAction: SubmitAction?
     ) -> KeyPress.Result {
@@ -285,6 +415,22 @@ extension TextField {
 
             state.insert(keyPress.characters, update: text)
             return .handled
+        }
+    }
+}
+
+private enum TextFieldDisplayMode {
+
+    case plain
+
+    case secure
+
+    func layoutText(for text: String) -> String {
+        switch self {
+        case .plain:
+            return text
+        case .secure:
+            return String(repeating: "•", count: text.count)
         }
     }
 }
@@ -352,7 +498,7 @@ final class TextFieldState {
         self.offset = min(max(offset, 0), text.count)
     }
 
-    func updateHorizontalScrollOffset(maxWidth: Int) {
+    func updateHorizontalScrollOffset(maxWidth: Int, layoutText: String) {
         guard maxWidth > 0 else {
             horizontalScrollOffset = 0
             return
@@ -361,7 +507,7 @@ final class TextFieldState {
         let visibleTextWidth = offset == text.count && !text.isEmpty
             ? maxWidth - 1
             : maxWidth
-        if TerminalText.columnWidth(text) <= visibleTextWidth {
+        if TerminalText.columnWidth(layoutText) <= visibleTextWidth {
             horizontalScrollOffset = 0
             return
         }
@@ -373,7 +519,7 @@ final class TextFieldState {
 
         let visibleUpperOffset = offset < text.count ? offset + 1 : offset
         if TerminalText.columnWidth(
-            text,
+            layoutText,
             lowerCharacterOffset: horizontalScrollOffset,
             upperCharacterOffset: visibleUpperOffset
         ) <= visibleTextWidth {
@@ -384,7 +530,7 @@ final class TextFieldState {
         while newOffset > 0 {
             let previousOffset = newOffset - 1
             let width = TerminalText.columnWidth(
-                text,
+                layoutText,
                 lowerCharacterOffset: previousOffset,
                 upperCharacterOffset: visibleUpperOffset
             )

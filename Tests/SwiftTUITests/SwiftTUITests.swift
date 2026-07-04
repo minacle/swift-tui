@@ -254,6 +254,121 @@ import Terminal
     #expect(ViewResolver.text(from: textField) == "Name")
 }
 
+@Test func maskedSecureFieldDisplaysBoundText() {
+    let secureField = SecureField("Password", text: .constant("secret"))
+
+    #expect(ViewResolver.text(from: secureField) == "••••••")
+}
+
+@Test func styledSecureFieldMasksText() {
+    let secureField = SecureField("Password", text: .constant("secret"))
+        .color(.brightGreen)
+        .bold()
+        .dim()
+
+    #expect(ViewResolver.block(from: secureField)?.runs == [
+        RenderedRun(
+            text: "••••••",
+            style: TextStyle(
+                color: AnyColor(Color16.brightGreen),
+                isBold: true,
+                isDim: true
+            )
+        ),
+    ])
+}
+
+@Test func emptySecureFieldDisplaysPromptBeforeTitle() {
+    let secureField = SecureField(
+        "Password",
+        text: .constant(""),
+        prompt: Text("Required")
+    )
+
+    #expect(ViewResolver.text(from: secureField) == "Required")
+}
+
+@Test func emptySecureFieldDisplaysTitleWhenPromptIsAbsent() {
+    let secureField = SecureField("Password", text: .constant(""))
+
+    #expect(ViewResolver.text(from: secureField) == "Password")
+}
+
+@Test func focusedSecureFieldEditsBoundTextWhileMaskingOutput() {
+    let runtime = StateRuntime()
+    let probe = BindingProbe<String>()
+    let view = SecureFieldEditingView(textProbe: probe)
+
+    #expect(runtime.block(from: view)?.text == "Password")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Password")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "e", characters: "e")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(probe.binding?.wrappedValue == "sec")
+    #expect(runtime.block(from: view)?.text == "•••")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+
+    #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "r", characters: "r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(probe.binding?.wrappedValue == "sec")
+    #expect(runtime.block(from: view)?.text == "•••")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+}
+
+@Test func focusedSecureFieldUsesMaskedColumnWidthForCursorAndScroll() {
+    let runtime = StateRuntime()
+    let view = SecureFieldInitialTextView(text: "한ABC")
+        .frame(width: 3)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == ["•• "])
+    #expect(block?.cursor == RenderedCursor(column: 2))
+
+    #expect(runtime.dispatch(KeyPress(key: .home, characters: "\u{F729}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.lines == ["•••"])
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+}
+
+@Test func submittingSecureFieldWithReturnKey() {
+    let runtime = StateRuntime()
+    let view = SecureFieldSubmitView()
+
+    #expect(runtime.block(from: view)?.lines == ["Password", "  none  "])
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.lines == ["•", "s"])
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+}
+
+@Test func flexibleSecureFieldTakesRemainingColumnsBeforeSpacer() {
+    let stack = HStack {
+        SecureField("Password", text: .constant(""))
+        Spacer()
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 20))
+
+    #expect(block?.width == 20)
+    #expect(block?.lines == ["Password            "])
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 0, width: 20, height: 1),
+    ])
+}
+
 @Test func focusedTextFieldEditsBoundTextContinuously() {
     let runtime = StateRuntime()
     let view = TextFieldEditingView()
@@ -7033,6 +7148,45 @@ private struct TextFieldEditingView: View {
     }
 }
 
+private struct SecureFieldEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    let textProbe: BindingProbe<String>
+
+    var body: some View {
+        CapturedSecureField(
+            text: $text,
+            isFocused: $isFocused,
+            textProbe: textProbe
+        )
+    }
+}
+
+private struct CapturedSecureField: View {
+
+    let text: Binding<String>
+
+    let isFocused: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        isFocused: FocusState<Bool>.Binding,
+        textProbe: BindingProbe<String>
+    ) {
+        self.text = text
+        self.isFocused = isFocused
+        textProbe.capture(text)
+    }
+
+    var body: some View {
+        SecureField("Password", text: text)
+            .focused(isFocused)
+    }
+}
+
 private struct TwoTextFieldsClickFocusView: View {
 
     @State var first = ""
@@ -7141,6 +7295,18 @@ private struct TextFieldInitialTextView: View {
     }
 }
 
+private struct SecureFieldInitialTextView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        SecureField("Password", text: $text)
+            .focused($isFocused)
+    }
+}
+
 private struct DelimitedTextFieldView: View {
 
     @State var text: String
@@ -7200,6 +7366,26 @@ private struct TextFieldSubmitView: View {
     var body: some View {
         VStack {
             TextField("Name", text: $text)
+                .focused($isFocused)
+                .onSubmit {
+                    submitted = text
+                }
+            Text(submitted)
+        }
+    }
+}
+
+private struct SecureFieldSubmitView: View {
+
+    @State var text = ""
+
+    @State var submitted = "none"
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        VStack {
+            SecureField("Password", text: $text)
                 .focused($isFocused)
                 .onSubmit {
                     submitted = text

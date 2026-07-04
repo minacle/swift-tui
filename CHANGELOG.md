@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `SecureField` for single-line secure text input that shares
+  `TextField` focus, editing, scrolling, styling, and `onSubmit` behavior while
+  masking entered text in terminal output.
 - Added Observation-based environment object injection and lookup with
   `View.environment(_:)` and `@Environment(Type.self)`, including
   `@Environment` binding projections like `$appState.token` for observable
