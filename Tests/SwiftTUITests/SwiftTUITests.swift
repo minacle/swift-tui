@@ -391,6 +391,22 @@ import Terminal
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
+@Test func disabledTextFieldIgnoresFocusAndTyping() {
+    let runtime = StateRuntime()
+    let textProbe = BindingProbe<String>()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let view = DisabledFocusedTextFieldView(
+        textProbe: textProbe,
+        focusProbe: focusProbe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Name")
+    #expect(focusProbe.binding?.wrappedValue == false)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
+    #expect(textProbe.binding?.wrappedValue == "")
+}
+
 @Test func focusedTextFieldMovesCaretWithHorizontalArrows() {
     let runtime = StateRuntime()
     let view = TextFieldEditingView()
@@ -681,6 +697,22 @@ import Terminal
     let block = runtime.block(from: view)
     #expect(block?.lines == ["a", "b"])
     #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func disabledTextEditorIgnoresFocusAndTyping() {
+    let runtime = StateRuntime()
+    let textProbe = BindingProbe<String>()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let view = DisabledFocusedTextEditorView(
+        textProbe: textProbe,
+        focusProbe: focusProbe
+    )
+
+    #expect(runtime.block(from: view)?.lines == [" "])
+    #expect(focusProbe.binding?.wrappedValue == false)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
+    #expect(textProbe.binding?.wrappedValue == "")
 }
 
 @Test func textEditorReturnInsertsNewlineAndDoesNotSubmit() {
@@ -2151,6 +2183,35 @@ import Terminal
     #expect(runtime.block(from: scrollView)?.lines == ["B", "C"])
 }
 
+@Test func disabledScrollViewIgnoresWheelInput() {
+    var position = ScrollPosition()
+    let scrollView = ScrollView {
+        VStack {
+            Text("A")
+            Text("B")
+            Text("C")
+        }
+    }
+    .scrollPosition(
+        Binding(
+            get: { position },
+            set: { position = $0 }
+        )
+    )
+    .frame(width: 1, height: 2)
+    .disabled(true)
+    let runtime = StateRuntime()
+
+    let block = runtime.block(from: scrollView)
+
+    #expect(block?.lines == ["A", "B"])
+    #expect(block?.scrollRegions == [])
+    dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1, expecting: .ignored)
+
+    #expect(position.point == nil)
+    #expect(!runtime.consumeInvalidation())
+}
+
 @Test func scrollViewWheelStoresPositionWithoutBinding() {
     let scrollView = ScrollView {
         VStack {
@@ -3149,6 +3210,36 @@ import Terminal
     .buttonSizing(.flexible)
 
     #expect(ViewResolver.text(from: view) == "flexible")
+}
+
+@Test func isEnabledEnvironmentDefaultsToTrue() {
+    #expect(EnvironmentValues().isEnabled)
+    #expect(ViewResolver.text(from: IsEnabledMarkerText()) == "enabled")
+}
+
+@Test func disabledModifierUpdatesIsEnabledEnvironment() {
+    #expect(ViewResolver.text(from: IsEnabledMarkerText().disabled(true)) == "disabled")
+    #expect(ViewResolver.text(from: IsEnabledMarkerText().disabled(false)) == "enabled")
+}
+
+@Test func parentDisabledOverridesChildEnabledEnvironment() {
+    let view = VStack(alignment: .leading) {
+        IsEnabledMarkerText()
+            .disabled(false)
+    }
+    .disabled(true)
+
+    #expect(ViewResolver.text(from: view) == "disabled")
+}
+
+@Test func disabledEnvironmentDoesNotLeakToSibling() {
+    let view = VStack(alignment: .leading) {
+        IsEnabledMarkerText()
+            .disabled(true)
+        IsEnabledMarkerText()
+    }
+
+    #expect(ViewResolver.block(from: view)?.lines == ["disabled", "enabled "])
 }
 
 @Test func onAppearRunsOnceForStableIdentity() {
@@ -4415,6 +4506,20 @@ func NavigationLinkDirectDestinationActivatesWithReturnAndTap() {
     #expect(runtime.block(from: view)?.text == "Detail")
 }
 
+@Test("Disabled navigation link ignores Return and tap")
+func DisabledNavigationLinkIgnoresReturnAndTap() {
+    let runtime = StateRuntime()
+    let view = FocusedDirectNavigationLinkView()
+        .disabled(true)
+
+    #expect(runtime.block(from: view)?.text == "Open")
+    _ = runtime.consumeInvalidation()
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.consumeInvalidation() == false)
+    #expect(runtime.block(from: view)?.text == "Open")
+}
+
 @Test("Navigation link value appends to bound path and renders destination")
 func NavigationLinkValueAppendsToBoundPathAndRendersDestination() {
     var path: [Int] = []
@@ -5024,6 +5129,26 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events.isEmpty)
 }
 
+@Test func disabledInputModifiersIgnoreUserInput() {
+    let runtime = StateRuntime()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let keyProbe = KeyPressProbe()
+    let tapProbe = TapGestureProbe()
+    let view = DisabledInputModifiersView(
+        focusProbe: focusProbe,
+        keyProbe: keyProbe,
+        tapProbe: tapProbe
+    )
+
+    #expect(runtime.block(from: view)?.text == "A")
+    #expect(focusProbe.binding?.wrappedValue == false)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .ignored)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(keyProbe.events.isEmpty)
+    #expect(tapProbe.events.isEmpty)
+}
+
 @Test func tapGestureActionMutatesStateAndInvalidatesView() {
     let runtime = StateRuntime()
     let view = TapGestureStateMutationView()
@@ -5226,6 +5351,22 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(tapProbe.events == ["go"])
+}
+
+@Test func disabledButtonIgnoresClickAndReturnActivation() {
+    let runtime = StateRuntime()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let tapProbe = TapGestureProbe()
+    let view = DisabledFocusedButtonView(
+        focusProbe: focusProbe,
+        tapProbe: tapProbe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Run")
+    #expect(focusProbe.binding?.wrappedValue == false)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(tapProbe.events.isEmpty)
 }
 
 @Test func buttonActionMutatesStateAndInvalidatesView() {
@@ -6041,6 +6182,15 @@ private struct ButtonSizingMarkerText: View {
     }
 }
 
+private struct IsEnabledMarkerText: View {
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Text(isEnabled ? "enabled" : "disabled")
+    }
+}
+
 private struct EnvironmentStateMarkerView: View {
 
     @State var marker = "initial"
@@ -6490,6 +6640,48 @@ private struct FocusedButtonView: View {
             tapProbe.record("go")
         }
         .focused($isFocused)
+    }
+}
+
+private struct DisabledFocusedButtonView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        CapturedFocusedButton(
+            focus: $isFocused,
+            focusProbe: focusProbe,
+            tapProbe: tapProbe
+        )
+        .disabled(true)
+    }
+}
+
+private struct CapturedFocusedButton: View {
+
+    let focus: FocusState<Bool>.Binding
+
+    let tapProbe: TapGestureProbe
+
+    init(
+        focus: FocusState<Bool>.Binding,
+        focusProbe: FocusBindingProbe<Bool>,
+        tapProbe: TapGestureProbe
+    ) {
+        self.focus = focus
+        self.tapProbe = tapProbe
+        focusProbe.capture(focus)
+    }
+
+    var body: some View {
+        Button("Run") {
+            tapProbe.record("run")
+        }
+        .focused(focus)
     }
 }
 
@@ -7429,6 +7621,51 @@ private struct TextFieldEditingView: View {
     }
 }
 
+private struct DisabledFocusedTextFieldView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    let textProbe: BindingProbe<String>
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedDisabledFocusedTextField(
+            text: $text,
+            focus: $isFocused,
+            textProbe: textProbe,
+            focusProbe: focusProbe
+        )
+        .disabled(true)
+    }
+}
+
+private struct CapturedDisabledFocusedTextField: View {
+
+    let text: Binding<String>
+
+    let focus: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        focus: FocusState<Bool>.Binding,
+        textProbe: BindingProbe<String>,
+        focusProbe: FocusBindingProbe<Bool>
+    ) {
+        self.text = text
+        self.focus = focus
+        textProbe.capture(text)
+        focusProbe.capture(focus)
+    }
+
+    var body: some View {
+        TextField("Name", text: text)
+            .focused(focus)
+    }
+}
+
 private struct TextEditorEditingView: View {
 
     @State var text = ""
@@ -7438,6 +7675,51 @@ private struct TextEditorEditingView: View {
     var body: some View {
         TextEditor(text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct DisabledFocusedTextEditorView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    let textProbe: BindingProbe<String>
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedDisabledFocusedTextEditor(
+            text: $text,
+            focus: $isFocused,
+            textProbe: textProbe,
+            focusProbe: focusProbe
+        )
+        .disabled(true)
+    }
+}
+
+private struct CapturedDisabledFocusedTextEditor: View {
+
+    let text: Binding<String>
+
+    let focus: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        focus: FocusState<Bool>.Binding,
+        textProbe: BindingProbe<String>,
+        focusProbe: FocusBindingProbe<Bool>
+    ) {
+        self.text = text
+        self.focus = focus
+        textProbe.capture(text)
+        focusProbe.capture(focus)
+    }
+
+    var body: some View {
+        TextEditor(text: text)
+            .focused(focus)
     }
 }
 
@@ -7940,6 +8222,27 @@ private struct FocusedAndGlobalKeyPressView: View {
     }
 }
 
+private struct DisabledInputModifiersView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    let keyProbe: KeyPressProbe
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        CapturedDisabledInputModifiersText(
+            focusBinding: $isFocused,
+            focusProbe: focusProbe,
+            keyProbe: keyProbe,
+            tapProbe: tapProbe
+        )
+        .disabled(true)
+    }
+}
+
 private struct NestedGlobalKeyPressView: View {
 
     let keyProbe: KeyPressProbe
@@ -7960,6 +8263,44 @@ private struct NestedGlobalKeyPressView: View {
             keyProbe.record("outer")
             return .handled
         }
+    }
+}
+
+private struct CapturedDisabledInputModifiersText: View {
+
+    let focusBinding: FocusState<Bool>.Binding
+
+    let keyProbe: KeyPressProbe
+
+    let tapProbe: TapGestureProbe
+
+    init(
+        focusBinding: FocusState<Bool>.Binding,
+        focusProbe: FocusBindingProbe<Bool>,
+        keyProbe: KeyPressProbe,
+        tapProbe: TapGestureProbe
+    ) {
+        self.focusBinding = focusBinding
+        self.keyProbe = keyProbe
+        self.tapProbe = tapProbe
+        focusProbe.capture(focusBinding)
+    }
+
+    var body: some View {
+        Text("A")
+            .focusable()
+            .focused(focusBinding)
+            .onKeyPress("a") {
+                keyProbe.record("focused")
+                return .handled
+            }
+            .onGlobalKeyPress("g") {
+                keyProbe.record("global")
+                return .handled
+            }
+            .onTapGesture {
+                tapProbe.record("tap")
+            }
     }
 }
 

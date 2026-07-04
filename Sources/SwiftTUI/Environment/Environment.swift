@@ -72,6 +72,16 @@ public nonisolated struct EnvironmentValues {
 
 public extension EnvironmentValues {
 
+    /// A Boolean value that indicates whether this environment allows user interaction.
+    nonisolated var isEnabled: Bool {
+        get {
+            self[IsEnabledKey.self]
+        }
+        set {
+            self[IsEnabledKey.self] = newValue
+        }
+    }
+
     /// An action that pops the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
@@ -433,6 +443,21 @@ extension EnvironmentModifierRenderable {
 
 public extension View {
 
+    /// Adds a condition that controls whether users can interact with this view.
+    ///
+    /// - Parameter disabled: A Boolean value that determines whether users can
+    ///   interact with this view.
+    /// - Returns: A view that controls whether users can interact with this view.
+    nonisolated func disabled(_ disabled: Bool) -> some View {
+        TransformedEnvironmentView(
+            content: self,
+            keyPath: \.isEnabled,
+            transform: {
+                $0 = $0 && !disabled
+            }
+        )
+    }
+
     /// Sets the environment value of the specified key path to the given value.
     ///
     /// - Parameters:
@@ -524,6 +549,13 @@ enum EnvironmentRenderContext {
         await $taskValues.withValue(TaskValues(values: values)) {
             await operation()
         }
+    }
+}
+
+private struct IsEnabledKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: Bool {
+        true
     }
 }
 

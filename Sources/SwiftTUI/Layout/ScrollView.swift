@@ -319,7 +319,9 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         }
 
         var block = result.block
-        block.scrollRegions.append(RenderedScrollRegion(path: path, frame: block.bounds))
+        if EnvironmentRenderContext.current.isEnabled {
+            block.scrollRegions.append(RenderedScrollRegion(path: path, frame: block.bounds))
+        }
         return block
     }
 

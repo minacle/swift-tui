@@ -104,6 +104,8 @@ wrapping, but the final output is still terminal text and SGR styling.
 - `@Environment` and `View.environment(_:)` pass key-path values and
   Observation objects through the view tree, including bindings such as
   `$appState.token` for typed observable environment objects.
+- `disabled(_:)` and `@Environment(\.isEnabled)` control user interaction for
+  descendant views.
 - `NavigationStack`, `NavigationLink`, `NavigationPath`, `navigationDestination`,
   `@Environment(\.push)`, and `@Environment(\.pop)` provide stack navigation.
 - `onAppear`, `onDisappear`, `task`, `onChange`, `onSubmit`, and `onTerminate`

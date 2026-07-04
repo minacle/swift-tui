@@ -572,7 +572,10 @@ final class StateRuntime {
             return
         }
 
-        focus.registerFocusable(isFocusable, at: path)
+        focus.registerFocusable(
+            isFocusable && EnvironmentRenderContext.current.isEnabled,
+            at: path
+        )
     }
 
     func registerFocusAttachment(_ attachment: any FocusAttachment, at path: [Int]) {
@@ -584,7 +587,8 @@ final class StateRuntime {
     }
 
     func registerKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
-        guard !isSuppressingInteractiveRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
             return
         }
 
@@ -595,7 +599,8 @@ final class StateRuntime {
     }
 
     func registerGlobalKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
-        guard !isSuppressingInteractiveRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
             return
         }
 
@@ -606,7 +611,8 @@ final class StateRuntime {
     }
 
     func registerTapGestureHandler(_ handler: TapGestureHandler, at path: [Int]) {
-        guard !isSuppressingInteractiveRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
             return
         }
 
