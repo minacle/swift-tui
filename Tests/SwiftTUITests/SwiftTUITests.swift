@@ -1209,6 +1209,47 @@ import Terminal
     #expect(spacer?.height == 2)
 }
 
+@Test func hiddenPreservesLayoutButRemovesOutputAndRegions() {
+    let block = ViewResolver.block(
+        from: Text("C")
+            .onTapGesture {}
+            .focusable()
+            .hidden()
+    )
+
+    #expect(block?.width == 1)
+    #expect(block?.height == 1)
+    #expect(block?.runs == [])
+    #expect(block?.cursor == nil)
+    #expect(block?.hitRegions == [])
+    #expect(block?.scrollRegions == [])
+    #expect(block?.focusRegions == [])
+}
+
+@Test func hiddenKeepsStackSpacingFootprint() {
+    let view = HStack {
+        Text("A")
+        Text("B")
+            .hidden()
+        Text("C")
+    }
+
+    #expect(ViewResolver.block(from: view)?.lines == ["A C"])
+}
+
+@Test func hiddenPreservesFramedPaddedWideCharacterSize() {
+    let block = ViewResolver.block(
+        from: Text("한")
+            .padding()
+            .frame(width: 5, height: 3)
+            .hidden()
+    )
+
+    #expect(block?.width == 5)
+    #expect(block?.height == 3)
+    #expect(block?.runs == [])
+}
+
 @Test func hStackAlignsChildrenVertically() {
     let top = HStack(alignment: .top, spacing: 1) {
         VStack {
@@ -3131,6 +3172,22 @@ import Terminal
     #expect(runtime.block(from: Text("A").onAppear())?.text == "A")
 }
 
+@Test func hiddenPreservesLifecycleRegistration() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+    let view = Text("A")
+        .onAppear {
+            probe.events.append("appear")
+        }
+        .hidden()
+
+    #expect(runtime.block(from: view)?.runs == [])
+    #expect(probe.events == ["appear"])
+
+    #expect(runtime.block(from: view)?.runs == [])
+    #expect(probe.events == ["appear"])
+}
+
 @Test func onDisappearRunsWhenRenderedIdentityIsRemoved() {
     let runtime = StateRuntime()
     let probe = LifecycleProbe()
@@ -3214,6 +3271,20 @@ import Terminal
 
     #expect(runtime.block(from: view)?.text == "A")
     await Task.yield()
+    #expect(probe.events == ["start"])
+}
+
+@Test func hiddenPreservesTaskRegistration() async {
+    let runtime = StateRuntime()
+    let probe = AsyncTaskProbe()
+    let view = Text("A")
+        .task {
+            probe.record("start")
+        }
+        .hidden()
+
+    #expect(runtime.block(from: view)?.runs == [])
+    await probe.waitForCount(1)
     #expect(probe.events == ["start"])
 }
 
@@ -3388,6 +3459,27 @@ import Terminal
         )?.text == "1"
     )
     #expect(probe.events == ["changed 1"])
+}
+
+@Test func hiddenPreservesChangeRegistration() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: OnChangeValueView(value: 1, initial: true, probe: probe)
+                .hidden()
+        )?.runs == []
+    )
+    #expect(probe.events == ["changed 1"])
+
+    #expect(
+        runtime.block(
+            from: OnChangeValueView(value: 2, initial: true, probe: probe)
+                .hidden()
+        )?.runs == []
+    )
+    #expect(probe.events == ["changed 1", "changed 2"])
 }
 
 @Test func onChangeRunsWhenValueChanges() {
@@ -4894,6 +4986,41 @@ private struct ParentCallbackStateMutationTests {
     )
 
     #expect(block?.text == "A")
+    #expect(tapProbe.events.isEmpty)
+}
+
+@Test func hiddenSuppressesInteractiveRuntimeRegistrations() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let view = VStack {
+        Button("Run") {
+            tapProbe.record("button")
+        }
+        Text("Key")
+            .focusable()
+            .onKeyPress("k") {
+                tapProbe.record("key")
+                return .handled
+            }
+            .onTapGesture {
+                tapProbe.record("tap")
+            }
+        ScrollView(.vertical) {
+            Text("A")
+            Text("B")
+        }
+    }
+    .hidden()
+
+    let block = runtime.block(from: view, in: RenderProposal(columns: 5, rows: 2))
+
+    #expect(block?.runs == [])
+    #expect(block?.hitRegions == [])
+    #expect(block?.scrollRegions == [])
+    #expect(block?.focusRegions == [])
+    #expect(runtime.dispatch(KeyPress(key: "k", characters: "k")) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
     #expect(tapProbe.events.isEmpty)
 }
 

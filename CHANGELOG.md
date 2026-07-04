@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `View.hidden()` for hiding terminal output and interactions while
+  preserving the view's terminal-cell layout footprint.
 - Added `TextEditor` for terminal-native multi-line text editing with
   binding-backed text, focus, cursor movement, Unicode-width-aware rendering,
   and vertical scrolling.

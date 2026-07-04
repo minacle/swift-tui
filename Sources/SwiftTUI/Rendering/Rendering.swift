@@ -1196,6 +1196,10 @@ enum ViewResolver {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let modifier = view as? any HiddenModifierRenderable {
+            return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let modifier = view as? any TerminationModifierRenderable {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
@@ -1354,6 +1358,14 @@ enum ViewResolver {
         }
 
         if let modifier = view as? any ChangeModifierRenderable {
+            return modifier.renderedElement(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+
+        if let modifier = view as? any HiddenModifierRenderable {
             return modifier.renderedElement(
                 in: proposal,
                 path: path,

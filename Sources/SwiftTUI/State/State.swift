@@ -337,10 +337,16 @@ final class StateRuntime {
 
     private var suppressRenderRegistrations = false
 
+    private var suppressInteractiveRenderRegistrations = false
+
     private var pendingRemovedStateSubtrees: [[Int]] = []
 
     var isSuppressingRenderRegistrations: Bool {
         suppressRenderRegistrations
+    }
+
+    var isSuppressingInteractiveRenderRegistrations: Bool {
+        suppressRenderRegistrations || suppressInteractiveRenderRegistrations
     }
 
     func block<Content: View>(
@@ -562,7 +568,7 @@ final class StateRuntime {
     }
 
     func registerFocusable(_ isFocusable: Bool, at path: [Int]) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -570,7 +576,7 @@ final class StateRuntime {
     }
 
     func registerFocusAttachment(_ attachment: any FocusAttachment, at path: [Int]) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -578,7 +584,7 @@ final class StateRuntime {
     }
 
     func registerKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -589,7 +595,7 @@ final class StateRuntime {
     }
 
     func registerGlobalKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -600,7 +606,7 @@ final class StateRuntime {
     }
 
     func registerTapGestureHandler(_ handler: TapGestureHandler, at path: [Int]) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -708,7 +714,7 @@ final class StateRuntime {
         maximumPoint: ScrollPoint,
         binding: Binding<ScrollPosition>?
     ) {
-        guard !suppressRenderRegistrations else {
+        guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
@@ -970,6 +976,16 @@ final class StateRuntime {
         suppressRenderRegistrations = true
         defer {
             suppressRenderRegistrations = previous
+        }
+
+        return operation()
+    }
+
+    func withoutInteractiveRenderRegistrations<Value>(_ operation: () -> Value) -> Value {
+        let previous = suppressInteractiveRenderRegistrations
+        suppressInteractiveRenderRegistrations = true
+        defer {
+            suppressInteractiveRenderRegistrations = previous
         }
 
         return operation()

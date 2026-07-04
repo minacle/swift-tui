@@ -95,8 +95,8 @@ wrapping, but the final output is still terminal text and SGR styling.
 - `Text`, `TextField`, `SecureField`, `TextEditor`, and text modifiers render
   styled and editable text.
 - `Button`, `onTapGesture`, `onKeyPress`, and `onGlobalKeyPress` handle input.
-- `HStack`, `VStack`, `Spacer`, `GeometryReader`, frame modifiers, padding, and
-  custom `Layout` implementations control terminal-cell layout.
+- `HStack`, `VStack`, `Spacer`, `GeometryReader`, frame modifiers, padding,
+  `hidden`, and custom `Layout` implementations control terminal-cell layout.
 - `ScrollView` and `ScrollPosition` provide bounded scrolling in horizontal and
   vertical axes.
 - `@State`, `Binding`, `@Bindable`, `@FocusState`, `focused`, and `focusable`

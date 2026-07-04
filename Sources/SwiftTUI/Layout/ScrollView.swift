@@ -313,7 +313,7 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         )
         if binding != nil
             && !LayoutMeasurementContext.isMeasuring
-            && runtime?.isSuppressingRenderRegistrations != true
+            && runtime?.isSuppressingInteractiveRenderRegistrations != true
             && (position.point != nil || position.edge != nil) {
             ScrollPositionContext.updateCurrentPosition(to: ScrollPosition(point: result.point))
         }
