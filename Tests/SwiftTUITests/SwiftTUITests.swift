@@ -2639,6 +2639,18 @@ import Terminal
     #expect(runtime.block(from: view)?.text == "interrupted")
 }
 
+@Test func terminateHandlerObservableNavigationPathInvalidatesImmediately() {
+    let runtime = StateRuntime()
+    let view = ObservableTerminateNavigationView()
+
+    #expect(runtime.block(from: view)?.text == "main")
+
+    runtime.dispatchTerminate()
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "confirm quit")
+}
+
 @Test func inputEventValueTypesExposeExpectedSemantics() {
     let key: KeyEquivalent = "a"
     let modifiers: EventModifiers = [.shift, .control]
@@ -5720,6 +5732,32 @@ private struct TerminateStatusView: View {
             .onTerminate {
                 status = "interrupted"
             }
+    }
+}
+
+@Observable
+private final class ObservableTerminateNavigationModel {
+
+    var path: [NavigationPushDestination] = []
+}
+
+private struct ObservableTerminateNavigationView: View {
+
+    @State private var model = ObservableTerminateNavigationModel()
+
+    var body: some View {
+        NavigationStack(path: $model.path) {
+            Text("main")
+                .navigationDestination(for: NavigationPushDestination.self) { destination in
+                    switch destination {
+                    case .detail:
+                        Text("confirm quit")
+                    }
+                }
+        }
+        .onTerminate {
+            model.path.append(.detail)
+        }
     }
 }
 

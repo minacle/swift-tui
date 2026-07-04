@@ -1460,12 +1460,15 @@ final class StateActionContext {
         self.path = context.path
     }
 
-    func perform<Value>(_ operation: () -> Value) -> Value {
+    func perform<Value>(
+        mode: StateRenderContextMode = .action,
+        _ operation: () -> Value
+    ) -> Value {
         guard let runtime else {
             return operation()
         }
 
-        return runtime.withView(at: path, perform: operation)
+        return runtime.withView(at: path, mode: mode, perform: operation)
     }
 }
 

@@ -387,18 +387,21 @@ struct NavigationPathAccessor {
     }
 
     init(_ path: Binding<NavigationPath>, context: StateActionContext? = nil) {
-        func withContext<Value>(_ operation: () -> Value) -> Value {
-            context?.perform(operation) ?? operation()
+        func withContext<Value>(
+            mode: StateRenderContextMode = .action,
+            _ operation: () -> Value
+        ) -> Value {
+            context?.perform(mode: mode, operation) ?? operation()
         }
 
         self.init(
             values: {
-                withContext {
+                withContext(mode: .render) {
                     path.wrappedValue.values
                 }
             },
             topValue: {
-                withContext {
+                withContext(mode: .render) {
                     path.wrappedValue.lastValue
                 }
             },
@@ -437,18 +440,21 @@ struct NavigationPathAccessor {
             Data: RangeReplaceableCollection,
             Data.Element: Hashable
     {
-        func withContext<Value>(_ operation: () -> Value) -> Value {
-            context?.perform(operation) ?? operation()
+        func withContext<Value>(
+            mode: StateRenderContextMode = .action,
+            _ operation: () -> Value
+        ) -> Value {
+            context?.perform(mode: mode, operation) ?? operation()
         }
 
         self.init(
             values: {
-                withContext {
+                withContext(mode: .render) {
                     path.wrappedValue.map(AnyNavigationValue.init)
                 }
             },
             topValue: {
-                withContext {
+                withContext(mode: .render) {
                     path.wrappedValue.last.map(AnyNavigationValue.init)
                 }
             },

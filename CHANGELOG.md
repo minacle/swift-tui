@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `onTerminate` handlers that update observable `NavigationStack(path:)`
+  state so they trigger an immediate redraw instead of waiting for the next
+  input event.
+
 ## [0.1.0] - 2026-07-04
 
 ### Added
