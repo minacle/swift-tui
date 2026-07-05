@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ZStack`, `View.background(alignment:content:)`,
+  `View.overlay(alignment:content:)`, and `View.zIndex(_:)` for layering
+  terminal-cell views with front-to-back ordering.
 - Added `Box`, `HeavyBox`, and `DoubleBox` views for drawing regular, heavy,
   and double-line box drawing borders around terminal-cell content.
 - Added `ShapeStyle`, `View.foregroundStyle(_:)`, and

@@ -87,3 +87,30 @@ public nonisolated struct VStack<Content: View>: View {
         self.content = content()
     }
 }
+
+/// A view that overlays its children, aligning them in both axes.
+///
+/// Later children are rendered above earlier children unless ``View/zIndex(_:)``
+/// changes their front-to-back order.
+public nonisolated struct ZStack<Content: View>: View {
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let alignment: Alignment
+
+    let content: Content
+
+    /// Creates an overlay stack.
+    ///
+    /// - Parameters:
+    ///   - alignment: The alignment used to place each child within the stack.
+    ///   - content: A view builder that creates the stack's children.
+    public init(
+        alignment: Alignment = .center,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.alignment = alignment
+        self.content = content()
+    }
+}

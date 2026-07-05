@@ -102,8 +102,9 @@ wrapping, but the final output is still terminal text and SGR styling.
 - `Box`, `HeavyBox`, and `DoubleBox` draw character-cell borders around
   content using box drawing characters.
 - `Button`, `onTapGesture`, `onKeyPress`, and `onGlobalKeyPress` handle input.
-- `HStack`, `VStack`, `Spacer`, `GeometryReader`, frame modifiers, padding,
-  `hidden`, and custom `Layout` implementations control terminal-cell layout.
+- `HStack`, `VStack`, `ZStack`, `Spacer`, `GeometryReader`, frame modifiers,
+  padding, `background`, `overlay`, `zIndex`, `hidden`, and custom `Layout`
+  implementations control terminal-cell layout and layering.
 - `ScrollView` and `ScrollPosition` provide bounded scrolling in horizontal and
   vertical axes.
 - `@State`, `Binding`, `@Bindable`, `@FocusState`, `focused`, and `focusable`

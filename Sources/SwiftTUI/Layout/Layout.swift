@@ -254,6 +254,36 @@ struct LayoutPriorityView<Content: View>: View, LayoutModifierRenderable,
     }
 }
 
+struct ZIndexView<Content: View>: View, LayoutModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let zIndex: Double
+
+    var layoutTraits: LayoutTraits {
+        var traits = ViewResolver.layoutTraits(from: content)
+        traits.zIndex = zIndex
+        return traits
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
 public extension View {
 
     /// Sets the priority that custom layouts can read for this child.
@@ -263,6 +293,17 @@ public extension View {
     /// - Returns: A view with the given layout priority.
     func layoutPriority(_ value: Double) -> some View {
         LayoutPriorityView(content: self, priority: value)
+    }
+
+    /// Controls the front-to-back display order of overlapping views.
+    ///
+    /// Larger values render above smaller values. Views with the same value
+    /// preserve their source order.
+    ///
+    /// - Parameter value: The relative z-axis ordering for this view.
+    /// - Returns: A view with the given z-index.
+    func zIndex(_ value: Double) -> some View {
+        ZIndexView(content: self, zIndex: value)
     }
 }
 
@@ -347,31 +388,44 @@ extension LayoutContainer: LayoutRenderable {
         subviews: LayoutSubviews
     ) -> RenderedBlock {
         let bounds = RenderedRect(width: size.columns, height: size.rows)
-        let blocks = placements.compactMap { placement -> RenderedBlock? in
-            guard subviews.indices.contains(placement.index),
-                  let block = subviews[placement.index]
-                    .child
-                    .render(placement.proposal.renderProposal, false)?
-                    .renderedBlock(proposal: placement.proposal.renderProposal) else {
-                return nil
+        let blocks = placements.enumerated()
+            .sorted { lhs, rhs in
+                let lhsPlacement = lhs.element
+                let rhsPlacement = rhs.element
+                let lhsZIndex = subviews.indices.contains(lhsPlacement.index)
+                    ? subviews[lhsPlacement.index].child.traits.zIndex
+                    : 0
+                let rhsZIndex = subviews.indices.contains(rhsPlacement.index)
+                    ? subviews[rhsPlacement.index].child.traits.zIndex
+                    : 0
+
+                if lhsZIndex == rhsZIndex {
+                    return lhs.offset < rhs.offset
+                }
+
+                return lhsZIndex < rhsZIndex
+            }
+            .compactMap { _, placement -> RenderedBlock? in
+                guard subviews.indices.contains(placement.index),
+                      let block = subviews[placement.index]
+                        .child
+                        .render(placement.proposal.renderProposal, false)?
+                        .renderedBlock(proposal: placement.proposal.renderProposal) else {
+                    return nil
+                }
+
+                return block.offsetBy(
+                    x: xOffset(for: block, placement: placement),
+                    y: yOffset(for: block, placement: placement),
+                    clippedTo: bounds
+                )
             }
 
-            return block.offsetBy(
-                x: xOffset(for: block, placement: placement),
-                y: yOffset(for: block, placement: placement),
-                clippedTo: bounds
-            )
-        }
-
-        return RenderedBlock(
-            runs: blocks.flatMap(\.runs),
+        return RenderedBlock.composited(
+            blocks,
             width: size.columns,
             height: size.rows,
-            paddedRows: Set(0..<size.rows),
-            cursor: blocks.compactMap(\.cursor).first,
-            hitRegions: blocks.flatMap(\.hitRegions),
-            scrollRegions: blocks.flatMap(\.scrollRegions),
-            focusRegions: blocks.flatMap(\.focusRegions)
+            paddedRows: Set(0..<size.rows)
         )
     }
 

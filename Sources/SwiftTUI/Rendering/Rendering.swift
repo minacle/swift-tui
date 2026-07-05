@@ -455,6 +455,49 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         )
     }
 
+    func aligned(in bounds: RenderedRect, alignment: Alignment) -> RenderedBlock {
+        offsetBy(
+            x: horizontalOffset(
+                contentWidth: width,
+                containerWidth: bounds.width,
+                alignment: alignment.horizontal
+            ),
+            y: verticalOffset(
+                contentHeight: height,
+                containerHeight: bounds.height,
+                alignment: alignment.vertical
+            ),
+            clippedTo: bounds
+        )
+    }
+
+    static func composited(
+        _ blocks: [RenderedBlock],
+        width: Int,
+        height: Int,
+        paddedRows: Set<Int> = []
+    ) -> RenderedBlock {
+        let width = max(width, 0)
+        let height = max(height, 0)
+        let bounds = RenderedRect(width: width, height: height)
+        let visiblePaddedRows = Set(
+            paddedRows.union(blocks.flatMap(\.paddedRows)).filter {
+                $0 >= 0 && $0 < height
+            }
+        )
+
+        return RenderedBlock(
+            runs: CompositedCell.runs(from: blocks, clippedTo: bounds),
+            width: width,
+            height: height,
+            paddedRows: visiblePaddedRows,
+            cursor: blocks.reversed().compactMap(\.cursor).first,
+            hitRegions: blocks.reversed().flatMap(\.hitRegions),
+            scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
+            focusRegions: blocks.reversed().flatMap(\.focusRegions)
+        )
+    }
+
     private func framedCursor(
         x: Int,
         y: Int,
@@ -566,6 +609,144 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     }
 }
 
+private nonisolated struct CompositedCell: Equatable {
+
+    var text: String
+
+    var row: Int
+
+    var column: Int
+
+    var width: Int
+
+    var style: TextStyle
+
+    static func runs(
+        from blocks: [RenderedBlock],
+        clippedTo bounds: RenderedRect
+    ) -> [RenderedRun] {
+        guard !bounds.isEmpty else {
+            return []
+        }
+
+        var rows: [Int: [Int: CompositedCell]] = [:]
+        for block in blocks {
+            for run in block.runs.flatMap({ $0.clipped(to: bounds) }) {
+                write(run, to: &rows)
+            }
+        }
+
+        return rows
+            .flatMap { row, cellsByColumn in
+                uniqueCells(in: cellsByColumn).map {
+                    RenderedRun(
+                        text: $0.text,
+                        row: row,
+                        column: $0.column,
+                        style: $0.style
+                    )
+                }
+            }
+            .sorted {
+                if $0.row == $1.row {
+                    return $0.column < $1.column
+                }
+
+                return $0.row < $1.row
+            }
+            .mergedAdjacentRuns()
+    }
+
+    private static func write(
+        _ run: RenderedRun,
+        to rows: inout [Int: [Int: CompositedCell]]
+    ) {
+        var column = run.column
+        for character in run.text {
+            let text = String(character)
+            let width = TerminalText.columnWidth(text)
+            guard width > 0 else {
+                continue
+            }
+
+            write(
+                CompositedCell(
+                    text: text,
+                    row: run.row,
+                    column: column,
+                    width: width,
+                    style: run.style
+                ),
+                to: &rows
+            )
+            column += width
+        }
+    }
+
+    private static func write(
+        _ cell: CompositedCell,
+        to rows: inout [Int: [Int: CompositedCell]]
+    ) {
+        var cellsByColumn = rows[cell.row] ?? [:]
+        let columns = cell.column..<(cell.column + cell.width)
+        var overlappedCells: [CompositedCell] = []
+
+        for column in columns {
+            if let overlappedCell = cellsByColumn[column],
+               !overlappedCells.contains(overlappedCell) {
+                overlappedCells.append(overlappedCell)
+            }
+        }
+
+        for overlappedCell in overlappedCells {
+            for column in overlappedCell.column..<(overlappedCell.column + overlappedCell.width) {
+                cellsByColumn[column] = nil
+            }
+        }
+
+        for column in columns {
+            cellsByColumn[column] = cell
+        }
+        rows[cell.row] = cellsByColumn
+    }
+
+    private static func uniqueCells(
+        in cellsByColumn: [Int: CompositedCell]
+    ) -> [CompositedCell] {
+        var cells: [CompositedCell] = []
+        for cell in cellsByColumn.values.sorted(by: { $0.column < $1.column }) {
+            if !cells.contains(cell) {
+                cells.append(cell)
+            }
+        }
+        return cells
+    }
+}
+
+private extension [RenderedRun] {
+
+    nonisolated func mergedAdjacentRuns() -> [RenderedRun] {
+        var runs: [RenderedRun] = []
+        for run in self {
+            guard let last = runs.last,
+                  last.row == run.row,
+                  last.column + last.width == run.column,
+                  last.style == run.style else {
+                runs.append(run)
+                continue
+            }
+
+            runs[runs.count - 1] = RenderedRun(
+                text: last.text + run.text,
+                row: last.row,
+                column: last.column,
+                style: last.style
+            )
+        }
+        return runs
+    }
+}
+
 nonisolated struct RenderProposal: Equatable, Sendable {
 
     var columns: Int?
@@ -594,6 +775,8 @@ nonisolated struct LayoutTraits: Sendable {
     var flexibleAxes: Axis.Set = []
 
     var priority: Double = 0
+
+    var zIndex: Double = 0
 
     func removingFlexibleAxes(_ axes: Axis.Set) -> LayoutTraits {
         var traits = self
@@ -1583,6 +1766,26 @@ extension VStack: StackRenderable {
     }
 }
 
+extension ZStack: StackRenderable {
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        ZStackRenderer.block(
+            ViewResolver.stackChildren(
+                from: content,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            ),
+            alignment: alignment,
+            proposal: proposal
+        )
+    }
+}
+
 extension ViewResolver {
 
     static func blocks<Content: View>(from view: Content) -> [RenderedBlock] {
@@ -1705,6 +1908,95 @@ extension ViewResolver {
             columns: axes.contains(.horizontal) ? proposal?.columns : nil,
             rows: axes.contains(.vertical) ? proposal?.rows : nil
         )
+    }
+}
+
+enum ZStackRenderer {
+
+    static func block(
+        _ children: [StackChild],
+        alignment: Alignment,
+        proposal: RenderProposal?
+    ) -> RenderedBlock? {
+        let measuredChildren = children.enumerated().compactMap { index, child -> MeasuredChild? in
+            guard let element = child.render(proposal, true),
+                  let block = renderedBlock(from: element, proposal: proposal),
+                  block.width > 0 || block.height > 0 else {
+                return nil
+            }
+
+            return MeasuredChild(index: index, child: child, block: block)
+        }
+        guard !measuredChildren.isEmpty else {
+            return nil
+        }
+
+        let width = proposal?.columns ?? (measuredChildren.map(\.block.width).max() ?? 0)
+        let height = proposal?.rows ?? (measuredChildren.map(\.block.height).max() ?? 0)
+        let bounds = RenderedRect(width: width, height: height)
+        let blocks = measuredChildren
+            .sorted {
+                if $0.child.traits.zIndex == $1.child.traits.zIndex {
+                    return $0.index < $1.index
+                }
+
+                return $0.child.traits.zIndex < $1.child.traits.zIndex
+            }
+            .compactMap { measuredChild -> RenderedBlock? in
+                guard let element = measuredChild.child.render(proposal, false),
+                      let block = renderedBlock(from: element, proposal: proposal) else {
+                    return nil
+                }
+
+                return block.aligned(in: bounds, alignment: alignment)
+            }
+
+        return RenderedBlock.composited(
+            blocks,
+            width: width,
+            height: height,
+            paddedRows: proposedPaddedRows(proposal: proposal, height: height)
+        )
+    }
+
+    private struct MeasuredChild {
+
+        var index: Int
+
+        var child: StackChild
+
+        var block: RenderedBlock
+    }
+
+    private static func renderedBlock(
+        from element: RenderedElement,
+        proposal: RenderProposal?
+    ) -> RenderedBlock? {
+        switch element {
+        case .block(let block):
+            return block
+        case .spacer(let minLength):
+            let width = max(proposal?.columns ?? minLength, minLength)
+            let height = max(proposal?.rows ?? minLength, minLength)
+            guard width > 0 || height > 0 else {
+                return nil
+            }
+
+            let renderedHeight = max(height, 1)
+            return RenderedBlock(
+                runs: [],
+                width: width,
+                height: renderedHeight,
+                paddedRows: Set(0..<renderedHeight)
+            )
+        }
+    }
+
+    private static func proposedPaddedRows(
+        proposal: RenderProposal?,
+        height: Int
+    ) -> Set<Int> {
+        proposal?.rows == nil ? [] : Set(0..<height)
     }
 }
 
