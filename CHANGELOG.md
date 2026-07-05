@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `View.italic(_:)`, `View.underline(_:)`, and
+  `View.strikethrough(_:)` text styling modifiers for terminal SGR italic,
+  underline, and strikethrough output.
+
 ## [0.2.0] - 2026-07-05
 
 ### Added

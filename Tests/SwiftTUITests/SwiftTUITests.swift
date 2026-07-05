@@ -12,7 +12,13 @@ import Terminal
 
 @Test func textStyleDoesNotChangePlainTextProjection() {
     let block = ViewResolver.block(
-        from: Text("Lorem ipsum").color(.green).bold().dim(),
+        from: Text("Lorem ipsum")
+            .color(.green)
+            .bold()
+            .dim()
+            .italic()
+            .underline()
+            .strikethrough(),
         in: RenderProposal(columns: 5)
     )
 
@@ -28,22 +34,35 @@ import Terminal
                 .color(.default)
                 .bold(false)
                 .dim(false)
+                .italic(false)
+                .underline(false)
+                .strikethrough(false)
         }
         .color(.red)
         .bold()
         .dim()
+        .italic()
+        .underline()
+        .strikethrough()
     )
 
     #expect(block?.runs == [
         RenderedRun(
             text: "A",
             row: 0,
-            style: TextStyle(color: AnyColor(Color16.red), isBold: true, isDim: true)
+            style: TextStyle(
+                color: AnyColor(Color16.red),
+                isBold: true,
+                isDim: true,
+                isItalic: true,
+                isUnderline: true,
+                isStrikethrough: true
+            )
         ),
         RenderedRun(
             text: "B",
             row: 1,
-            style: TextStyle(color: AnyColor(DefaultColor.default), isBold: false)
+            style: TextStyle(color: AnyColor(DefaultColor.default))
         ),
     ])
     #expect(block?.lines == ["A", "B"])
@@ -62,7 +81,7 @@ import Terminal
             text: "A",
             row: 1,
             column: 1,
-            style: TextStyle(color: AnyColor(Color16.blue), isBold: false)
+            style: TextStyle(color: AnyColor(Color16.blue))
         ),
     ])
     #expect(block?.lines == ["    ", " A  ", "    "])
@@ -225,6 +244,9 @@ import Terminal
         .color(.brightGreen)
         .bold()
         .dim()
+        .italic()
+        .underline()
+        .strikethrough()
 
     #expect(ViewResolver.block(from: textField)?.runs == [
         RenderedRun(
@@ -232,7 +254,10 @@ import Terminal
             style: TextStyle(
                 color: AnyColor(Color16.brightGreen),
                 isBold: true,
-                isDim: true
+                isDim: true,
+                isItalic: true,
+                isUnderline: true,
+                isStrikethrough: true
             )
         ),
     ])
@@ -265,6 +290,9 @@ import Terminal
         .color(.brightGreen)
         .bold()
         .dim()
+        .italic()
+        .underline()
+        .strikethrough()
 
     #expect(ViewResolver.block(from: secureField)?.runs == [
         RenderedRun(
@@ -272,7 +300,10 @@ import Terminal
             style: TextStyle(
                 color: AnyColor(Color16.brightGreen),
                 isBold: true,
-                isDim: true
+                isDim: true,
+                isItalic: true,
+                isUnderline: true,
+                isStrikethrough: true
             )
         ),
     ])
@@ -2690,7 +2721,7 @@ import Terminal
     #expect(block?.runs == [
         RenderedRun(
             text: "CDE",
-            style: TextStyle(color: AnyColor(Color16.magenta), isBold: false)
+            style: TextStyle(color: AnyColor(Color16.magenta))
         ),
     ])
     #expect(block?.lines == ["CDE"])
@@ -2805,18 +2836,53 @@ import Terminal
     #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[2mA\u{001B}[22m\u{001B}[?25l")
 }
 
+@Test func screenOutputRendersItalicSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").italic())!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[3mA\u{001B}[23m\u{001B}[?25l")
+}
+
+@Test func screenOutputRendersUnderlineSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").underline())!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[4mA\u{001B}[24m\u{001B}[?25l")
+}
+
+@Test func screenOutputRendersStrikethroughSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").strikethrough())!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[9mA\u{001B}[29m\u{001B}[?25l")
+}
+
 @Test func screenOutputRendersCombinedStyleInDeterministicOrder() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("A").bold().dim().color(.brightCyan))!,
+        for: ViewResolver.block(
+            from: Text("A")
+                .bold()
+                .dim()
+                .italic()
+                .underline()
+                .strikethrough()
+                .color(.brightCyan)
+        )!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
     #expect(
         output
             == "\u{001B}[2J\u{001B}[1;1H"
-            + "\u{001B}[1m\u{001B}[2m\u{001B}[96m"
+            + "\u{001B}[1m\u{001B}[2m\u{001B}[3m\u{001B}[4m\u{001B}[9m\u{001B}[96m"
             + "A"
-            + "\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[22m\u{001B}[23m\u{001B}[24m\u{001B}[29m\u{001B}[39m"
             + "\u{001B}[?25l"
     )
 }
@@ -2830,10 +2896,16 @@ import Terminal
                     .color(.default)
                     .bold(false)
                     .dim(false)
+                    .italic(false)
+                    .underline(false)
+                    .strikethrough(false)
             }
             .color(.red)
             .bold()
             .dim()
+            .italic()
+            .underline()
+            .strikethrough()
         )!,
         in: TerminalViewportSize(columns: 1, rows: 2)
     )
@@ -2842,9 +2914,9 @@ import Terminal
         output
             == "\u{001B}[2J"
             + "\u{001B}[1;1H"
-            + "\u{001B}[1m\u{001B}[2m\u{001B}[31m"
+            + "\u{001B}[1m\u{001B}[2m\u{001B}[3m\u{001B}[4m\u{001B}[9m\u{001B}[31m"
             + "A"
-            + "\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[22m\u{001B}[23m\u{001B}[24m\u{001B}[29m\u{001B}[39m"
             + "\u{001B}[2;1H\u{001B}[39mB\u{001B}[39m"
             + "\u{001B}[?25l"
     )

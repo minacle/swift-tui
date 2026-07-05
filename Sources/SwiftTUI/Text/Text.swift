@@ -71,16 +71,27 @@ nonisolated struct AnyColor: Color {
 
 nonisolated struct TextStyle: Equatable, Sendable {
 
-    var color: AnyColor?
+    var color: AnyColor? = nil
 
-    var isBold: Bool
+    var isBold: Bool = false
 
     var isDim: Bool = false
 
-    static let plain = TextStyle(color: nil, isBold: false)
+    var isItalic: Bool = false
+
+    var isUnderline: Bool = false
+
+    var isStrikethrough: Bool = false
+
+    static let plain = TextStyle()
 
     var isPlain: Bool {
-        color == nil && !isBold && !isDim
+        color == nil
+            && !isBold
+            && !isDim
+            && !isItalic
+            && !isUnderline
+            && !isStrikethrough
     }
 }
 
@@ -203,6 +214,39 @@ public extension View {
     func dim(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isDim = isActive
+        }
+    }
+
+    /// Sets whether text within this view renders in italics.
+    ///
+    /// - Parameter isActive: Pass `true` to enable italic SGR styling, or
+    ///   `false` to clear italic styling for descendant text.
+    /// - Returns: A view with the updated text style environment.
+    func italic(_ isActive: Bool = true) -> some View {
+        transformEnvironment(\.textStyle) {
+            $0.isItalic = isActive
+        }
+    }
+
+    /// Sets whether text within this view renders underlined.
+    ///
+    /// - Parameter isActive: Pass `true` to enable underline SGR styling, or
+    ///   `false` to clear underline styling for descendant text.
+    /// - Returns: A view with the updated text style environment.
+    func underline(_ isActive: Bool = true) -> some View {
+        transformEnvironment(\.textStyle) {
+            $0.isUnderline = isActive
+        }
+    }
+
+    /// Sets whether text within this view renders with strikethrough.
+    ///
+    /// - Parameter isActive: Pass `true` to enable strikethrough SGR styling,
+    ///   or `false` to clear strikethrough styling for descendant text.
+    /// - Returns: A view with the updated text style environment.
+    func strikethrough(_ isActive: Bool = true) -> some View {
+        transformEnvironment(\.textStyle) {
+            $0.isStrikethrough = isActive
         }
     }
 

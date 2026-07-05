@@ -53,6 +53,15 @@ enum TerminalControl {
         if style.isDim {
             sequences.append(Terminal.SGR.style(.dim))
         }
+        if style.isItalic {
+            sequences.append(Terminal.SGR.style(.italic))
+        }
+        if style.isUnderline {
+            sequences.append(Terminal.SGR.style(.underline))
+        }
+        if style.isStrikethrough {
+            sequences.append(Terminal.SGR.style(.strikethrough))
+        }
         if let color = style.color {
             sequences.append(foregroundSGRSequence(for: color))
         }
@@ -67,6 +76,15 @@ enum TerminalControl {
         }
         else if style.isDim {
             sequences.append(Terminal.SGR.resetStyle(.dim))
+        }
+        if style.isItalic {
+            sequences.append(Terminal.SGR.resetStyle(.italic))
+        }
+        if style.isUnderline {
+            sequences.append(Terminal.SGR.resetStyle(.underline))
+        }
+        if style.isStrikethrough {
+            sequences.append(Terminal.SGR.resetStyle(.strikethrough))
         }
         if style.color != nil {
             sequences.append(Terminal.SGR.resetForegroundColor)

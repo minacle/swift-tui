@@ -23,7 +23,7 @@ struct AnyViewTests {
         #expect(block?.runs == [
             RenderedRun(
                 text: "x",
-                style: TextStyle(color: nil, isBold: true)
+                style: TextStyle(isBold: true)
             ),
         ])
         #expect(block?.lines == ["x"])
@@ -35,7 +35,30 @@ struct AnyViewTests {
         #expect(block?.runs == [
             RenderedRun(
                 text: "x",
-                style: TextStyle(color: nil, isBold: false, isDim: true)
+                style: TextStyle(isDim: true)
+            ),
+        ])
+        #expect(block?.lines == ["x"])
+    }
+
+    @Test func preservesAdditionalTextStyles() {
+        let block = ViewResolver.block(
+            from: AnyView(
+                Text("x")
+                    .italic()
+                    .underline()
+                    .strikethrough()
+            )
+        )
+
+        #expect(block?.runs == [
+            RenderedRun(
+                text: "x",
+                style: TextStyle(
+                    isItalic: true,
+                    isUnderline: true,
+                    isStrikethrough: true
+                )
             ),
         ])
         #expect(block?.lines == ["x"])
@@ -71,7 +94,7 @@ struct AnyViewTests {
         #expect(ViewResolver.block(from: marked)?.runs == [
             RenderedRun(
                 text: "●",
-                style: TextStyle(color: AnyColor(Color16.green), isBold: false)
+                style: TextStyle(color: AnyColor(Color16.green))
             ),
             RenderedRun(text: "title", column: 1),
         ])
