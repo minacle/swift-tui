@@ -87,6 +87,203 @@ import Terminal
     #expect(block?.lines == ["    ", " A  ", "    "])
 }
 
+@Test func boxRendersSingleCellCross() {
+    let block = ViewResolver.block(
+        from: Box()
+            .frame(width: 1, height: 1)
+    )
+
+    #expect(block?.lines == ["┼"])
+}
+
+@Test func boxRendersSingleRowWithSideTees() {
+    let block = ViewResolver.block(
+        from: Box()
+            .frame(width: 3, height: 1)
+    )
+
+    #expect(block?.lines == ["├─┤"])
+}
+
+@Test func boxRendersSingleColumnWithTopAndBottomTees() {
+    let block = ViewResolver.block(
+        from: Box()
+            .frame(width: 1, height: 3)
+    )
+
+    #expect(block?.lines == ["┬", "│", "┴"])
+}
+
+@Test func boxRendersRegularBorderAndOffsetsContentInsideBorder() {
+    let block = ViewResolver.block(
+        from: Box {
+            Text("A")
+        }
+    )
+
+    #expect(block?.width == 3)
+    #expect(block?.height == 3)
+    #expect(block?.lines == [
+        "┌─┐",
+        "│A│",
+        "└─┘",
+    ])
+    #expect(block?.runs.contains(RenderedRun(text: "A", row: 1, column: 1)) == true)
+}
+
+@Test func boxClipsContentToInterior() {
+    let block = ViewResolver.block(
+        from: Box {
+            Text("AB")
+        }
+        .frame(width: 3, height: 3)
+    )
+
+    #expect(block?.lines == [
+        "┌─┐",
+        "│A│",
+        "└─┘",
+    ])
+}
+
+@Test func twoByTwoBoxHasNoContentArea() {
+    let block = ViewResolver.block(
+        from: Box {
+            Text("A")
+        }
+        .frame(width: 2, height: 2)
+    )
+
+    #expect(block?.lines == [
+        "┌┐",
+        "└┘",
+    ])
+}
+
+@Test func heavyAndDoubleBoxesUseTheirDrawingSets() {
+    let heavy = ViewResolver.block(
+        from: HeavyBox()
+            .frame(width: 3, height: 3)
+    )
+    let double = ViewResolver.block(
+        from: DoubleBox()
+            .frame(width: 3, height: 3)
+    )
+
+    #expect(heavy?.lines == [
+        "┏━┓",
+        "┃ ┃",
+        "┗━┛",
+    ])
+    #expect(double?.lines == [
+        "╔═╗",
+        "║ ║",
+        "╚═╝",
+    ])
+}
+
+@Test func boxBorderStyleOnlyKeepsColorAndDim() {
+    let block = ViewResolver.block(
+        from: Box {
+            Text("A")
+        }
+        .color(.red)
+        .bold()
+        .dim()
+        .italic()
+        .underline()
+        .strikethrough()
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "┌─┐",
+            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+        ),
+        RenderedRun(
+            text: "│",
+            row: 1,
+            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+        ),
+        RenderedRun(
+            text: "│",
+            row: 1,
+            column: 2,
+            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+        ),
+        RenderedRun(
+            text: "└─┘",
+            row: 2,
+            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+        ),
+        RenderedRun(
+            text: "A",
+            row: 1,
+            column: 1,
+            style: TextStyle(
+                color: AnyColor(Color16.red),
+                isBold: true,
+                isDim: true,
+                isItalic: true,
+                isUnderline: true,
+                isStrikethrough: true
+            )
+        ),
+    ])
+}
+
+@Test func boxBorderScreenOutputOnlyUsesColorAndDimSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(
+            from: Box()
+                .frame(width: 1, height: 1)
+                .color(.red)
+                .bold()
+                .dim()
+                .italic()
+                .underline()
+                .strikethrough()
+        )!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[2m\u{001B}[31m┼\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func boxOffsetsContentInteractionRegionsInsideBorder() {
+    let runtime = StateRuntime()
+    let view = Box {
+        ScrollView(.horizontal) {
+            Text("ABCDE")
+        }
+        .scrollPosition(.constant(ScrollPosition(x: 1)))
+        .onTapGesture {}
+        .focusable()
+    }
+    .frame(width: 5, height: 3)
+
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == [
+        "┌───┐",
+        "│BCD│",
+        "└───┘",
+    ])
+    #expect(block?.scrollRegions.map(\.frame) == [
+        RenderedRect(x: 1, y: 1, width: 3, height: 1),
+    ])
+    #expect(block?.hitRegions.map(\.frame) == [
+        RenderedRect(x: 1, y: 1, width: 3, height: 1),
+    ])
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 1, y: 1, width: 3, height: 1),
+    ])
+}
+
 @Test func textWrapsToProposedColumns() {
     let block = ViewResolver.block(
         from: Text("Lorem ipsum dolor"),

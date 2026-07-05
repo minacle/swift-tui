@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `Box`, `HeavyBox`, and `DoubleBox` views for drawing regular, heavy,
+  and double-line box drawing borders around terminal-cell content.
 - Added `View.italic(_:)`, `View.underline(_:)`, and
   `View.strikethrough(_:)` text styling modifiers for terminal SGR italic,
   underline, and strikethrough output.

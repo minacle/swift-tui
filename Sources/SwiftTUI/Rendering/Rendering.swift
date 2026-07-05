@@ -1141,6 +1141,10 @@ enum ViewResolver {
             return button.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let box = view as? any BoxRenderable {
+            return box.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let geometryReader = view as? any GeometryReaderRenderable {
             return geometryReader.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
@@ -1274,6 +1278,14 @@ enum ViewResolver {
 
         if let button = view as? any ButtonRenderable {
             return button.renderedBlock(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            ).map { .block($0) }
+        }
+
+        if let box = view as? any BoxRenderable {
+            return box.renderedBlock(
                 in: proposal,
                 path: path,
                 runtime: runtime

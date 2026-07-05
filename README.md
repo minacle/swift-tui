@@ -94,6 +94,8 @@ wrapping, but the final output is still terminal text and SGR styling.
   composable terminal view content.
 - `Text`, `TextField`, `SecureField`, `TextEditor`, and text modifiers render
   styled and editable text.
+- `Box`, `HeavyBox`, and `DoubleBox` draw character-cell borders around
+  content using box drawing characters.
 - `Button`, `onTapGesture`, `onKeyPress`, and `onGlobalKeyPress` handle input.
 - `HStack`, `VStack`, `Spacer`, `GeometryReader`, frame modifiers, padding,
   `hidden`, and custom `Layout` implementations control terminal-cell layout.
