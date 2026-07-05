@@ -96,8 +96,9 @@ wrapping, but the final output is still terminal text and SGR styling.
 - `App`, `Scene`, and `WindowGroup` define the root terminal session.
 - `View`, `ViewBuilder`, `Group`, `ForEach`, `EmptyView`, and `AnyView` define
   composable terminal view content.
-- `Text`, `TextField`, `SecureField`, `TextEditor`, and text modifiers render
-  styled and editable text.
+- `Text`, `TextField`, `SecureField`, `TextEditor`, and text modifiers such as
+  `foregroundStyle`, `backgroundStyle`, `bold`, and `dim` render styled and
+  editable text.
 - `Box`, `HeavyBox`, and `DoubleBox` draw character-cell borders around
   content using box drawing characters.
 - `Button`, `onTapGesture`, `onKeyPress`, and `onGlobalKeyPress` handle input.

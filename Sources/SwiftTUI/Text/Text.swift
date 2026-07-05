@@ -7,6 +7,12 @@ public import Terminal
 /// SwiftTUI for text styling APIs.
 public typealias Color = Terminal.SGR.Color
 
+/// A style that can be applied to terminal foreground or background content.
+///
+/// SwiftTUI currently implements shape styles for terminal color values only.
+public protocol ShapeStyle: Sendable {
+}
+
 /// A 16-color terminal SGR color.
 public typealias Color16 = Terminal.SGR.Color16
 
@@ -16,11 +22,20 @@ public typealias Color256 = Terminal.SGR.Color256
 /// A true-color terminal SGR color.
 public typealias TrueColor = Terminal.SGR.TrueColor
 
+extension Color16: ShapeStyle {
+}
+
+extension Color256: ShapeStyle {
+}
+
+extension TrueColor: ShapeStyle {
+}
+
 /// The default terminal color.
 ///
 /// Use this value to reset styled text back to the terminal's configured
 /// foreground or background color.
-public nonisolated enum DefaultColor: Color {
+public nonisolated enum DefaultColor: Color, ShapeStyle {
 
     /// The terminal's default foreground or background color.
     case `default`
@@ -71,7 +86,9 @@ nonisolated struct AnyColor: Color {
 
 nonisolated struct TextStyle: Equatable, Sendable {
 
-    var color: AnyColor? = nil
+    var foregroundStyle: AnyColor? = nil
+
+    var backgroundStyle: AnyColor? = nil
 
     var isBold: Bool = false
 
@@ -86,7 +103,8 @@ nonisolated struct TextStyle: Equatable, Sendable {
     static let plain = TextStyle()
 
     var isPlain: Bool {
-        color == nil
+        foregroundStyle == nil
+            && backgroundStyle == nil
             && !isBold
             && !isDim
             && !isItalic
@@ -149,49 +167,148 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
 
 public extension View {
 
-    /// Sets the terminal foreground color for text within this view.
+    /// Sets the terminal foreground style for text within this view.
     ///
-    /// - Parameter color: A 16-color terminal SGR color.
-    /// - Returns: A view that renders descendant text with the given color.
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A 16-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle(_ style: Color16) -> some View {
+        foregroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal foreground style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A 256-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle(_ style: Color256) -> some View {
+        foregroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal foreground style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A true-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle(_ style: TrueColor) -> some View {
+        foregroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal foreground style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: The terminal default color reset style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle(_ style: DefaultColor) -> some View {
+        foregroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal foreground style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A terminal SGR color style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle<S>(_ style: S) -> some View
+    where S: Color & ShapeStyle {
+        foregroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A 16-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle(_ style: Color16) -> some View {
+        backgroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A 256-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle(_ style: Color256) -> some View {
+        backgroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A true-color terminal SGR style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle(_ style: TrueColor) -> some View {
+        backgroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: The terminal default color reset style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle(_ style: DefaultColor) -> some View {
+        backgroundStyle(AnyColor(style))
+    }
+
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// SwiftTUI currently accepts terminal color styles only.
+    ///
+    /// - Parameter style: A terminal SGR color style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle<S>(_ style: S) -> some View
+    where S: Color & ShapeStyle {
+        backgroundStyle(AnyColor(style))
+    }
+
+    @available(*, deprecated, renamed: "foregroundStyle(_:)")
     func color(_ color: Color16) -> some View {
-        foregroundColor(AnyColor(color))
+        foregroundStyle(color)
     }
 
-    /// Sets the terminal foreground color for text within this view.
-    ///
-    /// - Parameter color: A 256-color terminal SGR color.
-    /// - Returns: A view that renders descendant text with the given color.
+    @available(*, deprecated, renamed: "foregroundStyle(_:)")
     func color(_ color: Color256) -> some View {
-        foregroundColor(AnyColor(color))
+        foregroundStyle(color)
     }
 
-    /// Sets the terminal foreground color for text within this view.
-    ///
-    /// - Parameter color: A true-color terminal SGR color.
-    /// - Returns: A view that renders descendant text with the given color.
+    @available(*, deprecated, renamed: "foregroundStyle(_:)")
     func color(_ color: TrueColor) -> some View {
-        foregroundColor(AnyColor(color))
+        foregroundStyle(color)
     }
 
-    /// Sets the terminal foreground color for text within this view.
-    ///
-    /// - Parameter color: The terminal default color reset value.
-    /// - Returns: A view that renders descendant text with the given color.
+    @available(*, deprecated, renamed: "foregroundStyle(_:)")
     func color(_ color: DefaultColor) -> some View {
-        foregroundColor(AnyColor(color))
+        foregroundStyle(color)
     }
 
-    /// Sets the terminal foreground color for text within this view.
+    /// Sets the terminal foreground style for text within this view.
     ///
     /// - Parameter color: Any SGR color value accepted by the `Terminal` package.
     /// - Returns: A view that renders descendant text with the given color.
+    @available(*, deprecated, renamed: "foregroundStyle(_:)")
     func color<C: Color>(_ color: C) -> some View {
-        foregroundColor(AnyColor(color))
+        transformEnvironment(\.textStyle) {
+            $0.foregroundStyle = AnyColor(color)
+        }
     }
 
-    private func foregroundColor(_ color: AnyColor) -> some View {
+    private func foregroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
-            $0.color = color
+            $0.foregroundStyle = style
+        }
+    }
+
+    private func backgroundStyle(_ style: AnyColor) -> some View {
+        transformEnvironment(\.textStyle) {
+            $0.backgroundStyle = style
         }
     }
 

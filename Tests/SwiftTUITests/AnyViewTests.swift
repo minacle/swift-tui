@@ -6,7 +6,7 @@ import Terminal
 struct AnyViewTests {
 
     @Test func preservesTextOutputAndStyle() {
-        let original = Text("●").color(.green)
+        let original = Text("●").foregroundStyle(.green)
         let erased = AnyView(original)
 
         #expect(ViewResolver.block(from: erased)?.runs == ViewResolver.block(from: original)?.runs)
@@ -88,13 +88,13 @@ struct AnyViewTests {
             }
         }
 
-        let marked = Row(marker: AnyView(Text("●").color(.green)))
+        let marked = Row(marker: AnyView(Text("●").foregroundStyle(.green)))
         let unmarked = Row(marker: nil)
 
         #expect(ViewResolver.block(from: marked)?.runs == [
             RenderedRun(
                 text: "●",
-                style: TextStyle(color: AnyColor(Color16.green))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.green))
             ),
             RenderedRun(text: "title", column: 1),
         ])

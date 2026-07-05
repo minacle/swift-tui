@@ -62,8 +62,11 @@ enum TerminalControl {
         if style.isStrikethrough {
             sequences.append(Terminal.SGR.style(.strikethrough))
         }
-        if let color = style.color {
-            sequences.append(foregroundSGRSequence(for: color))
+        if let foregroundStyle = style.foregroundStyle {
+            sequences.append(foregroundSGRSequence(for: foregroundStyle))
+        }
+        if let backgroundStyle = style.backgroundStyle {
+            sequences.append(backgroundSGRSequence(for: backgroundStyle))
         }
 
         return sequences.joined()
@@ -86,8 +89,11 @@ enum TerminalControl {
         if style.isStrikethrough {
             sequences.append(Terminal.SGR.resetStyle(.strikethrough))
         }
-        if style.color != nil {
+        if style.foregroundStyle != nil {
             sequences.append(Terminal.SGR.resetForegroundColor)
+        }
+        if style.backgroundStyle != nil {
+            sequences.append(Terminal.SGR.resetBackgroundColor)
         }
 
         return sequences.joined()
@@ -95,6 +101,10 @@ enum TerminalControl {
 
     private static func foregroundSGRSequence(for color: AnyColor) -> String {
         Terminal.SGR.foregroundColor(color)
+    }
+
+    private static func backgroundSGRSequence(for color: AnyColor) -> String {
+        Terminal.SGR.backgroundColor(color)
     }
 
     static func currentTerminalSize() -> TerminalViewportSize {

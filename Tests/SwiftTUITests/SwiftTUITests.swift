@@ -4,6 +4,13 @@ import Testing
 import Terminal
 @testable import SwiftTUI
 
+nonisolated struct CustomShapeStyle: Color, ShapeStyle {
+
+    let background = "48;5;24"
+
+    let foreground = "38;5;42"
+}
+
 @Test func textPreservesContent() {
     let text = Text("Hello")
 
@@ -13,7 +20,7 @@ import Terminal
 @Test func textStyleDoesNotChangePlainTextProjection() {
     let block = ViewResolver.block(
         from: Text("Lorem ipsum")
-            .color(.green)
+            .foregroundStyle(.green)
             .bold()
             .dim()
             .italic()
@@ -31,14 +38,14 @@ import Terminal
         from: VStack(alignment: .leading) {
             Text("A")
             Text("B")
-                .color(.default)
+                .foregroundStyle(.default)
                 .bold(false)
                 .dim(false)
                 .italic(false)
                 .underline(false)
                 .strikethrough(false)
         }
-        .color(.red)
+        .foregroundStyle(.red)
         .bold()
         .dim()
         .italic()
@@ -51,7 +58,7 @@ import Terminal
             text: "A",
             row: 0,
             style: TextStyle(
-                color: AnyColor(Color16.red),
+                foregroundStyle: AnyColor(Color16.red),
                 isBold: true,
                 isDim: true,
                 isItalic: true,
@@ -62,7 +69,7 @@ import Terminal
         RenderedRun(
             text: "B",
             row: 1,
-            style: TextStyle(color: AnyColor(DefaultColor.default))
+            style: TextStyle(foregroundStyle: AnyColor(DefaultColor.default))
         ),
     ])
     #expect(block?.lines == ["A", "B"])
@@ -71,7 +78,7 @@ import Terminal
 @Test func textStyleSurvivesPaddingAndFrameLayout() {
     let block = ViewResolver.block(
         from: Text("A")
-            .color(.blue)
+            .foregroundStyle(.blue)
             .padding()
             .frame(width: 4, height: 3, alignment: .topLeading)
     )
@@ -81,10 +88,28 @@ import Terminal
             text: "A",
             row: 1,
             column: 1,
-            style: TextStyle(color: AnyColor(Color16.blue))
+            style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
         ),
     ])
     #expect(block?.lines == ["    ", " A  ", "    "])
+}
+
+@Test func foregroundAndBackgroundStylesAcceptCustomColorShapeStyle() {
+    let block = ViewResolver.block(
+        from: Text("A")
+            .foregroundStyle(CustomShapeStyle())
+            .backgroundStyle(CustomShapeStyle())
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(
+                foregroundStyle: AnyColor(CustomShapeStyle()),
+                backgroundStyle: AnyColor(CustomShapeStyle())
+            )
+        ),
+    ])
 }
 
 @Test func boxRendersSingleCellCross() {
@@ -187,7 +212,8 @@ import Terminal
         from: Box {
             Text("A")
         }
-        .color(.red)
+        .foregroundStyle(.red)
+        .backgroundStyle(.blue)
         .bold()
         .dim()
         .italic()
@@ -198,30 +224,47 @@ import Terminal
     #expect(block?.runs == [
         RenderedRun(
             text: "┌─┐",
-            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                backgroundStyle: AnyColor(Color16.blue),
+                isDim: true
+            )
         ),
         RenderedRun(
             text: "│",
             row: 1,
-            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                backgroundStyle: AnyColor(Color16.blue),
+                isDim: true
+            )
         ),
         RenderedRun(
             text: "│",
             row: 1,
             column: 2,
-            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                backgroundStyle: AnyColor(Color16.blue),
+                isDim: true
+            )
         ),
         RenderedRun(
             text: "└─┘",
             row: 2,
-            style: TextStyle(color: AnyColor(Color16.red), isDim: true)
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                backgroundStyle: AnyColor(Color16.blue),
+                isDim: true
+            )
         ),
         RenderedRun(
             text: "A",
             row: 1,
             column: 1,
             style: TextStyle(
-                color: AnyColor(Color16.red),
+                foregroundStyle: AnyColor(Color16.red),
+                backgroundStyle: AnyColor(Color16.blue),
                 isBold: true,
                 isDim: true,
                 isItalic: true,
@@ -237,7 +280,8 @@ import Terminal
         for: ViewResolver.block(
             from: Box()
                 .frame(width: 1, height: 1)
-                .color(.red)
+                .foregroundStyle(.red)
+                .backgroundStyle(.blue)
                 .bold()
                 .dim()
                 .italic()
@@ -249,7 +293,7 @@ import Terminal
 
     #expect(
         output == "\u{001B}[2J\u{001B}[1;1H"
-            + "\u{001B}[2m\u{001B}[31m┼\u{001B}[22m\u{001B}[39m"
+            + "\u{001B}[2m\u{001B}[31m\u{001B}[44m┼\u{001B}[22m\u{001B}[39m\u{001B}[49m"
             + "\u{001B}[?25l"
     )
 }
@@ -438,7 +482,7 @@ import Terminal
 
 @Test func textFieldDisplayTextInheritsTextStyle() {
     let textField = TextField("Name", text: .constant("mayu"))
-        .color(.brightGreen)
+        .foregroundStyle(.brightGreen)
         .bold()
         .dim()
         .italic()
@@ -449,7 +493,7 @@ import Terminal
         RenderedRun(
             text: "mayu",
             style: TextStyle(
-                color: AnyColor(Color16.brightGreen),
+                foregroundStyle: AnyColor(Color16.brightGreen),
                 isBold: true,
                 isDim: true,
                 isItalic: true,
@@ -484,7 +528,7 @@ import Terminal
 
 @Test func styledSecureFieldMasksText() {
     let secureField = SecureField("Password", text: .constant("secret"))
-        .color(.brightGreen)
+        .foregroundStyle(.brightGreen)
         .bold()
         .dim()
         .italic()
@@ -495,7 +539,7 @@ import Terminal
         RenderedRun(
             text: "••••••",
             style: TextStyle(
-                color: AnyColor(Color16.brightGreen),
+                foregroundStyle: AnyColor(Color16.brightGreen),
                 isBold: true,
                 isDim: true,
                 isItalic: true,
@@ -2906,7 +2950,7 @@ import Terminal
 @Test func textStyleSurvivesScrollViewClipping() {
     let scrollView = ScrollView(.horizontal) {
         Text("ABCDE")
-            .color(.magenta)
+            .foregroundStyle(.magenta)
     }
     .scrollPosition(.constant(ScrollPosition(x: 2)))
 
@@ -2918,7 +2962,7 @@ import Terminal
     #expect(block?.runs == [
         RenderedRun(
             text: "CDE",
-            style: TextStyle(color: AnyColor(Color16.magenta))
+            style: TextStyle(foregroundStyle: AnyColor(Color16.magenta))
         ),
     ])
     #expect(block?.lines == ["CDE"])
@@ -2978,7 +3022,7 @@ import Terminal
 
 @Test func screenOutputRendersForegroundColorSGR() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("A").color(.red))!,
+        for: ViewResolver.block(from: Text("A").foregroundStyle(.red))!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
@@ -2987,7 +3031,7 @@ import Terminal
 
 @Test func screenOutputRendersColor256ForegroundSGR() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("A").color(Color256(rawValue: 196)))!,
+        for: ViewResolver.block(from: Text("A").foregroundStyle(Color256(rawValue: 196)))!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
@@ -3002,7 +3046,7 @@ import Terminal
 @Test func screenOutputRendersTrueColorForegroundSGR() {
     let output = TextRenderer.screen(
         for: ViewResolver.block(
-            from: Text("A").color(TrueColor(red: 1, green: 2, blue: 3))
+            from: Text("A").foregroundStyle(TrueColor(red: 1, green: 2, blue: 3))
         )!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
@@ -3011,6 +3055,67 @@ import Terminal
         output
             == "\u{001B}[2J\u{001B}[1;1H"
             + "\u{001B}[38;2;1;2;3mA\u{001B}[39m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func screenOutputRendersBackgroundColorSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").backgroundStyle(.red))!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[41mA\u{001B}[49m\u{001B}[?25l")
+}
+
+@Test func screenOutputRendersColor256BackgroundSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(from: Text("A").backgroundStyle(Color256(rawValue: 196)))!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[48;5;196mA\u{001B}[49m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func screenOutputRendersTrueColorBackgroundSGR() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(
+            from: Text("A").backgroundStyle(TrueColor(red: 1, green: 2, blue: 3))
+        )!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[48;2;1;2;3mA\u{001B}[49m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func screenOutputRendersDefaultBackgroundOverride() {
+    let output = TextRenderer.screen(
+        for: ViewResolver.block(
+            from: VStack(alignment: .leading) {
+                Text("A")
+                Text("B")
+                    .backgroundStyle(.default)
+            }
+            .backgroundStyle(.red)
+        )!,
+        in: TerminalViewportSize(columns: 1, rows: 2)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J"
+            + "\u{001B}[1;1H\u{001B}[41mA\u{001B}[49m"
+            + "\u{001B}[2;1H\u{001B}[49mB\u{001B}[49m"
             + "\u{001B}[?25l"
     )
 }
@@ -3069,7 +3174,8 @@ import Terminal
                 .italic()
                 .underline()
                 .strikethrough()
-                .color(.brightCyan)
+                .foregroundStyle(.brightCyan)
+                .backgroundStyle(.blue)
         )!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
@@ -3077,9 +3183,9 @@ import Terminal
     #expect(
         output
             == "\u{001B}[2J\u{001B}[1;1H"
-            + "\u{001B}[1m\u{001B}[2m\u{001B}[3m\u{001B}[4m\u{001B}[9m\u{001B}[96m"
+            + "\u{001B}[1m\u{001B}[2m\u{001B}[3m\u{001B}[4m\u{001B}[9m\u{001B}[96m\u{001B}[44m"
             + "A"
-            + "\u{001B}[22m\u{001B}[23m\u{001B}[24m\u{001B}[29m\u{001B}[39m"
+            + "\u{001B}[22m\u{001B}[23m\u{001B}[24m\u{001B}[29m\u{001B}[39m\u{001B}[49m"
             + "\u{001B}[?25l"
     )
 }
@@ -3090,14 +3196,14 @@ import Terminal
             from: VStack(alignment: .leading) {
                 Text("A")
                 Text("B")
-                    .color(.default)
+                    .foregroundStyle(.default)
                     .bold(false)
                     .dim(false)
                     .italic(false)
                     .underline(false)
                     .strikethrough(false)
             }
-            .color(.red)
+            .foregroundStyle(.red)
             .bold()
             .dim()
             .italic()
@@ -3139,7 +3245,7 @@ import Terminal
 
 @Test func screenOutputClipsStyledLinesToViewportWidth() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("ABCDE").color(.blue).dim())!,
+        for: ViewResolver.block(from: Text("ABCDE").foregroundStyle(.blue).dim())!,
         in: TerminalViewportSize(columns: 3, rows: 1)
     )
 
