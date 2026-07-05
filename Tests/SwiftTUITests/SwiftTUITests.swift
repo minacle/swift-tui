@@ -2927,6 +2927,108 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(position.point == ScrollPoint(y: 1))
 }
 
+@Test func viewIDResetsSubtreeStateWhenIDChanges() {
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: ExplicitIDCounterHost(id: 1))?.text == "0")
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: ExplicitIDCounterHost(id: 1))?.text == "1")
+    #expect(runtime.block(from: ExplicitIDCounterHost(id: 1))?.text == "1")
+    #expect(runtime.block(from: ExplicitIDCounterHost(id: 2))?.text == "0")
+}
+
+@Test func viewIDResetsNestedScrollStateWhenIDChanges() {
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: ExplicitIDScrollHost(id: 1))?.lines == ["A", "B"])
+    dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: ExplicitIDScrollHost(id: 1))?.lines == ["B", "C"])
+    #expect(runtime.block(from: ExplicitIDScrollHost(id: 2))?.lines == ["A", "B"])
+}
+
+@Test func scrollViewReaderScrollsToIdentifiedViewFromButtonAction() {
+    let runtime = StateRuntime()
+    let view = ReaderScrollToBottomView()
+
+    #expect(runtime.block(from: view)?.lines == ["go", "A ", "B "])
+    dispatchClick(to: runtime, column: 1, row: 1)
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.lines == ["go", "C ", "D "])
+}
+
+@Test func scrollViewReaderAlignsExplicitAnchors() {
+    let runtime = StateRuntime()
+    let bottom = ReaderAnchorScrollView(anchor: .bottom)
+
+    #expect(runtime.block(from: bottom)?.lines == ["go", "A ", "B "])
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: bottom)?.lines == ["go", "B ", "C "])
+
+    let topRuntime = StateRuntime()
+    let top = ReaderAnchorScrollView(anchor: .top)
+    #expect(topRuntime.block(from: top)?.lines == ["go", "A ", "B "])
+    dispatchClick(to: topRuntime, column: 1, row: 1)
+    #expect(topRuntime.consumeInvalidation())
+    #expect(topRuntime.block(from: top)?.lines == ["go", "C ", "D "])
+}
+
+@Test func scrollViewReaderUpdatesScrollPositionBinding() {
+    var position = ScrollPosition()
+    let runtime = StateRuntime()
+    let view = ReaderBindingScrollView(
+        position: Binding(
+            get: { position },
+            set: { position = $0 }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.lines == ["go", "A ", "B "])
+    dispatchClick(to: runtime, column: 1, row: 1)
+
+    #expect(position.point == ScrollPoint(y: 1))
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.lines == ["go", "B ", "C "])
+}
+
+@Test func scrollViewReaderSupportsHorizontalAndTwoAxisScrolling() {
+    let horizontalRuntime = StateRuntime()
+    let horizontal = ReaderHorizontalScrollView()
+
+    #expect(horizontalRuntime.block(from: horizontal)?.lines == ["go", "AB"])
+    dispatchClick(to: horizontalRuntime, column: 1, row: 1)
+    #expect(horizontalRuntime.consumeInvalidation())
+    #expect(horizontalRuntime.block(from: horizontal)?.lines == ["go", "BC"])
+
+    let twoAxisRuntime = StateRuntime()
+    let twoAxis = ReaderTwoAxisScrollView()
+
+    #expect(twoAxisRuntime.block(from: twoAxis)?.lines == ["go", "AB", "DE"])
+    dispatchClick(to: twoAxisRuntime, column: 1, row: 1)
+    #expect(twoAxisRuntime.consumeInvalidation())
+    #expect(twoAxisRuntime.block(from: twoAxis)?.lines == ["go", "EF", "HI"])
+}
+
+@Test func scrollViewReaderIgnoresMissingAndOutOfScopeIDs() {
+    let missingRuntime = StateRuntime()
+    let missing = ReaderMissingIDView()
+
+    #expect(missingRuntime.block(from: missing)?.lines == ["go", "A ", "B "])
+    dispatchClick(to: missingRuntime, column: 1, row: 1)
+    _ = missingRuntime.consumeInvalidation()
+    #expect(missingRuntime.block(from: missing)?.lines == ["go", "A ", "B "])
+
+    let scopedRuntime = StateRuntime()
+    let scoped = ReaderOutOfScopeView()
+    #expect(scopedRuntime.block(from: scoped)?.lines == ["go", "X ", "A ", "B "])
+    dispatchClick(to: scopedRuntime, column: 1, row: 1)
+    _ = scopedRuntime.consumeInvalidation()
+    #expect(scopedRuntime.block(from: scoped)?.lines == ["go", "X ", "A ", "B "])
+}
+
 @Test func scrollPositionModifierAffectsScrollableDescendantOnly() {
     let scrolled = HStack {
         ScrollView {
@@ -6741,6 +6843,210 @@ private struct IdentifiedTaskView: View {
                     probe.record("cancel \(id)")
                 }
             }
+    }
+}
+
+private struct ExplicitIDCounterHost: View {
+
+    let id: Int
+
+    var body: some View {
+        ExplicitIDCounter()
+            .id(id)
+    }
+}
+
+private struct ExplicitIDCounter: View {
+
+    @State private var count = 0
+
+    var body: some View {
+        Text("\(count)")
+            .onTapGesture {
+                count += 1
+            }
+    }
+}
+
+private struct ExplicitIDScrollHost: View {
+
+    let id: Int
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading) {
+                Text("A")
+                Text("B")
+                Text("C")
+            }
+        }
+        .frame(width: 1, height: 2)
+        .id(id)
+    }
+}
+
+private struct ReaderScrollToBottomView: View {
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("bottom")
+                }
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("A")
+                            .id("top")
+                        Text("B")
+                        Text("C")
+                        Text("D")
+                            .id("bottom")
+                    }
+                }
+                .frame(width: 1, height: 2)
+            }
+        }
+    }
+}
+
+private struct ReaderAnchorScrollView: View {
+
+    let anchor: UnitPoint
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("target", anchor: anchor)
+                }
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("A")
+                        Text("B")
+                        Text("C")
+                            .id("target")
+                        Text("D")
+                    }
+                }
+                .frame(width: 1, height: 2)
+            }
+        }
+    }
+}
+
+private struct ReaderBindingScrollView: View {
+
+    let position: Binding<ScrollPosition>
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("target")
+                }
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("A")
+                        Text("B")
+                        Text("C")
+                            .id("target")
+                        Text("D")
+                    }
+                }
+                .scrollPosition(position)
+                .frame(width: 1, height: 2)
+            }
+        }
+    }
+}
+
+private struct ReaderHorizontalScrollView: View {
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("target")
+                }
+                ScrollView(.horizontal) {
+                    HStack {
+                        Text("A")
+                        Text("B")
+                        Text("C")
+                            .id("target")
+                        Text("D")
+                    }
+                }
+                .frame(width: 2, height: 1)
+            }
+        }
+    }
+}
+
+private struct ReaderTwoAxisScrollView: View {
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("target", anchor: .bottomTrailing)
+                }
+                ScrollView([.horizontal, .vertical]) {
+                    VStack(alignment: .leading) {
+                        Text("ABC")
+                        Text("DEF")
+                        Text("GHI")
+                            .id("target")
+                    }
+                }
+                .frame(width: 2, height: 2)
+            }
+        }
+    }
+}
+
+private struct ReaderMissingIDView: View {
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            VStack(alignment: .leading) {
+                Button("go") {
+                    proxy.scrollTo("missing")
+                }
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        Text("A")
+                        Text("B")
+                        Text("C")
+                    }
+                }
+                .frame(width: 1, height: 2)
+            }
+        }
+    }
+}
+
+private struct ReaderOutOfScopeView: View {
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            ScrollViewReader { proxy in
+                Button("go") {
+                    proxy.scrollTo("target")
+                }
+            }
+            Text("X")
+                .id("target")
+            ScrollView {
+                VStack(alignment: .leading) {
+                    Text("A")
+                    Text("B")
+                    Text("C")
+                        .id("target")
+                }
+            }
+            .frame(width: 1, height: 2)
+        }
     }
 }
 

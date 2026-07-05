@@ -105,8 +105,8 @@ wrapping, but the final output is still terminal text and SGR styling.
 - `HStack`, `VStack`, `ZStack`, `Spacer`, `GeometryReader`, frame modifiers,
   padding, `background`, `overlay`, `zIndex`, `hidden`, `layoutValue`, and
   custom `Layout` implementations control terminal-cell layout and layering.
-- `ScrollView` and `ScrollPosition` provide bounded scrolling in horizontal and
-  vertical axes.
+- `ScrollView`, `ScrollPosition`, `ScrollViewReader`, and `View.id(_:)`
+  provide bounded and programmatic scrolling in horizontal and vertical axes.
 - `@State`, `Binding`, `@Bindable`, `@FocusState`, `focused`, and `focusable`
   manage local state and keyboard focus.
 - `@Environment` and `View.environment(_:)` pass key-path values and

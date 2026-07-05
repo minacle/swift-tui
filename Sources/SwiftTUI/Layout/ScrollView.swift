@@ -44,6 +44,52 @@ public nonisolated enum Edge: Equatable, Hashable, Sendable {
     case trailing
 }
 
+/// A normalized point in a two-dimensional rectangle.
+public nonisolated struct UnitPoint: Equatable, Hashable, Sendable {
+
+    /// The horizontal location, where `0` is leading and `1` is trailing.
+    public let x: Double
+
+    /// The vertical location, where `0` is top and `1` is bottom.
+    public let y: Double
+
+    /// Creates a unit point.
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
+
+    /// The top-leading point.
+    public static let zero = UnitPoint(x: 0, y: 0)
+
+    /// The center point.
+    public static let center = UnitPoint(x: 0.5, y: 0.5)
+
+    /// The top-center point.
+    public static let top = UnitPoint(x: 0.5, y: 0)
+
+    /// The bottom-center point.
+    public static let bottom = UnitPoint(x: 0.5, y: 1)
+
+    /// The leading-center point.
+    public static let leading = UnitPoint(x: 0, y: 0.5)
+
+    /// The trailing-center point.
+    public static let trailing = UnitPoint(x: 1, y: 0.5)
+
+    /// The top-leading point.
+    public static let topLeading = UnitPoint(x: 0, y: 0)
+
+    /// The top-trailing point.
+    public static let topTrailing = UnitPoint(x: 1, y: 0)
+
+    /// The bottom-leading point.
+    public static let bottomLeading = UnitPoint(x: 0, y: 1)
+
+    /// The bottom-trailing point.
+    public static let bottomTrailing = UnitPoint(x: 1, y: 1)
+}
+
 /// A terminal-native point in scrollable content.
 public nonisolated struct ScrollPoint: Equatable, Sendable {
 
@@ -190,6 +236,105 @@ public nonisolated struct ScrollView<Content: View>: View {
     }
 }
 
+/// A proxy value that supports programmatic scrolling of descendant scroll views.
+public struct ScrollViewProxy {
+
+    private let context: StateActionContext?
+
+    init(context: StateActionContext?) {
+        self.context = context
+    }
+
+    /// Scrolls to the first descendant scroll view child with the given identifier.
+    ///
+    /// If `anchor` is `nil`, SwiftTUI scrolls by the minimum amount needed to
+    /// reveal the identified view. If `anchor` is non-`nil`, SwiftTUI aligns the
+    /// same unit point in the target view and scroll viewport.
+    public func scrollTo<ID>(_ id: ID, anchor: UnitPoint? = nil) where ID: Hashable {
+        guard let context else {
+            preconditionFailure(
+                "ScrollViewProxy may not be used outside a ScrollViewReader action."
+            )
+        }
+
+        context.scrollTo(id: AnyHashable(id), anchor: anchor)
+    }
+}
+
+/// A view that provides programmatic scrolling through a scroll view proxy.
+public struct ScrollViewReader<Content: View>: View {
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let content: (ScrollViewProxy) -> Content
+
+    let statePath: [Int]?
+
+    /// Creates a scroll view reader.
+    ///
+    /// - Parameter content: A view builder that receives a scroll proxy.
+    public init(@ViewBuilder content: @escaping (ScrollViewProxy) -> Content) {
+        self.content = content
+        self.statePath = StateContext.currentPath
+    }
+}
+
+struct IdentifiedView<Content: View>: View, LayoutModifierRenderable, LayoutTraitRenderable {
+
+    typealias Body = Never
+
+    let content: Content
+
+    let id: AnyHashable
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        guard case .block(let block) = renderedElement(
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        let childIndex = runtime?.explicitIDChildIndex(at: path, id: id) ?? 0
+        let childPath = path + [childIndex]
+        let element = ViewResolver.element(
+            from: content,
+            in: proposal,
+            path: childPath,
+            runtime: runtime
+        )
+
+        if runtime?.isSuppressingRenderRegistrations != true {
+            runtime?.finishExplicitIDRender(at: path, activeID: id)
+        }
+
+        guard case .block(var block) = element else {
+            return element
+        }
+
+        block.identifiedRegions.append(RenderedIdentifiedRegion(id: id, frame: block.bounds))
+        return .block(block)
+    }
+}
+
 struct ScrollPositionView<Content: View>: View, ScrollPositionModifierRenderable,
     LayoutTraitRenderable
 {
@@ -261,6 +406,14 @@ protocol ScrollPositionModifierRenderable {
 
 public extension View {
 
+    /// Binds this view's identity to a hashable value.
+    ///
+    /// SwiftTUI uses this identity for subtree state and as a scroll target for
+    /// ``ScrollViewProxy/scrollTo(_:anchor:)``.
+    func id<ID>(_ id: ID) -> some View where ID: Hashable {
+        IdentifiedView(content: self, id: AnyHashable(id))
+    }
+
     /// Associates a binding to a scroll position with scroll views within this view.
     ///
     /// - Parameter position: A binding read and updated by descendant scroll views.
@@ -309,6 +462,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             axes: axes,
             point: result.point,
             maximumPoint: result.maximumPoint,
+            viewportSize: GeometrySize(columns: result.block.width, rows: result.block.height),
+            identifiedRegions: contentBlock.identifiedRegions,
             binding: binding
         )
         if binding != nil
@@ -329,6 +484,39 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         RenderProposal(
             columns: axes.contains(.horizontal) ? nil : proposal?.columns,
             rows: axes.contains(.vertical) ? nil : proposal?.rows
+        )
+    }
+}
+
+extension ScrollViewReader: ScrollRenderable, LayoutTraitRenderable {
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content(ScrollViewProxy(context: nil)))
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        let proxy = runtime.map {
+            ScrollViewProxy(context: StateActionContext(runtime: $0, path: path))
+        } ?? ScrollViewProxy(context: nil)
+        let resolvedContent: Content
+        if let statePath, let runtime {
+            resolvedContent = runtime.withView(at: statePath, mode: .render) {
+                content(proxy)
+            }
+        }
+        else {
+            resolvedContent = content(proxy)
+        }
+
+        return ViewResolver.block(
+            from: resolvedContent,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
         )
     }
 }
@@ -449,6 +637,13 @@ enum ScrollViewRenderer {
                     y: clampedY,
                     width: width,
                     height: height
+                ),
+                identifiedRegions: identifiedRegions(
+                    from: content.identifiedRegions,
+                    x: clampedX,
+                    y: clampedY,
+                    width: width,
+                    height: height
                 )
             ),
             point: ScrollPoint(x: clampedX, y: clampedY),
@@ -524,6 +719,19 @@ enum ScrollViewRenderer {
         width: Int,
         height: Int
     ) -> [RenderedFocusRegion] {
+        let bounds = RenderedRect(width: width, height: height)
+        return regions.compactMap {
+            $0.offsetBy(x: -x, y: -y).clipped(to: bounds)
+        }
+    }
+
+    private static func identifiedRegions(
+        from regions: [RenderedIdentifiedRegion],
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int
+    ) -> [RenderedIdentifiedRegion] {
         let bounds = RenderedRect(width: width, height: height)
         return regions.compactMap {
             $0.offsetBy(x: -x, y: -y).clipped(to: bounds)

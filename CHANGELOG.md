@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ScrollViewReader`, `ScrollViewProxy.scrollTo(_:anchor:)`,
+  `UnitPoint`, and `View.id(_:)` for programmatic scrolling to identified
+  child views.
 - Added `LayoutValueKey` and `View.layoutValue(key:value:)` so custom
   `Layout` implementations can read child-specific layout metadata through
   `LayoutSubview`.

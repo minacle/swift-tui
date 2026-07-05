@@ -325,7 +325,11 @@ final class StateRuntime {
 
     private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
 
+    private var explicitIDStates: [ExplicitIDIdentityKey: ExplicitIDIdentityState] = [:]
+
     private var scrollViewStates: [[Int]: ScrollViewState] = [:]
+
+    private var scrollViewRenderOrder: [[Int]] = []
 
     private var terminationHandler: TerminationHandler?
 
@@ -358,6 +362,7 @@ final class StateRuntime {
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
+        scrollViewRenderOrder = []
         terminationHandler = nil
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
@@ -408,6 +413,7 @@ final class StateRuntime {
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
+        scrollViewRenderOrder = []
         terminationHandler = nil
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
@@ -718,16 +724,24 @@ final class StateRuntime {
         axes: Axis.Set,
         point: ScrollPoint,
         maximumPoint: ScrollPoint,
+        viewportSize: GeometrySize,
+        identifiedRegions: [RenderedIdentifiedRegion],
         binding: Binding<ScrollPosition>?
     ) {
         guard !isSuppressingInteractiveRenderRegistrations else {
             return
         }
 
+        scrollViewRenderOrder.removeAll {
+            $0 == path
+        }
+        scrollViewRenderOrder.append(path)
         scrollViewStates[path] = ScrollViewState(
             axes: axes,
             point: point,
             maximumPoint: maximumPoint,
+            viewportSize: viewportSize,
+            identifiedRegions: identifiedRegions,
             binding: binding
         )
     }
@@ -793,6 +807,38 @@ final class StateRuntime {
             activeIDs.contains($0.key)
         }
         forEachIdentityStates[key] = state
+
+        pendingRemovedStateSubtrees.append(contentsOf: removedPaths)
+    }
+
+    func explicitIDChildIndex(at path: [Int], id: AnyHashable) -> Int {
+        let key = ExplicitIDIdentityKey(path: path)
+        var state = explicitIDStates[key] ?? ExplicitIDIdentityState()
+
+        if let index = state.indicesByID[id] {
+            return index
+        }
+
+        let index = state.nextIndex
+        state.indicesByID[id] = index
+        state.nextIndex += 1
+        explicitIDStates[key] = state
+        return index
+    }
+
+    func finishExplicitIDRender(at path: [Int], activeID: AnyHashable) {
+        let key = ExplicitIDIdentityKey(path: path)
+        guard var state = explicitIDStates[key] else {
+            return
+        }
+
+        let removedPaths = state.indicesByID.compactMap { id, index -> [Int]? in
+            id == activeID ? nil : path + [index]
+        }
+        state.indicesByID = state.indicesByID.filter {
+            $0.key == activeID
+        }
+        explicitIDStates[key] = state
 
         pendingRemovedStateSubtrees.append(contentsOf: removedPaths)
     }
@@ -1019,8 +1065,14 @@ final class StateRuntime {
         forEachIdentityStates = forEachIdentityStates.filter {
             !$0.key.path.starts(with: path)
         }
+        explicitIDStates = explicitIDStates.filter {
+            !$0.key.path.starts(with: path)
+        }
         scrollViewStates = scrollViewStates.filter {
             !$0.key.starts(with: path)
+        }
+        scrollViewRenderOrder.removeAll {
+            $0.starts(with: path)
         }
         navigation.removeStateSubtree(at: path)
     }
@@ -1031,6 +1083,101 @@ final class StateRuntime {
         }
 
         pendingRemovedStateSubtrees = []
+    }
+
+    func scrollTo(
+        id: AnyHashable,
+        anchor: UnitPoint?,
+        under readerPath: [Int]
+    ) {
+        for path in scrollViewRenderOrder where path.starts(with: readerPath) {
+            guard var state = scrollViewStates[path],
+                  let region = state.identifiedRegions.first(where: { $0.id == id }) else {
+                continue
+            }
+
+            let currentPoint = state.binding?.wrappedValue.point ?? state.point
+            let nextPoint = scrollPoint(
+                from: currentPoint,
+                toReveal: region.frame,
+                anchor: anchor,
+                axes: state.axes,
+                viewportSize: state.viewportSize,
+                maximumPoint: state.maximumPoint
+            )
+            guard nextPoint != currentPoint else {
+                return
+            }
+
+            state.point = nextPoint
+            scrollViewStates[path] = state
+            state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
+            invalidated = true
+            return
+        }
+    }
+
+    private func scrollPoint(
+        from currentPoint: ScrollPoint,
+        toReveal target: RenderedRect,
+        anchor: UnitPoint?,
+        axes: Axis.Set,
+        viewportSize: GeometrySize,
+        maximumPoint: ScrollPoint
+    ) -> ScrollPoint {
+        ScrollPoint(
+            x: axes.contains(.horizontal)
+                ? clamped(
+                    resolvedScrollOffset(
+                        current: currentPoint.x,
+                        targetOrigin: target.x,
+                        targetLength: target.width,
+                        viewportLength: viewportSize.columns,
+                        anchorValue: anchor?.x
+                    ),
+                    upperBound: maximumPoint.x
+                )
+                : currentPoint.x,
+            y: axes.contains(.vertical)
+                ? clamped(
+                    resolvedScrollOffset(
+                        current: currentPoint.y,
+                        targetOrigin: target.y,
+                        targetLength: target.height,
+                        viewportLength: viewportSize.rows,
+                        anchorValue: anchor?.y
+                    ),
+                    upperBound: maximumPoint.y
+                )
+                : currentPoint.y
+        )
+    }
+
+    private func resolvedScrollOffset(
+        current: Int,
+        targetOrigin: Int,
+        targetLength: Int,
+        viewportLength: Int,
+        anchorValue: Double?
+    ) -> Int {
+        guard let anchorValue else {
+            if targetOrigin < current {
+                return targetOrigin
+            }
+
+            let targetEnd = targetOrigin + targetLength
+            let viewportEnd = current + viewportLength
+            if targetEnd > viewportEnd {
+                return targetEnd - viewportLength
+            }
+
+            return current
+        }
+
+        let aligned = Double(targetOrigin)
+            + Double(targetLength) * anchorValue
+            - Double(viewportLength) * anchorValue
+        return Int(aligned.rounded(.down))
     }
 
     private func dispatchScroll(
@@ -1304,6 +1451,18 @@ private struct ForEachIdentityState {
     var nextIndex = 0
 }
 
+private struct ExplicitIDIdentityKey: Hashable {
+
+    var path: [Int]
+}
+
+private struct ExplicitIDIdentityState {
+
+    var indicesByID: [AnyHashable: Int] = [:]
+
+    var nextIndex = 0
+}
+
 private struct ScrollViewState {
 
     var axes: Axis.Set
@@ -1311,6 +1470,10 @@ private struct ScrollViewState {
     var point: ScrollPoint
 
     var maximumPoint: ScrollPoint
+
+    var viewportSize: GeometrySize
+
+    var identifiedRegions: [RenderedIdentifiedRegion]
 
     var binding: Binding<ScrollPosition>?
 }
@@ -1511,6 +1674,11 @@ final class StateActionContext {
 
     private let path: [Int]
 
+    init(runtime: StateRuntime, path: [Int]) {
+        self.runtime = runtime
+        self.path = path
+    }
+
     fileprivate init?(_ context: StateRenderContext?) {
         guard let context else {
             return nil
@@ -1529,6 +1697,20 @@ final class StateActionContext {
         }
 
         return runtime.withView(at: path, mode: mode, perform: operation)
+    }
+
+    func scrollTo(id: AnyHashable, anchor: UnitPoint?) {
+        guard StateRenderContext.current?.mode != .render else {
+            preconditionFailure(
+                "ScrollViewProxy may not be used during ScrollViewReader content rendering."
+            )
+        }
+
+        guard let runtime else {
+            return
+        }
+
+        runtime.scrollTo(id: id, anchor: anchor, under: path)
     }
 }
 

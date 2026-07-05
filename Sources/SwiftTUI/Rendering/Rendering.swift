@@ -253,6 +253,23 @@ nonisolated struct RenderedFocusRegion: Equatable, Sendable {
     }
 }
 
+nonisolated struct RenderedIdentifiedRegion: Equatable, @unchecked Sendable {
+
+    var id: AnyHashable
+
+    var frame: RenderedRect
+
+    func offsetBy(x: Int, y: Int) -> RenderedIdentifiedRegion {
+        RenderedIdentifiedRegion(id: id, frame: frame.offsetBy(x: x, y: y))
+    }
+
+    func clipped(to bounds: RenderedRect) -> RenderedIdentifiedRegion? {
+        frame.clipped(to: bounds).map {
+            RenderedIdentifiedRegion(id: id, frame: $0)
+        }
+    }
+}
+
 nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var runs: [RenderedRun]
@@ -272,13 +289,16 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var focusRegions: [RenderedFocusRegion]
 
+    var identifiedRegions: [RenderedIdentifiedRegion]
+
     init(
         lines: [String],
         style: TextStyle = .plain,
         cursor: RenderedCursor? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
-        focusRegions: [RenderedFocusRegion] = []
+        focusRegions: [RenderedFocusRegion] = [],
+        identifiedRegions: [RenderedIdentifiedRegion] = []
     ) {
         let minimumWidth = lines.map(TerminalText.columnWidth).max() ?? 0
         self.runs = lines.enumerated().compactMap { row, line in
@@ -295,6 +315,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
+        self.identifiedRegions = identifiedRegions
     }
 
     init(
@@ -305,7 +326,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         cursor: RenderedCursor? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
-        focusRegions: [RenderedFocusRegion] = []
+        focusRegions: [RenderedFocusRegion] = [],
+        identifiedRegions: [RenderedIdentifiedRegion] = []
     ) {
         self.runs = runs.filter { !$0.isEmpty }
         self.minimumWidth = max(width ?? 0, 0)
@@ -315,6 +337,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
+        self.identifiedRegions = identifiedRegions
     }
 
     var lines: [String] {
@@ -400,7 +423,13 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             cursor: framedCursor(x: x, y: y, width: targetWidth, height: targetHeight),
             hitRegions: framedHitRegions(x: x, y: y, width: targetWidth, height: targetHeight),
             scrollRegions: framedScrollRegions(x: x, y: y, width: targetWidth, height: targetHeight),
-            focusRegions: framedFocusRegions(x: x, y: y, width: targetWidth, height: targetHeight)
+            focusRegions: framedFocusRegions(x: x, y: y, width: targetWidth, height: targetHeight),
+            identifiedRegions: framedIdentifiedRegions(
+                x: x,
+                y: y,
+                width: targetWidth,
+                height: targetHeight
+            )
         )
     }
 
@@ -426,6 +455,9 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             },
             focusRegions: focusRegions.map {
                 $0.offsetBy(x: insets.leading, y: insets.top)
+            },
+            identifiedRegions: identifiedRegions.map {
+                $0.offsetBy(x: insets.leading, y: insets.top)
             }
         )
     }
@@ -450,6 +482,9 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             },
             focusRegions: focusRegions.compactMap {
+                $0.offsetBy(x: x, y: y).clipped(to: bounds)
+            },
+            identifiedRegions: identifiedRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             }
         )
@@ -494,7 +529,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             cursor: blocks.reversed().compactMap(\.cursor).first,
             hitRegions: blocks.reversed().flatMap(\.hitRegions),
             scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
-            focusRegions: blocks.reversed().flatMap(\.focusRegions)
+            focusRegions: blocks.reversed().flatMap(\.focusRegions),
+            identifiedRegions: blocks.reversed().flatMap(\.identifiedRegions)
         )
     }
 
@@ -572,6 +608,18 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     ) -> [RenderedFocusRegion] {
         let bounds = RenderedRect(width: targetWidth, height: targetHeight)
         return focusRegions.compactMap {
+            $0.offsetBy(x: x, y: y).clipped(to: bounds)
+        }
+    }
+
+    private func framedIdentifiedRegions(
+        x: Int,
+        y: Int,
+        width targetWidth: Int,
+        height targetHeight: Int
+    ) -> [RenderedIdentifiedRegion] {
+        let bounds = RenderedRect(width: targetWidth, height: targetHeight)
+        return identifiedRegions.compactMap {
             $0.offsetBy(x: x, y: y).clipped(to: bounds)
         }
     }
@@ -2109,6 +2157,12 @@ enum StackRenderer {
             scrollRegions: horizontalScrollRegions(from: items, height: height, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             focusRegions: horizontalFocusRegions(from: items, height: height, alignment: alignment)
+                .compactMap { $0.clipped(to: bounds) },
+            identifiedRegions: horizontalIdentifiedRegions(
+                from: items,
+                height: height,
+                alignment: alignment
+            )
                 .compactMap { $0.clipped(to: bounds) }
         )
     }
@@ -2164,6 +2218,12 @@ enum StackRenderer {
             scrollRegions: verticalScrollRegions(from: items, width: width, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             focusRegions: verticalFocusRegions(from: items, width: width, alignment: alignment)
+                .compactMap { $0.clipped(to: bounds) },
+            identifiedRegions: verticalIdentifiedRegions(
+                from: items,
+                width: width,
+                alignment: alignment
+            )
                 .compactMap { $0.clipped(to: bounds) }
         )
     }
@@ -2591,6 +2651,27 @@ enum StackRenderer {
         }
     }
 
+    private static func horizontalIdentifiedRegions(
+        from items: [HorizontalItem],
+        height: Int,
+        alignment: VerticalAlignment
+    ) -> [RenderedIdentifiedRegion] {
+        items.flatMap { item -> [RenderedIdentifiedRegion] in
+            guard let block = item.block else {
+                return []
+            }
+
+            let y = verticalOffset(
+                contentHeight: block.height,
+                containerHeight: height,
+                alignment: alignment
+            )
+            return block.identifiedRegions.map {
+                $0.offsetBy(x: item.x, y: y)
+            }
+        }
+    }
+
     private static func verticalCursor(
         from items: [VerticalItem],
         width: Int,
@@ -2672,6 +2753,27 @@ enum StackRenderer {
                 alignment: alignment
             )
             return block.focusRegions.map {
+                $0.offsetBy(x: x, y: item.y)
+            }
+        }
+    }
+
+    private static func verticalIdentifiedRegions(
+        from items: [VerticalItem],
+        width: Int,
+        alignment: HorizontalAlignment
+    ) -> [RenderedIdentifiedRegion] {
+        items.flatMap { item -> [RenderedIdentifiedRegion] in
+            guard let block = item.block else {
+                return []
+            }
+
+            let x = horizontalOffset(
+                contentWidth: block.width,
+                containerWidth: width,
+                alignment: alignment
+            )
+            return block.identifiedRegions.map {
                 $0.offsetBy(x: x, y: item.y)
             }
         }
