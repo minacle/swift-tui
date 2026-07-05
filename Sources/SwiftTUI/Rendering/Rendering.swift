@@ -778,10 +778,50 @@ nonisolated struct LayoutTraits: Sendable {
 
     var zIndex: Double = 0
 
+    private var layoutValues = LayoutValueStorage()
+
     func removingFlexibleAxes(_ axes: Axis.Set) -> LayoutTraits {
         var traits = self
         traits.flexibleAxes.subtract(axes)
         return traits
+    }
+
+    func settingPriority(_ value: Double) -> LayoutTraits {
+        var traits = self
+        traits.priority = value
+        return traits
+    }
+
+    func settingZIndex(_ value: Double) -> LayoutTraits {
+        var traits = self
+        traits.zIndex = value
+        return traits
+    }
+
+    func settingLayoutValue<K: LayoutValueKey>(
+        key: K.Type,
+        value: K.Value
+    ) -> LayoutTraits {
+        var traits = self
+        traits.layoutValues.set(value, for: key)
+        return traits
+    }
+
+    func layoutValue<K: LayoutValueKey>(for key: K.Type) -> K.Value {
+        layoutValues.value(for: key)
+    }
+}
+
+private nonisolated struct LayoutValueStorage: @unchecked Sendable {
+
+    private var values: [ObjectIdentifier: Any] = [:]
+
+    func value<K: LayoutValueKey>(for key: K.Type) -> K.Value {
+        values[ObjectIdentifier(key)] as? K.Value ?? K.defaultValue
+    }
+
+    mutating func set<K: LayoutValueKey>(_ value: K.Value, for key: K.Type) {
+        values[ObjectIdentifier(key)] = value
     }
 }
 

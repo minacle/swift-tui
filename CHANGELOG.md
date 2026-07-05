@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `LayoutValueKey` and `View.layoutValue(key:value:)` so custom
+  `Layout` implementations can read child-specific layout metadata through
+  `LayoutSubview`.
 - Added `ZStack`, `View.background(alignment:content:)`,
   `View.overlay(alignment:content:)`, and `View.zIndex(_:)` for layering
   terminal-cell views with front-to-back ordering.

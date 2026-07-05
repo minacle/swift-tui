@@ -62,6 +62,16 @@ public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
     }
 }
 
+/// A key for accessing a layout value of a layout container's subviews.
+public protocol LayoutValueKey {
+
+    /// The type of value associated with this key.
+    associatedtype Value
+
+    /// The value returned for subviews that do not set this key.
+    nonisolated static var defaultValue: Value { get }
+}
+
 /// A proxy that represents one subview of a layout.
 public nonisolated struct LayoutSubview: Equatable {
 
@@ -74,6 +84,11 @@ public nonisolated struct LayoutSubview: Equatable {
     /// The layout priority assigned to this subview.
     public var priority: Double {
         child.traits.priority
+    }
+
+    /// Gets the layout value associated with the specified key.
+    public subscript<K: LayoutValueKey>(key: K.Type) -> K.Value {
+        child.traits.layoutValue(for: key)
     }
 
     /// Measures this subview with a proposed terminal-cell size.
@@ -235,9 +250,8 @@ struct LayoutPriorityView<Content: View>: View, LayoutModifierRenderable,
     let priority: Double
 
     var layoutTraits: LayoutTraits {
-        var traits = ViewResolver.layoutTraits(from: content)
-        traits.priority = priority
-        return traits
+        ViewResolver.layoutTraits(from: content)
+            .settingPriority(priority)
     }
 
     func renderedBlock(
@@ -265,9 +279,40 @@ struct ZIndexView<Content: View>: View, LayoutModifierRenderable,
     let zIndex: Double
 
     var layoutTraits: LayoutTraits {
-        var traits = ViewResolver.layoutTraits(from: content)
-        traits.zIndex = zIndex
-        return traits
+        ViewResolver.layoutTraits(from: content)
+            .settingZIndex(zIndex)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
+struct LayoutValueView<Content: View, K: LayoutValueKey>: View,
+    LayoutModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let key: K.Type
+
+    let value: K.Value
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+            .settingLayoutValue(key: key, value: value)
     }
 
     func renderedBlock(
@@ -304,6 +349,22 @@ public extension View {
     /// - Returns: A view with the given z-index.
     func zIndex(_ value: Double) -> some View {
         ZIndexView(content: self, zIndex: value)
+    }
+
+    /// Associates a value with a custom layout property.
+    ///
+    /// Custom layouts can read the value from each child through
+    /// ``LayoutSubview/subscript(_:)``.
+    ///
+    /// - Parameters:
+    ///   - key: The layout value key type.
+    ///   - value: The value to associate with this view.
+    /// - Returns: A view with the specified layout value.
+    func layoutValue<K: LayoutValueKey>(
+        key: K.Type,
+        value: K.Value
+    ) -> some View {
+        LayoutValueView(content: self, key: key, value: value)
     }
 }
 

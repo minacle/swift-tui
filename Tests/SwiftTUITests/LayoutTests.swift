@@ -117,6 +117,47 @@ import Testing
     #expect(block?.lines == ["     ", " A   ", "     "])
 }
 
+@Test func layoutValueIsVisibleAndFallsBackToDefaultValue() {
+    let view = LayoutValueRowLayout() {
+        Text("A")
+            .layoutValue(key: ColumnSpanKey.self, value: 3)
+        Text("B")
+    }
+
+    let block = ViewResolver.block(from: view)
+
+    #expect(block?.width == 4)
+    #expect(block?.lines == ["A  B"])
+}
+
+@Test func layoutValueIsVisibleThroughTypeErasureAndLayoutModifiers() {
+    let view = LayoutValueWidthLayout() {
+        AnyView(
+            Text("A")
+                .layoutValue(key: ColumnSpanKey.self, value: 5)
+                .padding()
+                .frame(width: 7, alignment: .leading)
+        )
+    }
+
+    let block = ViewResolver.block(from: view)
+
+    #expect(block?.width == 5)
+}
+
+@Test func multipleLayoutValueKeysAreIndependent() {
+    let view = LayoutValueRowLayout() {
+        Text("A")
+            .layoutValue(key: LeadingInsetKey.self, value: 2)
+            .layoutValue(key: ColumnSpanKey.self, value: 4)
+    }
+
+    let block = ViewResolver.block(from: view)
+
+    #expect(block?.width == 6)
+    #expect(block?.lines == ["  A   "])
+}
+
 @Test func customLayoutSharesCacheBetweenSizingAndPlacement() {
     let view = CacheBackedLayout() {
         Text("A")
@@ -287,6 +328,73 @@ private struct PriorityWidthLayout: Layout {
         subviews[0].place(
             at: bounds.origin,
             proposal: ProposedViewSize(columns: bounds.size.columns, rows: bounds.size.rows)
+        )
+    }
+}
+
+private nonisolated enum ColumnSpanKey: LayoutValueKey {
+
+    static let defaultValue = 1
+}
+
+private nonisolated enum LeadingInsetKey: LayoutValueKey {
+
+    static let defaultValue = 0
+}
+
+private struct LayoutValueRowLayout: Layout {
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> GeometrySize {
+        let columns = subviews.reduce(0) { total, subview in
+            total + subview[LeadingInsetKey.self] + subview[ColumnSpanKey.self]
+        }
+        return GeometrySize(columns: columns, rows: 1)
+    }
+
+    func placeSubviews(
+        in bounds: GeometryFrame,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var column = bounds.origin.column
+        for subview in subviews {
+            column += subview[LeadingInsetKey.self]
+            subview.place(
+                at: GeometryPoint(column: column, row: bounds.origin.row),
+                proposal: ProposedViewSize(
+                    columns: subview[ColumnSpanKey.self],
+                    rows: 1
+                )
+            )
+            column += subview[ColumnSpanKey.self]
+        }
+    }
+}
+
+private struct LayoutValueWidthLayout: Layout {
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> GeometrySize {
+        GeometrySize(columns: subviews[0][ColumnSpanKey.self], rows: 1)
+    }
+
+    func placeSubviews(
+        in bounds: GeometryFrame,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        subviews[0].place(
+            at: bounds.origin,
+            proposal: ProposedViewSize(columns: bounds.size.columns, rows: 1)
         )
     }
 }
