@@ -6023,6 +6023,54 @@ func NavigationDestinationIsPresentedStatePresentsFromDirectDestination() {
     #expect(runtime.block(from: view)?.text == "Presented")
 }
 
+@Test("Navigation destination isPresented direct destination keeps presented input active")
+func NavigationDestinationIsPresentedDirectDestinationKeepsPresentedInputActive() {
+    let runtime = StateRuntime()
+    let probe = KeyPressProbe()
+    let view = NavigationPresentedBoolStateDirectDestinationInputView(probe: probe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Activate")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(probe.events == ["activated"])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Activated")
+}
+
+@Test("Navigation destination isPresented direct destination keeps presented focused key input active")
+func NavigationDestinationIsPresentedDirectDestinationKeepsPresentedFocusedKeyInputActive() {
+    let runtime = StateRuntime()
+    let probe = KeyPressProbe()
+    let view = NavigationPresentedBoolStateDirectDestinationInputView(probe: probe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Activate")
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(probe.events == ["activated"])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Activated")
+}
+
 @Test("Navigation destination item binding presents and resets on Escape")
 func NavigationDestinationItemBindingPresentsAndResetsOnEscape() {
     var item: Int? = nil
@@ -7361,6 +7409,64 @@ private struct NavigationPresentedBoolStateDirectDestinationDetailView: View {
                 isPresented = true
                 return .handled
             }
+    }
+}
+
+private struct NavigationPresentedBoolStateDirectDestinationInputView: View {
+
+    let probe: KeyPressProbe
+
+    @FocusState
+    private var isFocused: Bool = true
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink("Open") {
+                NavigationPresentedBoolStateDirectDestinationInputDetailView(probe: probe)
+            }
+            .focusable()
+            .focused($isFocused)
+        }
+    }
+}
+
+private struct NavigationPresentedBoolStateDirectDestinationInputDetailView: View {
+
+    let probe: KeyPressProbe
+
+    @State
+    private var isPresented = false
+
+    var body: some View {
+        Text("Detail")
+            .navigationDestination(isPresented: $isPresented) {
+                NavigationPresentedBoolStateDirectDestinationInputPresentedView(probe: probe)
+            }
+            .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+                _ in
+
+                isPresented = true
+                return .handled
+            }
+    }
+}
+
+private struct NavigationPresentedBoolStateDirectDestinationInputPresentedView: View {
+
+    let probe: KeyPressProbe
+
+    @FocusState
+    private var isFocused: Bool = true
+
+    @State
+    private var wasActivated = false
+
+    var body: some View {
+        Button(wasActivated ? "Activated" : "Activate") {
+            probe.record("activated")
+            wasActivated = true
+        }
+        .focused($isFocused)
     }
 }
 

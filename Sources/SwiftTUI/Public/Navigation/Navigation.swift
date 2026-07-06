@@ -1008,11 +1008,7 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
             )
 
             return NavigationStackContext.withStack(path: path, runtime: runtime) {
-                let presentedDestination = destinations.presentedDestination
-                runtime?.updateNavigationPresentedDestination(
-                    presentedDestination,
-                    at: path
-                )
+                let rootPresentedDestination = destinations.presentedDestination
 
                 if let directDestination = runtime?.topDirectNavigationDestination(at: path) {
                     let target = NavigationDismissTarget.direct(
@@ -1027,7 +1023,8 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                             dismiss
                         )
                     }
-                    let presentedDestination = destinations.presentedDestination
+                    let presentedDestination =
+                        destinations.presentedDestination ?? rootPresentedDestination
                     runtime?.updateNavigationPresentedDestination(
                         presentedDestination,
                         at: path
@@ -1054,6 +1051,11 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                     )
                 }
 
+                let presentedDestination = rootPresentedDestination
+                runtime?.updateNavigationPresentedDestination(
+                    presentedDestination,
+                    at: path
+                )
                 if let presentedDestination =
                     runtime?.topPresentedNavigationDestination(at: path) ?? presentedDestination
                 {
