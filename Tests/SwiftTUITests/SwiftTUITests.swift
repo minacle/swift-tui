@@ -6023,6 +6023,28 @@ func NavigationDestinationIsPresentedStatePresentsFromDirectDestination() {
     #expect(runtime.block(from: view)?.text == "Presented")
 }
 
+@Test("Navigation destination isPresented direct destination Escape dismisses presented first")
+func NavigationDestinationIsPresentedDirectDestinationEscapeDismissesPresentedFirst() {
+    let runtime = StateRuntime()
+    let view = NavigationPresentedBoolStateDirectDestinationView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Presented")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+}
+
 @Test("Navigation destination isPresented direct destination keeps presented input active")
 func NavigationDestinationIsPresentedDirectDestinationKeepsPresentedInputActive() {
     let runtime = StateRuntime()

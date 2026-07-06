@@ -1378,14 +1378,14 @@ final class NavigationRuntime {
 
     func pop(at path: [Int]) -> [[Int]]? {
         let state = state(at: path)
-        if let destination = state.directDestinations.popLast() {
-            return [path + [1, destination.id]]
-        }
-
         if let destination = state.presentedDestination {
             state.presentedDestination = nil
             destination.dismiss()
             return [path + destination.renderPath(in: path)]
+        }
+
+        if let destination = state.directDestinations.popLast() {
+            return [path + [1, destination.id]]
         }
 
         guard state.pathAccessor?.removeLast() == true else {
