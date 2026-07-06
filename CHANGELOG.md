@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the direct `swift-system` package dependency and tightened terminal
+  platform imports around `System`, `SystemPackage`, `Glibc`, and `Darwin` so
+  the package continues to build cleanly on macOS and Linux.
+
 ## [0.3.0] - 2026-07-06
 
 ### Added

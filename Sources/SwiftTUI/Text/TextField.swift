@@ -615,49 +615,6 @@ private enum TextFieldInput {
     }
 
     static func isTextInsertion(_ keyPress: KeyPress) -> Bool {
-        guard keyPress.key.isPrintableCharacter else {
-            return false
-        }
-
-        guard !keyPress.characters.isEmpty,
-              keyPress.modifiers.intersection([.control, .option, .command]).isEmpty else {
-            return false
-        }
-
-        return keyPress.characters.unicodeScalars.allSatisfy {
-            !CharacterSet.controlCharacters.contains($0)
-        }
-    }
-}
-
-private extension KeyEquivalent {
-
-    var isPrintableCharacter: Bool {
-        switch self {
-        case .upArrow, .downArrow, .leftArrow, .rightArrow,
-                .clear, .delete, .deleteForward, .end, .escape,
-                .home, .pageDown, .pageUp, .return, .tab:
-            return false
-        default:
-            return true
-        }
-    }
-}
-
-private extension String {
-
-    mutating func insert(_ insertedText: String, atCharacterOffset offset: Int) {
-        insert(
-            contentsOf: insertedText,
-            at: indexAtCharacterOffset(offset)
-        )
-    }
-
-    mutating func removeCharacter(atOffset offset: Int) {
-        remove(at: indexAtCharacterOffset(offset))
-    }
-
-    private func indexAtCharacterOffset(_ offset: Int) -> Index {
-        index(startIndex, offsetBy: min(max(offset, 0), count))
+        keyPress.isTextInsertion
     }
 }

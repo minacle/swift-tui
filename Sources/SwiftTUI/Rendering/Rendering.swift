@@ -828,6 +828,12 @@ nonisolated struct LayoutTraits: Sendable {
 
     private var layoutValues = LayoutValueStorage()
 
+    init(flexibleAxes: Axis.Set = [], priority: Double = 0, zIndex: Double = 0) {
+        self.flexibleAxes = flexibleAxes
+        self.priority = priority
+        self.zIndex = zIndex
+    }
+
     func removingFlexibleAxes(_ axes: Axis.Set) -> LayoutTraits {
         var traits = self
         traits.flexibleAxes.subtract(axes)
@@ -1358,6 +1364,13 @@ enum TextLineWrapper {
 
 enum ViewResolver {
 
+    private enum BlockResolution {
+
+        case unresolved
+
+        case resolved(RenderedBlock?)
+    }
+
     static func text<Content: View>(from view: Content) -> String? {
         block(from: view)?.text
     }
@@ -1384,36 +1397,11 @@ enum ViewResolver {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        if let text = view as? Text {
-            return TextLayoutRenderer.block(for: text, in: proposal)
-        }
-
-        if view is EmptyView {
-            return nil
-        }
-
-        if let spacer = view as? Spacer {
-            return block(for: spacer, in: proposal)
-        }
-
-        if let scroll = view as? any ScrollRenderable {
-            return scroll.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let textField = view as? any TextFieldRenderable {
-            return textField.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let textEditor = view as? any TextEditorRenderable {
-            return textEditor.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let button = view as? any ButtonRenderable {
-            return button.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let box = view as? any BoxRenderable {
-            return box.renderedBlock(in: proposal, path: path, runtime: runtime)
+        switch directlyResolvedBlock(from: view, in: proposal, path: path, runtime: runtime) {
+        case .resolved(let block):
+            return block
+        case .unresolved:
+            break
         }
 
         if let geometryReader = view as? any GeometryReaderRenderable {
@@ -1426,29 +1414,6 @@ enum ViewResolver {
 
         if let navigation = view as? any NavigationRenderable {
             return navigation.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let group = view as? ViewGroup {
-            return StackRenderer.vertical(
-                group.elements.enumerated().flatMap { index, element in
-                    element.stackChildren(
-                        in: proposal,
-                        path: path + [index],
-                        runtime: runtime
-                    )
-                },
-                alignment: .leading,
-                spacing: 0,
-                proposal: proposal
-            )
-        }
-
-        if let content = view as? any FlattenableViewContent {
-            return content.renderedBlock(in: proposal, path: path, runtime: runtime)
-        }
-
-        if let stack = view as? any StackRenderable {
-            return stack.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
         if let modifier = view as? any LayoutModifierRenderable {
@@ -1511,56 +1476,14 @@ enum ViewResolver {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        if let text = view as? Text {
-            return .block(TextLayoutRenderer.block(for: text, in: proposal))
-        }
-
-        if view is EmptyView {
-            return nil
-        }
-
-        if let spacer = view as? Spacer {
-            return .spacer(minLength: spacer.minLength ?? 0)
-        }
-
-        if let scroll = view as? any ScrollRenderable {
-            return scroll.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
-        }
-
-        if let textField = view as? any TextFieldRenderable {
-            return textField.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
-        }
-
-        if let textEditor = view as? any TextEditorRenderable {
-            return textEditor.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
-        }
-
-        if let button = view as? any ButtonRenderable {
-            return button.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
-        }
-
-        if let box = view as? any BoxRenderable {
-            return box.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
+        switch directlyResolvedBlock(from: view, in: proposal, path: path, runtime: runtime) {
+        case .resolved(let block):
+            if let spacer = view as? Spacer {
+                return .spacer(minLength: spacer.minLength ?? 0)
+            }
+            return block.map { .block($0) }
+        case .unresolved:
+            break
         }
 
         if let geometryReader = view as? any GeometryReaderRenderable {
@@ -1585,27 +1508,6 @@ enum ViewResolver {
                 path: path,
                 runtime: runtime
             )
-        }
-
-        if let group = view as? ViewGroup {
-            return block(
-                from: group,
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
-        }
-
-        if let content = view as? any FlattenableViewContent {
-            return content.renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
-        }
-
-        if let stack = view as? any StackRenderable {
-            return stack.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            ).map { .block($0) }
         }
 
         if let modifier = view as? any LayoutModifierRenderable {
@@ -1693,6 +1595,72 @@ enum ViewResolver {
             return view.body
         } ?? view.body
         return element(from: body, in: proposal, path: path + [0], runtime: runtime)
+    }
+
+    private static func directlyResolvedBlock<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> BlockResolution {
+        if let text = view as? Text {
+            return .resolved(TextLayoutRenderer.block(for: text, in: proposal))
+        }
+
+        if view is EmptyView {
+            return .resolved(nil)
+        }
+
+        if let spacer = view as? Spacer {
+            return .resolved(block(for: spacer, in: proposal))
+        }
+
+        if let scroll = view as? any ScrollRenderable {
+            return .resolved(scroll.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let textField = view as? any TextFieldRenderable {
+            return .resolved(textField.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let textEditor = view as? any TextEditorRenderable {
+            return .resolved(textEditor.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let button = view as? any ButtonRenderable {
+            return .resolved(button.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let box = view as? any BoxRenderable {
+            return .resolved(box.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let group = view as? ViewGroup {
+            return .resolved(
+                StackRenderer.vertical(
+                    group.elements.enumerated().flatMap { index, element in
+                        element.stackChildren(
+                            in: proposal,
+                            path: path + [index],
+                            runtime: runtime
+                        )
+                    },
+                    alignment: .leading,
+                    spacing: 0,
+                    proposal: proposal
+                )
+            )
+        }
+
+        if let content = view as? any FlattenableViewContent {
+            return .resolved(content.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let stack = view as? any StackRenderable {
+            return .resolved(stack.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        return .unresolved
     }
 
     private static func block(

@@ -2,12 +2,18 @@ import Foundation
 import Terminal
 import Termios
 
-#if os(Linux)
-import Glibc
-import SystemPackage
-#else
-import Darwin
+#if canImport(System)
 import System
+#else
+import SystemPackage
+#endif
+
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#else
+#error("SwiftTUI requires Glibc or Darwin.")
 #endif
 
 enum TerminalInput: Equatable, Sendable {

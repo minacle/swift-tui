@@ -1,3 +1,5 @@
+import Foundation
+
 nonisolated enum TerminalText {
 
     static func columnWidth(_ text: String) -> Int {
@@ -142,5 +144,49 @@ extension String {
         let lowerIndex = index(startIndex, offsetBy: lowerOffset)
         let upperIndex = index(startIndex, offsetBy: upperOffset)
         return String(self[lowerIndex..<upperIndex])
+    }
+
+    mutating func insert(_ insertedText: String, atCharacterOffset offset: Int) {
+        insert(contentsOf: insertedText, at: indexAtCharacterOffset(offset))
+    }
+
+    mutating func removeCharacter(atOffset offset: Int) {
+        remove(at: indexAtCharacterOffset(offset))
+    }
+
+    private func indexAtCharacterOffset(_ offset: Int) -> Index {
+        index(startIndex, offsetBy: min(max(offset, 0), count))
+    }
+}
+
+extension KeyPress {
+
+    var isTextInsertion: Bool {
+        guard key.isTextInputPrintableCharacter else {
+            return false
+        }
+
+        guard !characters.isEmpty,
+              modifiers.intersection([.control, .option, .command]).isEmpty else {
+            return false
+        }
+
+        return characters.unicodeScalars.allSatisfy {
+            !CharacterSet.controlCharacters.contains($0)
+        }
+    }
+}
+
+private extension KeyEquivalent {
+
+    var isTextInputPrintableCharacter: Bool {
+        switch self {
+        case .upArrow, .downArrow, .leftArrow, .rightArrow,
+                .clear, .delete, .deleteForward, .end, .escape,
+                .home, .pageDown, .pageUp, .return, .tab:
+            return false
+        default:
+            return true
+        }
     }
 }

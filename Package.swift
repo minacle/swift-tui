@@ -30,10 +30,6 @@ let package = Package(
             from: "1.5.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-system",
-            from: "1.7.2"
-        ),
-        .package(
             url: "https://github.com/minacle/swift-terminal",
             revision: "1f45bc5860f008543cd9a718fb1e66920ef9411d"
         ),
@@ -46,10 +42,6 @@ let package = Package(
         .target(
             name: "SwiftTUI",
             dependencies: [
-                .product(
-                    name: "SystemPackage",
-                    package: "swift-system"
-                ),
                 .product(
                     name: "Terminal",
                     package: "swift-terminal"

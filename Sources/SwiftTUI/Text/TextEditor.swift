@@ -242,7 +242,7 @@ final class TextEditorState {
     }
 
     func insert(_ newText: String, update binding: Binding<String>) {
-        text.insert(newText, atTextEditorOffset: offset)
+        text.insert(newText, atCharacterOffset: offset)
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
         offset += newText.count
@@ -254,7 +254,7 @@ final class TextEditorState {
             return
         }
 
-        text.removeTextEditorCharacter(atOffset: offset - 1)
+        text.removeCharacter(atOffset: offset - 1)
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
         offset -= 1
@@ -266,7 +266,7 @@ final class TextEditorState {
             return
         }
 
-        text.removeTextEditorCharacter(atOffset: offset)
+        text.removeCharacter(atOffset: offset)
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
         preferredColumn = nil
@@ -450,49 +450,6 @@ private enum TextEditorInput {
     }
 
     static func isTextInsertion(_ keyPress: KeyPress) -> Bool {
-        guard keyPress.key.isTextEditorPrintableCharacter else {
-            return false
-        }
-
-        guard !keyPress.characters.isEmpty,
-              keyPress.modifiers.intersection([.control, .option, .command]).isEmpty else {
-            return false
-        }
-
-        return keyPress.characters.unicodeScalars.allSatisfy {
-            !CharacterSet.controlCharacters.contains($0)
-        }
-    }
-}
-
-private extension KeyEquivalent {
-
-    var isTextEditorPrintableCharacter: Bool {
-        switch self {
-        case .upArrow, .downArrow, .leftArrow, .rightArrow,
-                .clear, .delete, .deleteForward, .end, .escape,
-                .home, .pageDown, .pageUp, .return, .tab:
-            return false
-        default:
-            return true
-        }
-    }
-}
-
-private extension String {
-
-    mutating func insert(_ insertedText: String, atTextEditorOffset offset: Int) {
-        insert(
-            contentsOf: insertedText,
-            at: textEditorIndex(at: offset)
-        )
-    }
-
-    mutating func removeTextEditorCharacter(atOffset offset: Int) {
-        remove(at: textEditorIndex(at: offset))
-    }
-
-    private func textEditorIndex(at offset: Int) -> Index {
-        index(startIndex, offsetBy: min(max(offset, 0), count))
+        keyPress.isTextInsertion
     }
 }
