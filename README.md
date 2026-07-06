@@ -86,44 +86,15 @@ struct CounterView: View {
 Run the executable in a real terminal, not through a non-interactive build log
 or background process.
 
-## Core Concepts
+## How It Works
 
-SwiftTUI views measure and render in terminal character cells. Widths are
-columns, heights are rows, and layout proposals may leave either dimension
-unspecified. Text rendering accounts for Unicode display width and line
-wrapping, but the final output is still terminal text and SGR styling.
+SwiftTUI provides a SwiftUI-shaped API for terminal apps. Views are measured in
+character cells, rendered as terminal text with SGR styling, and updated from
+keyboard and mouse events in an interactive terminal session.
 
-- `App`, `Scene`, and `WindowGroup` define the root terminal session.
-- `View`, `ViewBuilder`, `Group`, `ForEach`, `EmptyView`, and `AnyView` define
-  composable terminal view content.
-- `Text`, `TextField`, `SecureField`, `TextEditor`, and text modifiers such as
-  `foregroundStyle`, `backgroundStyle`, `bold`, and `dim` render styled and
-  editable text.
-- `Box`, `HeavyBox`, and `DoubleBox` draw character-cell borders around
-  content using box drawing characters.
-- `Button`, `onTapGesture`, `onKeyPress`, and `onGlobalKeyPress` handle input.
-- `HStack`, `VStack`, `ZStack`, `Spacer`, `GeometryReader`, frame modifiers,
-  padding, `background`, `overlay`, `zIndex`, `hidden`, `layoutValue`, and
-  custom `Layout` implementations control terminal-cell layout and layering.
-- `ScrollView`, `ScrollPosition`, `ScrollViewReader`, and `View.id(_:)`
-  provide bounded and programmatic scrolling in horizontal and vertical axes.
-- `@State`, `Binding`, `@Bindable`, `@FocusState`, `focused`, and `focusable`
-  manage local state and keyboard focus.
-- `@Environment` and `View.environment(_:)` pass key-path values and
-  Observation objects through the view tree, including bindings such as
-  `$appState.token` for typed observable environment objects.
-- `disabled(_:)` and `@Environment(\.isEnabled)` control user interaction for
-  descendant views.
-- `NavigationStack`, `NavigationLink`, `NavigationPath`, `navigationDestination`,
-  `@Environment(\.push)`, and `@Environment(\.pop)` provide stack navigation.
-- `onAppear`, `onDisappear`, `task`, `onChange` with zero-parameter or
-  old/new-value actions, `onSubmit`, and `onTerminate` provide lifecycle and
-  event hooks.
-
-SwiftTUI intentionally resembles SwiftUI where that makes terminal apps easier
-to write, but it is not a complete SwiftUI implementation. Its behavior is
-defined by the terminal renderer, input loop, and character-cell layout model in
-this package.
+SwiftTUI is not a SwiftUI renderer or native-control bridge. Its layout, focus,
+scrolling, navigation, state, and lifecycle behavior are defined by this
+package's terminal runtime.
 
 ## Validation
 
