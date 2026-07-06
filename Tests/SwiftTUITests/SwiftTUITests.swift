@@ -108,6 +108,55 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     ])
 }
 
+@Test func attributedTextMapsForegroundAndBackgroundAttributesToRuns() {
+    var attributed = AttributedString("Red Blue")
+    attributed[attributed.range(of: "Red")!].foregroundColor = .color16(.red)
+    attributed[attributed.range(of: "Blue")!].backgroundColor = .trueColor(
+        red: 1,
+        green: 2,
+        blue: 3
+    )
+
+    let block = ViewResolver.block(from: Text(attributed))
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "Red",
+            style: TextStyle(foregroundStyle: AnyColor(Color16.red))
+        ),
+        RenderedRun(text: " ", column: 3),
+        RenderedRun(
+            text: "Blue",
+            column: 4,
+            style: TextStyle(
+                backgroundStyle: AnyColor(TrueColor(red: 1, green: 2, blue: 3))
+            )
+        ),
+    ])
+}
+
+@Test func attributedTextAttributesOverrideEnvironmentStyles() {
+    var attributed = AttributedString("Styled")
+    attributed.foregroundColor = .color16(.green)
+    attributed.backgroundColor = .color256(196)
+
+    let block = ViewResolver.block(
+        from: Text(attributed)
+            .foregroundStyle(.red)
+            .backgroundStyle(.blue)
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "Styled",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.green),
+                backgroundStyle: AnyColor(Color256(rawValue: 196))
+            )
+        ),
+    ])
+}
+
 @Test func attributedTextPreservesRunStylesAcrossWrapping() {
     var attributed = AttributedString("Alpha Beta")
     attributed[attributed.range(of: "Beta")!].inlinePresentationIntent = .stronglyEmphasized
@@ -119,6 +168,39 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
         RenderedRun(text: "Beta", row: 1, style: TextStyle(isBold: true)),
     ])
     #expect(block?.lines == ["Alpha", "Beta "])
+}
+
+@Test func attributedTextAlignsLinesWithinProposal() {
+    var left = AttributedString("A")
+    left.alignment = .left
+    var center = AttributedString("A")
+    center.alignment = .center
+    var right = AttributedString("A")
+    right.alignment = .right
+
+    let leftBlock = ViewResolver.block(from: Text(left), in: RenderProposal(columns: 5))
+    let centerBlock = ViewResolver.block(from: Text(center), in: RenderProposal(columns: 5))
+    let rightBlock = ViewResolver.block(from: Text(right), in: RenderProposal(columns: 5))
+
+    #expect(leftBlock?.runs == [RenderedRun(text: "A")])
+    #expect(leftBlock?.lines == ["A    "])
+    #expect(centerBlock?.runs == [RenderedRun(text: "A", column: 2)])
+    #expect(centerBlock?.lines == ["  A  "])
+    #expect(rightBlock?.runs == [RenderedRun(text: "A", column: 4)])
+    #expect(rightBlock?.lines == ["    A"])
+}
+
+@Test func attributedTextPreservesAlignmentAcrossWrapping() {
+    var attributed = AttributedString("AB CD")
+    attributed.alignment = .center
+
+    let block = ViewResolver.block(from: Text(attributed), in: RenderProposal(columns: 4))
+
+    #expect(block?.runs == [
+        RenderedRun(text: "AB", column: 1),
+        RenderedRun(text: "CD", row: 1, column: 1),
+    ])
+    #expect(block?.lines == [" AB ", " CD "])
 }
 
 @Test func attributedLinkIsClickableWithoutDefaultUnderline() {
@@ -150,6 +232,23 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
         RenderedRun(
             text: "Visit",
             style: TextStyle(foregroundStyle: AnyColor(Color16.green)),
+            link: url
+        ),
+    ])
+}
+
+@Test func attributedLinkForegroundColorOverridesTint() {
+    var attributed = AttributedString("Visit")
+    let url = URL(string: "https://example.com")!
+    attributed.link = url
+    attributed.foregroundColor = .color16(.red)
+
+    let block = ViewResolver.block(from: Text(attributed).tint(.green))
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "Visit",
+            style: TextStyle(foregroundStyle: AnyColor(Color16.red)),
             link: url
         ),
     ])

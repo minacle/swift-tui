@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftTUI attributed string attributes for foreground color, background
+  color, and horizontal text alignment in `Text(AttributedString)`.
 - Added public `AnyColor` as a type-erased alias for `Terminal.SGR.AnyColor`,
   with `.default`, `.color16(_:)`, `.color256(_:)`, and `.trueColor(...)`
   conveniences for use anywhere SwiftTUI accepts a `ShapeStyle`.

@@ -89,6 +89,65 @@ public extension AnyColor {
     }
 }
 
+/// The horizontal alignment of attributed text within its proposed width.
+public nonisolated enum AttributedTextAlignment: Hashable, Sendable {
+
+    /// Align each line to the left edge of its proposed width.
+    case left
+
+    /// Align each line to the center of its proposed width.
+    case center
+
+    /// Align each line to the right edge of its proposed width.
+    case right
+}
+
+public enum SwiftTUIForegroundColorAttribute: AttributedStringKey {
+
+    public typealias Value = AnyColor
+
+    public static let name = "SwiftTUIForegroundColor"
+}
+
+public enum SwiftTUIBackgroundColorAttribute: AttributedStringKey {
+
+    public typealias Value = AnyColor
+
+    public static let name = "SwiftTUIBackgroundColor"
+}
+
+public enum SwiftTUIAlignmentAttribute: AttributedStringKey {
+
+    public typealias Value = AttributedTextAlignment
+
+    public static let name = "SwiftTUIAlignment"
+}
+
+public extension AttributeScopes {
+
+    struct SwiftTUIAttributes: AttributeScope {
+
+        public let foregroundColor: SwiftTUIForegroundColorAttribute
+
+        public let backgroundColor: SwiftTUIBackgroundColorAttribute
+
+        public let alignment: SwiftTUIAlignmentAttribute
+    }
+
+    var swiftTUI: SwiftTUIAttributes.Type {
+        SwiftTUIAttributes.self
+    }
+}
+
+public extension AttributeDynamicLookup {
+
+    nonisolated subscript<T: AttributedStringKey>(
+        dynamicMember keyPath: KeyPath<AttributeScopes.SwiftTUIAttributes, T>
+    ) -> T {
+        self[T.self]
+    }
+}
+
 /// The default terminal color.
 ///
 /// Use this value to reset styled text back to the terminal's configured
@@ -126,6 +185,10 @@ public nonisolated struct Text: View, Equatable, Sendable {
         runs.map(\.text).joined()
     }
 
+    nonisolated var hasAttributedAlignment: Bool {
+        runs.contains { $0.alignment != nil }
+    }
+
     /// Creates a text view from a string.
     ///
     /// - Parameter content: The string to render in the terminal.
@@ -159,14 +222,18 @@ nonisolated struct TextRun: Equatable, Sendable {
 
     var link: URL?
 
+    var alignment: AttributedTextAlignment?
+
     init(
         text: String,
         style: TextStyle = .plain,
-        link: URL? = nil
+        link: URL? = nil,
+        alignment: AttributedTextAlignment? = nil
     ) {
         self.text = text
         self.style = style
         self.link = link
+        self.alignment = alignment
     }
 
     static func runs(from attributedString: AttributedString) -> [TextRun] {
@@ -176,10 +243,15 @@ nonisolated struct TextRun: Equatable, Sendable {
                 return nil
             }
 
+            var style = TextStyle(inlinePresentationIntent: run.inlinePresentationIntent)
+            style.foregroundStyle = run.foregroundColor
+            style.backgroundStyle = run.backgroundColor
+
             return TextRun(
                 text: text,
-                style: TextStyle(inlinePresentationIntent: run.inlinePresentationIntent),
-                link: run.link
+                style: style,
+                link: run.link,
+                alignment: run.alignment
             )
         }
     }

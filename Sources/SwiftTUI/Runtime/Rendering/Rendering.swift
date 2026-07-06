@@ -1234,11 +1234,18 @@ enum TextLayoutRenderer {
             for: lines,
             text: text,
             baseStyle: EnvironmentRenderContext.current.textStyle,
-            tint: EnvironmentRenderContext.current.tint
+            tint: EnvironmentRenderContext.current.tint,
+            alignmentWidth: text.hasAttributedAlignment ? proposal?.columns : nil
         )
+        let width = if text.hasAttributedAlignment, let columns = proposal?.columns {
+            columns
+        }
+        else {
+            lines.map(TerminalText.columnWidth).max() ?? 0
+        }
         var block = RenderedBlock(
             runs: runs,
-            width: lines.map(TerminalText.columnWidth).max() ?? 0,
+            width: width,
             height: lines.count,
             paddedRows: Set(
                 lines.enumerated().compactMap { row, line in
@@ -1297,13 +1304,16 @@ private enum TextRunLayoutMapper {
         var style: TextStyle
 
         var link: URL?
+
+        var alignment: AttributedTextAlignment?
     }
 
     static func renderedRuns(
         for lines: [String],
         text: Text,
         baseStyle: TextStyle,
-        tint: AnyColor?
+        tint: AnyColor?,
+        alignmentWidth: Int? = nil
     ) -> [RenderedRun] {
         let characters = styledCharacters(for: text, baseStyle: baseStyle, tint: tint)
         var sourceIndex = characters.startIndex
@@ -1315,13 +1325,15 @@ private enum TextRunLayoutMapper {
             var pendingColumn = 0
             var pendingStyle: TextStyle?
             var pendingLink: URL?
+            var rowRuns: [RenderedRun] = []
+            var rowAlignment: AttributedTextAlignment?
 
             func flush() {
                 guard !pendingText.isEmpty, let style = pendingStyle else {
                     return
                 }
 
-                renderedRuns.append(
+                rowRuns.append(
                     RenderedRun(
                         text: pendingText,
                         row: row,
@@ -1343,6 +1355,9 @@ private enum TextRunLayoutMapper {
                 )
                 let style = styledCharacter?.style ?? baseStyle
                 let link = styledCharacter?.link
+                if rowAlignment == nil {
+                    rowAlignment = styledCharacter?.alignment
+                }
                 if pendingStyle != style || pendingLink != link {
                     flush()
                     pendingColumn = column
@@ -1356,6 +1371,12 @@ private enum TextRunLayoutMapper {
             }
 
             flush()
+            let offset = horizontalOffset(
+                for: line,
+                alignment: rowAlignment,
+                width: alignmentWidth
+            )
+            renderedRuns.append(contentsOf: rowRuns.map { $0.offsetBy(x: offset, y: 0) })
         }
 
         return renderedRuns
@@ -1368,13 +1389,38 @@ private enum TextRunLayoutMapper {
     ) -> [StyledCharacter] {
         text.runs.flatMap { run -> [StyledCharacter] in
             var style = baseStyle.merged(with: run.style)
-            if run.link != nil, let tint {
+            if run.link != nil, style.foregroundStyle == nil, let tint {
                 style.foregroundStyle = tint
             }
 
             return run.text.map {
-                StyledCharacter(character: $0, style: style, link: run.link)
+                StyledCharacter(
+                    character: $0,
+                    style: style,
+                    link: run.link,
+                    alignment: run.alignment
+                )
             }
+        }
+    }
+
+    private static func horizontalOffset(
+        for line: String,
+        alignment: AttributedTextAlignment?,
+        width: Int?
+    ) -> Int {
+        guard let alignment, let width else {
+            return 0
+        }
+
+        let padding = max(width - TerminalText.columnWidth(line), 0)
+        switch alignment {
+        case .left:
+            return 0
+        case .center:
+            return padding / 2
+        case .right:
+            return padding
         }
     }
 
