@@ -31,7 +31,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/minacle/swift-terminal",
-            revision: "bdfb2e45672f0e071a2e1328861c45cb1198a7cf"
+            revision: "8579d2df55c8e1b34d07a0c3b0689732ae24f2ea"
         ),
         .package(
             url: "https://github.com/minacle/swift-termios",

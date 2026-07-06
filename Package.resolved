@@ -1,5 +1,5 @@
 {
-  "originHash" : "2f51c246bb7755350e66da58bf8e4468027a8707c519a3da394b86385e0f5507",
+  "originHash" : "dc25b58d2121d48c22dbdb3e2f68b6b00c8dac22e097725cb92229cf427e1e55",
   "pins" : [
     {
       "identity" : "swift-docc-plugin",
@@ -42,7 +42,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/minacle/swift-terminal",
       "state" : {
-        "revision" : "bdfb2e45672f0e071a2e1328861c45cb1198a7cf"
+        "revision" : "8579d2df55c8e1b34d07a0c3b0689732ae24f2ea"
       }
     },
     {
