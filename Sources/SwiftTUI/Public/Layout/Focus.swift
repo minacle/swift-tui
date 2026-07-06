@@ -75,13 +75,21 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        runtime?.registerFocusable(true, at: path)
         runtime?.registerFocusAttachment(attachment, at: path)
-        return ViewResolver.block(
+        guard var block = ViewResolver.block(
             from: content,
             in: proposal,
             path: path,
             runtime: runtime
-        )
+        ) else {
+            return nil
+        }
+
+        if !block.focusRegions.contains(where: { $0.path == path }) {
+            block.focusRegions.append(RenderedFocusRegion(path: path, frame: block.bounds))
+        }
+        return block
     }
 
     func renderedElement(
@@ -89,13 +97,25 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
+        runtime?.registerFocusable(true, at: path)
         runtime?.registerFocusAttachment(attachment, at: path)
-        return ViewResolver.element(
+        guard let element = ViewResolver.element(
             from: content,
             in: proposal,
             path: path,
             runtime: runtime
-        )
+        ) else {
+            return nil
+        }
+
+        guard case .block(var block) = element else {
+            return element
+        }
+
+        if !block.focusRegions.contains(where: { $0.path == path }) {
+            block.focusRegions.append(RenderedFocusRegion(path: path, frame: block.bounds))
+        }
+        return .block(block)
     }
 }
 

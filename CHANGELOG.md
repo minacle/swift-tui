@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `.focused(...)` modifiers so they implicitly make rendered views
+  focusable, allowing focus-state bindings and click focus to work without an
+  extra `.focusable()` modifier.
 - Fixed fallback text wrapping around punctuation so commas, periods,
   exclamation marks, question marks, colons, semicolons, quotes, brackets, and
   CJK punctuation do not detach from preceding text when a line is narrowed,

@@ -5257,6 +5257,30 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(probe.binding?.wrappedValue == true)
 }
 
+@Test func focusedOnlyRegistersFocusCandidate() {
+    let runtime = StateRuntime()
+    let probe = FocusBindingProbe<Bool>()
+
+    _ = runtime.block(from: BoolFocusedOnlyView(probe: probe))
+
+    probe.binding?.wrappedValue = true
+    _ = runtime.block(from: BoolFocusedOnlyView(probe: probe))
+
+    #expect(probe.binding?.wrappedValue == true)
+}
+
+@Test func optionalFocusedOnlyRegistersFocusCandidate() {
+    let runtime = StateRuntime()
+    let probe = FocusBindingProbe<FocusField?>()
+
+    _ = runtime.block(from: OptionalFocusedOnlyView(probe: probe))
+
+    probe.binding?.wrappedValue = .first
+    _ = runtime.block(from: OptionalFocusedOnlyView(probe: probe))
+
+    #expect(probe.binding?.wrappedValue == .first)
+}
+
 @Test func falseBooleanFocusStateClearsFocus() {
     let runtime = StateRuntime()
     let probe = FocusBindingProbe<Bool>()
@@ -5349,6 +5373,22 @@ private func lineBreakKinds(in text: String) -> [String] {
     let runtime = StateRuntime()
     let probe = FocusBindingProbe<Bool>()
     let view = ClickableFocusedTextView(probe: probe)
+
+    _ = runtime.block(from: view)
+
+    #expect(probe.binding?.wrappedValue == false)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(probe.binding?.wrappedValue == true)
+}
+
+@Test func clickingFocusedOnlyTextRequestsFocus() {
+    let runtime = StateRuntime()
+    let probe = FocusBindingProbe<Bool>()
+    let view = ClickableFocusedOnlyTextView(probe: probe)
 
     _ = runtime.block(from: view)
 
@@ -5630,7 +5670,19 @@ func NavigationLinkNilValueIsInactive() {
 
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
     #expect(!runtime.consumeInvalidation())
-    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date
+        ) == .ignored
+    )
     #expect(runtime.block(from: view)?.text == "Missing")
 }
 
@@ -8584,6 +8636,43 @@ private struct BoolFocusedThenFocusableView: View {
     }
 }
 
+private struct BoolFocusedOnlyView: View {
+
+    @FocusState var isFocused: Bool
+
+    let probe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedBoolFocusedOnlyText(binding: $isFocused, probe: probe)
+    }
+}
+
+private struct ClickableFocusedOnlyTextView: View {
+
+    @FocusState var isFocused: Bool
+
+    let probe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedBoolFocusedOnlyText(binding: $isFocused, probe: probe)
+    }
+}
+
+private struct OptionalFocusedOnlyView: View {
+
+    @FocusState var field: FocusField?
+
+    let probe: FocusBindingProbe<FocusField?>
+
+    var body: some View {
+        CapturedOptionalFocusedOnlyText(
+            binding: $field,
+            value: .first,
+            probe: probe
+        )
+    }
+}
+
 private struct DisabledFocusableView: View {
 
     @FocusState var isFocused: Bool
@@ -8624,6 +8713,43 @@ private struct CapturedBoolFocusedThenFocusableText: View {
         Text("A")
             .focused(binding)
             .focusable()
+    }
+}
+
+private struct CapturedBoolFocusedOnlyText: View {
+
+    let binding: FocusState<Bool>.Binding
+
+    init(binding: FocusState<Bool>.Binding, probe: FocusBindingProbe<Bool>) {
+        self.binding = binding
+        probe.capture(binding)
+    }
+
+    var body: some View {
+        Text("A")
+            .focused(binding)
+    }
+}
+
+private struct CapturedOptionalFocusedOnlyText: View {
+
+    let binding: FocusState<FocusField?>.Binding
+
+    let value: FocusField
+
+    init(
+        binding: FocusState<FocusField?>.Binding,
+        value: FocusField,
+        probe: FocusBindingProbe<FocusField?>
+    ) {
+        self.binding = binding
+        self.value = value
+        probe.capture(binding)
+    }
+
+    var body: some View {
+        Text("A")
+            .focused(binding, equals: value)
     }
 }
 
