@@ -1,0 +1,186 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build DocC site
+    runs-on: macos-26
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Restore documentation site cache
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/cache/restore@v4
+        with:
+          path: _site
+          key: documentation-site-${{ github.run_id }}
+          restore-keys: |
+            documentation-site-
+
+      - name: Build versioned documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          site_dir="$GITHUB_WORKSPACE/_site"
+          worktree_root="$RUNNER_TEMP/swifttui-doc-worktrees"
+          built_versions=()
+          full_build=false
+          mkdir -p "$site_dir" "$worktree_root"
+
+          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
+            full_build=true
+          elif ! compgen -G "$site_dir/*/documentation/swifttui/index.html" > /dev/null; then
+            echo "::warning::No cached documentation site was restored; rebuilding all versions."
+            full_build=true
+          fi
+
+          if [[ "$full_build" == "true" ]]; then
+            rm -rf "$site_dir"
+            mkdir -p "$site_dir"
+          fi
+
+          touch "$site_dir/.nojekyll"
+
+          build_docs() {
+            local ref="$1"
+            local version="$2"
+            local required="$3"
+            local worktree="$worktree_root/$version"
+            local output="$site_dir/$version"
+
+            git worktree add --detach "$worktree" "$ref"
+            rm -rf "$output"
+
+            set +e
+            swift package --package-path "$worktree" \
+              --allow-writing-to-directory "$output" \
+              generate-documentation --target SwiftTUI \
+              --disable-indexing \
+              --transform-for-static-hosting \
+              --hosting-base-path "swift-tui/$version" \
+              --output-path "$output"
+            local status="$?"
+            set -e
+
+            git worktree remove --force "$worktree"
+
+            if [[ "$status" -ne 0 ]]; then
+              if [[ "$required" == "true" ]]; then
+                return "$status"
+              fi
+
+              echo "::warning::Skipping documentation for $version because DocC generation failed."
+              return 0
+            fi
+
+            built_versions+=("$version")
+          }
+
+          is_included_release_tag() {
+            local tag="$1"
+
+            if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              local major="${BASH_REMATCH[1]}"
+              local minor="${BASH_REMATCH[2]}"
+
+              if (( major > 0 || minor > 3 )); then
+                return 0
+              fi
+            fi
+
+            return 1
+          }
+
+          cat > "$site_dir/index.html" <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=latest/documentation/swifttui/">
+            <title>SwiftTUI Documentation</title>
+          </head>
+          <body>
+            <p><a href="latest/documentation/swifttui/">SwiftTUI documentation</a></p>
+          </body>
+          </html>
+          HTML
+
+          current_tag=""
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            current_tag="${GITHUB_REF_NAME:-}"
+          fi
+
+          if [[ "$full_build" == "true" ]]; then
+            build_docs origin/main latest true
+
+            while IFS= read -r tag; do
+              required=false
+              if [[ "$tag" == "$current_tag" ]]; then
+                required=true
+              fi
+              build_docs "$tag" "$tag" "$required"
+            done < <(git tag --list "v*.*.*" --sort=v:refname | sed -n '/^v0\.3\.0$/,$p')
+          elif [[ -n "$current_tag" ]]; then
+            if is_included_release_tag "$current_tag"; then
+              build_docs "$current_tag" "$current_tag" true
+            else
+              echo "::warning::Skipping $current_tag because only v0.3.0 and later release tags are published."
+            fi
+          else
+            build_docs origin/main latest true
+          fi
+
+          test -f "$site_dir/.nojekyll"
+          for version in "${built_versions[@]}"; do
+            test -f "$site_dir/$version/documentation/swifttui/index.html"
+          done
+
+      - name: Save documentation site cache
+        uses: actions/cache/save@v4
+        with:
+          path: _site
+          key: documentation-site-${{ github.run_id }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
