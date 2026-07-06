@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `View.navigationDestination(isPresented:)` and
+  `View.navigationDestination(item:)` for binding-driven navigation stack
+  presentations that dismiss by resetting their bindings.
 - Added `ViewThatFits` for choosing the first child view whose ideal
   terminal-cell size fits the proposed size.
 - Added SwiftUI-compatible `Text` initializers for `StringProtocol`,

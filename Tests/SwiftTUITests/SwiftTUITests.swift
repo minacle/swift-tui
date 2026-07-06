@@ -5926,6 +5926,106 @@ func NavigationPopActionRemovesBoundPathValueAndNoOpsAtRoot() {
     #expect(runtime.block(from: view)?.text == "Root")
 }
 
+@Test("Navigation destination isPresented binding presents and resets on Escape")
+func NavigationDestinationIsPresentedBindingPresentsAndResetsOnEscape() {
+    var isPresented = false
+    let runtime = StateRuntime()
+    let view = NavigationPresentedBoolView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "Presented")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation destination item binding presents and resets on Escape")
+func NavigationDestinationItemBindingPresentsAndResetsOnEscape() {
+    var item: Int? = nil
+    let runtime = StateRuntime()
+    let view = NavigationPresentedItemView(
+        item: Binding(
+            get: {
+                item
+            },
+            set: {
+                item = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    item = 7
+    #expect(runtime.block(from: view)?.text == "Item 7")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(item == nil)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation destination item binding resets state when item changes")
+func NavigationDestinationItemBindingResetsStateWhenItemChanges() {
+    var item: Int? = 1
+    let runtime = StateRuntime()
+    let view = NavigationPresentedItemStateResetView(
+        item: Binding(
+            get: {
+                item
+            },
+            set: {
+                item = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Value 1 count 0")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Value 1 count 1")
+
+    item = 2
+    #expect(runtime.block(from: view)?.text == "Value 2 count 0")
+}
+
+@Test("Navigation pop action dismisses binding destination")
+func NavigationPopActionDismissesBindingDestination() {
+    var isPresented = true
+    let runtime = StateRuntime()
+    let view = NavigationPresentedPopActionView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Back")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
 @Test("Default navigation environment actions are no-ops")
 func DefaultNavigationEnvironmentActionsAreNoOps() {
     let probe = NavigationActionProbe()
@@ -6898,6 +6998,74 @@ private struct NavigationPopValueView: View {
                         }
                 }
         }
+    }
+}
+
+private struct NavigationPresentedBoolView: View {
+
+    let isPresented: Binding<Bool>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    Text("Presented")
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedItemView: View {
+
+    let item: Binding<Int?>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(item: item) { value in
+                    Text("Item \(value)")
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedItemStateResetView: View {
+
+    let item: Binding<Int?>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(item: item) { value in
+                    NavigationStatefulDestination(value: value)
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedPopActionView: View {
+
+    let isPresented: Binding<Bool>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    NavigationPresentedPopDestination()
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedPopDestination: View {
+
+    @Environment(\.pop) private var pop
+
+    var body: some View {
+        Text("Back")
+            .onTapGesture {
+                pop()
+            }
     }
 }
 

@@ -321,6 +321,44 @@ public extension View {
             contextPath: StateContext.currentPath
         )
     }
+
+    /// Associates a destination view with a binding that can push the view onto a navigation stack.
+    ///
+    /// - Parameters:
+    ///   - isPresented: A binding that indicates whether the destination is presented.
+    ///   - destination: A view builder that creates the destination to present.
+    /// - Returns: A view that presents the destination while the binding is `true`.
+    func navigationDestination<Destination>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View where Destination: View {
+        NavigationPresentedDestinationView(
+            content: self,
+            isPresented: isPresented,
+            destination: destination,
+            contextPath: StateContext.currentPath,
+            actionContext: StateContext.captureActionContext()
+        )
+    }
+
+    /// Associates a destination view with a bound value for use within a navigation stack.
+    ///
+    /// - Parameters:
+    ///   - item: A binding to the data to present, or `nil` when no destination is presented.
+    ///   - destination: A view builder that creates a destination for a non-`nil` item.
+    /// - Returns: A view that presents the destination while the item binding is non-`nil`.
+    func navigationDestination<Item, Destination>(
+        item: Binding<Item?>,
+        @ViewBuilder destination: @escaping (Item) -> Destination
+    ) -> some View where Item: Hashable, Destination: View {
+        NavigationItemDestinationView(
+            content: self,
+            item: item,
+            destination: destination,
+            contextPath: StateContext.currentPath,
+            actionContext: StateContext.captureActionContext()
+        )
+    }
 }
 
 struct AnyNavigationValue: Equatable {
@@ -498,6 +536,24 @@ struct NavigationDirectDestination {
     let destination: NavigationDestination
 }
 
+struct NavigationPresentedDestination {
+
+    let slot: [Int]
+
+    let identity: AnyHashable
+
+    let destination: NavigationDestination
+
+    let dismiss: () -> Void
+
+    func renderPath(in stackPath: [Int]) -> [Int] {
+        let suffix = slot.starts(with: stackPath)
+            ? Array(slot.dropFirst(stackPath.count))
+            : slot
+        return [3] + suffix
+    }
+}
+
 struct NavigationDestination {
 
     private let block: (RenderProposal?, [Int], StateRuntime?) -> RenderedBlock?
@@ -644,6 +700,179 @@ struct NavigationDestinationView<Content: View, Value: Hashable, Destination: Vi
     }
 }
 
+struct NavigationPresentedDestinationView<Content: View, Destination: View>: View,
+    NavigationRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let isPresented: Binding<Bool>
+
+    let destination: () -> Destination
+
+    let contextPath: [Int]?
+
+    let actionContext: StateActionContext?
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        registerDestination(at: path)
+        return ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        registerDestination(at: path)
+        return ViewResolver.element(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    private func registerDestination(at path: [Int]) {
+        guard readIsPresented() else {
+            return
+        }
+
+        let environment = EnvironmentRenderContext.current
+        NavigationDestinationCollectionContext.current?.registerPresented(
+            NavigationPresentedDestination(
+                slot: path,
+                identity: AnyHashable(true),
+                destination: NavigationDestination(
+                    environment: environment,
+                    contextPath: contextPath,
+                    destination: destination
+                ),
+                dismiss: {
+                    writeIsPresented(false)
+                }
+            )
+        )
+    }
+
+    private func readIsPresented() -> Bool {
+        actionContext?.perform(mode: .render) {
+            isPresented.wrappedValue
+        } ?? isPresented.wrappedValue
+    }
+
+    private func writeIsPresented(_ newValue: Bool) {
+        actionContext?.perform {
+            isPresented.wrappedValue = newValue
+        } ?? {
+            isPresented.wrappedValue = newValue
+        }()
+    }
+}
+
+struct NavigationItemDestinationView<Content: View, Item: Hashable, Destination: View>: View,
+    NavigationRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let item: Binding<Item?>
+
+    let destination: (Item) -> Destination
+
+    let contextPath: [Int]?
+
+    let actionContext: StateActionContext?
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        registerDestination(at: path)
+        return ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        registerDestination(at: path)
+        return ViewResolver.element(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    private func registerDestination(at path: [Int]) {
+        guard let value = readItem() else {
+            return
+        }
+
+        let environment = EnvironmentRenderContext.current
+        NavigationDestinationCollectionContext.current?.registerPresented(
+            NavigationPresentedDestination(
+                slot: path,
+                identity: AnyHashable(value),
+                destination: NavigationDestination(
+                    environment: environment,
+                    contextPath: contextPath
+                ) {
+                    destination(value)
+                },
+                dismiss: {
+                    writeItem(nil)
+                }
+            )
+        )
+    }
+
+    private func readItem() -> Item? {
+        actionContext?.perform(mode: .render) {
+            item.wrappedValue
+        } ?? item.wrappedValue
+    }
+
+    private func writeItem(_ newValue: Item?) {
+        actionContext?.perform {
+            item.wrappedValue = newValue
+        } ?? {
+            item.wrappedValue = newValue
+        }()
+    }
+}
+
 protocol NavigationRenderable {
 
     func renderedBlock(
@@ -725,10 +954,25 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
             )
 
             return NavigationStackContext.withStack(path: path, runtime: runtime) {
+                let presentedDestination = destinations.presentedDestination
+                runtime?.updateNavigationPresentedDestination(
+                    presentedDestination,
+                    at: path
+                )
+
                 if let directDestination = runtime?.topDirectNavigationDestination(at: path) {
                     return renderDestination(
                         directDestination.destination,
                         [1, directDestination.id]
+                    )
+                }
+
+                if let presentedDestination =
+                    runtime?.topPresentedNavigationDestination(at: path) ?? presentedDestination
+                {
+                    return renderDestination(
+                        presentedDestination.destination,
+                        presentedDestination.renderPath(in: path)
                     )
                 }
 
@@ -969,6 +1213,13 @@ final class NavigationRuntime {
         state(at: path).updateValues(values, stackPath: path)
     }
 
+    func updatePresentedDestination(
+        _ destination: NavigationPresentedDestination?,
+        at path: [Int]
+    ) -> [[Int]] {
+        state(at: path).updatePresentedDestination(destination, stackPath: path)
+    }
+
     func pushValue(_ value: AnyNavigationValue, at path: [Int]) -> Bool {
         let state = state(at: path)
         guard state.pathAccessor?.append(value) == true else {
@@ -992,10 +1243,20 @@ final class NavigationRuntime {
         state(at: path).directDestinations.last
     }
 
+    func topPresentedDestination(at path: [Int]) -> NavigationPresentedDestination? {
+        state(at: path).presentedDestination
+    }
+
     func pop(at path: [Int]) -> [[Int]]? {
         let state = state(at: path)
         if let destination = state.directDestinations.popLast() {
             return [path + [1, destination.id]]
+        }
+
+        if let destination = state.presentedDestination {
+            state.presentedDestination = nil
+            destination.dismiss()
+            return [path + destination.renderPath(in: path)]
         }
 
         guard state.pathAccessor?.removeLast() == true else {
@@ -1033,7 +1294,30 @@ private final class NavigationStackState {
 
     var directDestinations: [NavigationDirectDestination] = []
 
+    var presentedDestination: NavigationPresentedDestination?
+
     private var valueDestinationValues: [AnyNavigationValue] = []
+
+    func updatePresentedDestination(
+        _ destination: NavigationPresentedDestination?,
+        stackPath: [Int]
+    ) -> [[Int]] {
+        defer {
+            presentedDestination = destination
+        }
+
+        guard let current = presentedDestination else {
+            return []
+        }
+
+        guard let destination,
+              current.slot == destination.slot,
+              current.identity == destination.identity else {
+            return [stackPath + current.renderPath(in: stackPath)]
+        }
+
+        return []
+    }
 
     func updateValues(_ values: [AnyNavigationValue], stackPath: [Int]) -> [[Int]] {
         let commonCount = min(values.count, valueDestinationValues.count)
@@ -1066,8 +1350,14 @@ final class NavigationDestinationCollection {
 
     private var destinations: [ObjectIdentifier: (AnyNavigationValue) -> NavigationDestination?] = [:]
 
+    private var presentedDestinations: [NavigationPresentedDestination] = []
+
     var typeIDs: Set<ObjectIdentifier> {
         Set(destinations.keys)
+    }
+
+    var presentedDestination: NavigationPresentedDestination? {
+        presentedDestinations.last
     }
 
     func register<Value, Destination>(
@@ -1089,6 +1379,10 @@ final class NavigationDestinationCollection {
 
     func destination(for value: AnyNavigationValue) -> NavigationDestination? {
         destinations[value.typeID]?(value)
+    }
+
+    func registerPresented(_ destination: NavigationPresentedDestination) {
+        presentedDestinations.append(destination)
     }
 }
 

@@ -407,6 +407,16 @@ final class StateRuntime {
         }
     }
 
+    func updateNavigationPresentedDestination(
+        _ destination: NavigationPresentedDestination?,
+        at path: [Int]
+    ) {
+        let removedPaths = navigation.updatePresentedDestination(destination, at: path)
+        for removedPath in removedPaths {
+            removeStateSubtree(at: removedPath)
+        }
+    }
+
     func pushNavigationValue(_ value: AnyNavigationValue, at path: [Int]) -> Bool {
         guard navigation.pushValue(value, at: path) else {
             return false
@@ -426,6 +436,10 @@ final class StateRuntime {
 
     func topDirectNavigationDestination(at path: [Int]) -> NavigationDirectDestination? {
         navigation.topDirectDestination(at: path)
+    }
+
+    func topPresentedNavigationDestination(at path: [Int]) -> NavigationPresentedDestination? {
+        navigation.topPresentedDestination(at: path)
     }
 
     func popNavigationStack(at path: [Int]) -> Bool {
