@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ViewThatFits` for choosing the first child view whose ideal
+  terminal-cell size fits the proposed size.
 - Added SwiftUI-compatible `Text` initializers for `StringProtocol`,
   `verbatim` strings, and Foundation `AttributedString` content.
 - Added attributed `Text` rendering for bold, italic, strikethrough, and link

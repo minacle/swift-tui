@@ -1599,6 +1599,10 @@ enum ViewResolver {
             return layout.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let viewThatFits = view as? any ViewThatFitsRenderable {
+            return viewThatFits.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let navigation = view as? any NavigationRenderable {
             return navigation.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
@@ -1687,6 +1691,14 @@ enum ViewResolver {
 
         if let layout = view as? any LayoutRenderable {
             return layout.renderedElement(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+
+        if let viewThatFits = view as? any ViewThatFitsRenderable {
+            return viewThatFits.renderedElement(
                 in: proposal,
                 path: path,
                 runtime: runtime
