@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a SwiftUI-compatible `View.onChange(of:initial:_:)` overload that
+  passes old and new values to the change action.
 - Added `ScrollViewReader`, `ScrollViewProxy.scrollTo(_:anchor:)`,
   `UnitPoint`, and `View.id(_:)` for programmatic scrolling to identified
   child views.

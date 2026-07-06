@@ -4060,6 +4060,45 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(probe.events == ["changed 2"])
 }
 
+@Test func onChangeWithOldAndNewValuesRunsWhenValueChanges() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(runtime.block(from: OnChangePairValueView(value: 1, probe: probe))?.text == "1")
+    #expect(runtime.block(from: OnChangePairValueView(value: 2, probe: probe))?.text == "2")
+
+    #expect(probe.events == ["changed 1 -> 2"])
+}
+
+@Test func onChangeWithOldAndNewValuesDoesNotRunWhenValueIsEqual() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(runtime.block(from: OnChangePairValueView(value: 1, probe: probe))?.text == "1")
+    #expect(runtime.block(from: OnChangePairValueView(value: 1, probe: probe))?.text == "1")
+
+    #expect(probe.events.isEmpty)
+}
+
+@Test func onChangeWithOldAndNewInitialRunsOnceForStableIdentity() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: OnChangePairValueView(value: 1, initial: true, probe: probe)
+        )?.text == "1"
+    )
+    #expect(probe.events == ["changed 1 -> 1"])
+
+    #expect(
+        runtime.block(
+            from: OnChangePairValueView(value: 1, initial: true, probe: probe)
+        )?.text == "1"
+    )
+    #expect(probe.events == ["changed 1 -> 1"])
+}
+
 @Test func onChangeActionMutatesStateWithRestoredViewContext() {
     let runtime = StateRuntime()
 
@@ -4067,6 +4106,15 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(runtime.block(from: OnChangeStateMutationView(value: 2))?.text == "idle")
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: OnChangeStateMutationView(value: 2))?.text == "changed")
+}
+
+@Test func onChangeWithOldAndNewActionMutatesStateWithRestoredViewContext() {
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: OnChangePairStateMutationView(value: 1))?.text == "idle")
+    #expect(runtime.block(from: OnChangePairStateMutationView(value: 2))?.text == "idle")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: OnChangePairStateMutationView(value: 2))?.text == "1 -> 2")
 }
 
 @Test func onChangeActionUsesLatestEnvironment() {
@@ -4089,6 +4137,26 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(probe.events == ["second"])
 }
 
+@Test func onChangeWithOldAndNewActionUsesLatestEnvironment() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: OnChangePairEnvironmentView(value: 1, probe: probe)
+                .environment(\.testMarker, "first")
+        )?.text == "marker"
+    )
+    #expect(
+        runtime.block(
+            from: OnChangePairEnvironmentView(value: 2, probe: probe)
+                .environment(\.testMarker, "second")
+        )?.text == "marker"
+    )
+
+    #expect(probe.events == ["second 1 -> 2"])
+}
+
 @Test func onChangeInitialRunsAgainAfterConditionalReinsert() {
     let runtime = StateRuntime()
     let probe = LifecycleProbe()
@@ -4109,6 +4177,26 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(probe.events == ["changed 1", "changed 1"])
 }
 
+@Test func onChangeWithOldAndNewInitialRunsAgainAfterConditionalReinsert() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+
+    #expect(
+        runtime.block(
+            from: ConditionalOnChangePairView(isVisible: true, value: 1, probe: probe)
+        )?.text == "A"
+    )
+    #expect(probe.events == ["changed 1 -> 1"])
+
+    #expect(runtime.block(from: ConditionalOnChangePairView(isVisible: false, value: 1, probe: probe)) == nil)
+    #expect(
+        runtime.block(
+            from: ConditionalOnChangePairView(isVisible: true, value: 1, probe: probe)
+        )?.text == "A"
+    )
+    #expect(probe.events == ["changed 1 -> 1", "changed 1 -> 1"])
+}
+
 @Test func forEachReorderDoesNotTriggerOnChangeActions() {
     let runtime = StateRuntime()
     let probe = LifecycleProbe()
@@ -4123,6 +4211,23 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
 
     #expect(runtime.block(from: ForEachOnChangeView(items: first, probe: probe))?.lines == ["A", "B"])
     #expect(runtime.block(from: ForEachOnChangeView(items: reordered, probe: probe))?.lines == ["B", "A"])
+    #expect(probe.events.isEmpty)
+}
+
+@Test func forEachReorderDoesNotTriggerOnChangeWithOldAndNewActions() {
+    let runtime = StateRuntime()
+    let probe = LifecycleProbe()
+    let first = [
+        LifecycleItem(id: "a", label: "A"),
+        LifecycleItem(id: "b", label: "B"),
+    ]
+    let reordered = [
+        LifecycleItem(id: "b", label: "B"),
+        LifecycleItem(id: "a", label: "A"),
+    ]
+
+    #expect(runtime.block(from: ForEachOnChangePairView(items: first, probe: probe))?.lines == ["A", "B"])
+    #expect(runtime.block(from: ForEachOnChangePairView(items: reordered, probe: probe))?.lines == ["B", "A"])
     #expect(probe.events.isEmpty)
 }
 
@@ -7189,6 +7294,22 @@ private struct OnChangeValueView: View {
     }
 }
 
+private struct OnChangePairValueView: View {
+
+    let value: Int
+
+    var initial = false
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        Text("\(value)")
+            .onChange(of: value, initial: initial) { oldValue, newValue in
+                probe.events.append("changed \(oldValue) -> \(newValue)")
+            }
+    }
+}
+
 private struct OnChangeStateMutationView: View {
 
     let value: Int
@@ -7199,6 +7320,20 @@ private struct OnChangeStateMutationView: View {
         Text(status)
             .onChange(of: value) {
                 status = "changed"
+            }
+    }
+}
+
+private struct OnChangePairStateMutationView: View {
+
+    let value: Int
+
+    @State private var status = "idle"
+
+    var body: some View {
+        Text(status)
+            .onChange(of: value) { oldValue, newValue in
+                status = "\(oldValue) -> \(newValue)"
             }
     }
 }
@@ -7215,6 +7350,22 @@ private struct OnChangeEnvironmentView: View {
         Text("marker")
             .onChange(of: value) {
                 probe.events.append(marker)
+            }
+    }
+}
+
+private struct OnChangePairEnvironmentView: View {
+
+    let value: Int
+
+    let probe: LifecycleProbe
+
+    @Environment(\.testMarker) private var marker
+
+    var body: some View {
+        Text("marker")
+            .onChange(of: value) { oldValue, newValue in
+                probe.events.append("\(marker) \(oldValue) -> \(newValue)")
             }
     }
 }
@@ -7237,6 +7388,24 @@ private struct ConditionalOnChangeView: View {
     }
 }
 
+private struct ConditionalOnChangePairView: View {
+
+    let isVisible: Bool
+
+    let value: Int
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        if isVisible {
+            Text("A")
+                .onChange(of: value, initial: true) { oldValue, newValue in
+                    probe.events.append("changed \(oldValue) -> \(newValue)")
+                }
+        }
+    }
+}
+
 private struct ForEachOnChangeView: View {
 
     let items: [LifecycleItem]
@@ -7247,6 +7416,22 @@ private struct ForEachOnChangeView: View {
         ForEach(items) { item in
             Text(item.label)
                 .onChange(of: item.label) {
+                    probe.events.append("changed \(item.id)")
+                }
+        }
+    }
+}
+
+private struct ForEachOnChangePairView: View {
+
+    let items: [LifecycleItem]
+
+    let probe: LifecycleProbe
+
+    var body: some View {
+        ForEach(items) { item in
+            Text(item.label)
+                .onChange(of: item.label) { _, _ in
                     probe.events.append("changed \(item.id)")
                 }
         }

@@ -926,7 +926,7 @@ final class StateRuntime {
     private func performChangeHandler(_ handler: ChangeHandler) {
         EnvironmentRenderContext.withValues(handler.environment) {
             withView(at: handler.actionPath) {
-                handler.action()
+                handler.perform()
             }
         }
     }

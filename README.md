@@ -116,8 +116,9 @@ wrapping, but the final output is still terminal text and SGR styling.
   descendant views.
 - `NavigationStack`, `NavigationLink`, `NavigationPath`, `navigationDestination`,
   `@Environment(\.push)`, and `@Environment(\.pop)` provide stack navigation.
-- `onAppear`, `onDisappear`, `task`, `onChange`, `onSubmit`, and `onTerminate`
-  provide lifecycle and event hooks.
+- `onAppear`, `onDisappear`, `task`, `onChange` with zero-parameter or
+  old/new-value actions, `onSubmit`, and `onTerminate` provide lifecycle and
+  event hooks.
 
 SwiftTUI intentionally resembles SwiftUI where that makes terminal apps easier
 to write, but it is not a complete SwiftUI implementation. Its behavior is

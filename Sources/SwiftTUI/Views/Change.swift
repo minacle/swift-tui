@@ -14,7 +14,7 @@ struct ChangeView<Content: View, Value: Equatable>: View, ChangeModifierRenderab
 
     let actionPath: [Int]?
 
-    let action: () -> Void
+    let action: ChangeAction<Value>
 
     var layoutTraits: LayoutTraits {
         ViewResolver.layoutTraits(from: content)
@@ -72,22 +72,24 @@ struct ChangeHandler {
 
     var environment: EnvironmentValues
 
-    var action: () -> Void
+    var previousValue: Any?
 
     private var hasChangedFrom: (Any) -> Bool
+
+    private var performAction: (Any?) -> Void
 
     init<Value: Equatable>(
         value: Value,
         initial: Bool,
         actionPath: [Int],
         environment: EnvironmentValues,
-        action: @escaping () -> Void
+        action: ChangeAction<Value>
     ) {
         self.value = value
         self.initial = initial
         self.actionPath = actionPath
         self.environment = environment
-        self.action = action
+        self.previousValue = nil
         self.hasChangedFrom = { previousValue in
             guard let previousValue = previousValue as? Value else {
                 return true
@@ -95,10 +97,38 @@ struct ChangeHandler {
 
             return previousValue != value
         }
+        self.performAction = { previousValue in
+            action.perform(previousValue: previousValue as? Value, currentValue: value)
+        }
     }
 
     func hasChanged(since previous: ChangeHandler) -> Bool {
         hasChangedFrom(previous.value)
+    }
+
+    func perform() {
+        performAction(previousValue)
+    }
+}
+
+struct ChangeAction<Value: Equatable> {
+
+    private var performAction: (Value?, Value) -> Void
+
+    init(_ action: @escaping () -> Void) {
+        self.performAction = { _, _ in
+            action()
+        }
+    }
+
+    init(_ action: @escaping (Value, Value) -> Void) {
+        self.performAction = { previousValue, currentValue in
+            action(previousValue ?? currentValue, currentValue)
+        }
+    }
+
+    func perform(previousValue: Value?, currentValue: Value) {
+        performAction(previousValue, currentValue)
     }
 }
 
@@ -122,7 +152,8 @@ public extension View {
     /// Adds a modifier for this view that fires an action when a specific value changes.
     ///
     /// SwiftTUI compares the current value to the value registered for the same
-    /// rendered identity path during the previous render pass.
+    /// rendered identity path during the previous render pass. When `initial` is
+    /// true, the action runs once when this modifier is first registered.
     ///
     /// - Parameters:
     ///   - value: The equatable value to observe.
@@ -139,7 +170,33 @@ public extension View {
             value: value,
             initial: initial,
             actionPath: StateContext.currentPath,
-            action: action
+            action: ChangeAction(action)
+        )
+    }
+
+    /// Adds a modifier for this view that fires an action when a specific value changes.
+    ///
+    /// SwiftTUI compares the current value to the value registered for the same
+    /// rendered identity path during the previous render pass. The action receives
+    /// the old value and the new value. When `initial` is true, the action runs once
+    /// with the initial value passed as both the old and new value.
+    ///
+    /// - Parameters:
+    ///   - value: The equatable value to observe.
+    ///   - initial: Whether to run the action on the first render pass.
+    ///   - action: The action to run with the old and new values.
+    /// - Returns: A view with a change handler attached.
+    func onChange<Value: Equatable>(
+        of value: Value,
+        initial: Bool = false,
+        _ action: @escaping (Value, Value) -> Void
+    ) -> some View {
+        ChangeView(
+            content: self,
+            value: value,
+            initial: initial,
+            actionPath: StateContext.currentPath,
+            action: ChangeAction(action)
         )
     }
 }
@@ -176,6 +233,8 @@ final class ChangeRuntime {
                     continue
                 }
 
+                var handler = handler
+                handler.previousValue = previous.value
                 perform(handler)
             }
             else if handler.initial {
