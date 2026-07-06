@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directories without changing the public API, and updated Unicode line-break
   data generation for the new runtime path.
 
+### Fixed
+
+- Fixed fallback text wrapping around punctuation so commas, periods,
+  exclamation marks, question marks, colons, semicolons, quotes, brackets, and
+  CJK punctuation do not detach from preceding text when a line is narrowed,
+  while still respecting the proposed terminal column width.
+- Fixed one-column text wrapping for East Asian wide characters so text after an
+  unrenderable wide character is not incorrectly rendered on a later line.
+
 ## [0.3.0] - 2026-07-06
 
 ### Added

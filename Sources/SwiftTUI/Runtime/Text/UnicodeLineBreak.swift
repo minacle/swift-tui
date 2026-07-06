@@ -179,6 +179,21 @@ enum UnicodeLineBreak {
         lineBreakClass(for: character) == .space
     }
 
+    static func preventsBreakBefore(_ character: Character) -> Bool {
+        switch lineBreakClass(for: character) {
+        case .breakSymbols,
+             .closeParenthesis,
+             .closePunctuation,
+             .exclamation,
+             .infixNumeric,
+             .postfixNumeric,
+             .quotation:
+            true
+        default:
+            false
+        }
+    }
+
     private static func tokens(in text: String) -> [Token] {
         var tokens: [Token] = []
         var index = text.startIndex
@@ -303,6 +318,7 @@ enum UnicodeLineBreak {
         if right == .breakAfter
             || right == .unambiguousHyphen
             || right == .hyphen
+            || right == .infixNumeric
             || right == .nonstarter
             || left == .breakBefore
         {

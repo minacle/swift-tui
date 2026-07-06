@@ -1292,6 +1292,9 @@ enum TextLineWrapper {
                     start = skippingLeadingWhitespace(in: paragraph, from: fallbackEnd)
                 }
                 else {
+                    if TerminalText.columnWidth(String(paragraph[start])) > maxWidth {
+                        break
+                    }
                     start = paragraph.index(after: start)
                 }
             }
@@ -1316,6 +1319,15 @@ enum TextLineWrapper {
 
             width += characterWidth
             index = nextIndex
+        }
+        if index < text.endIndex,
+           index > start,
+           UnicodeLineBreak.preventsBreakBefore(text[index])
+        {
+            let previousIndex = text.index(before: index)
+            if TerminalText.columnWidth(String(text[start..<previousIndex])) >= 2 {
+                index = previousIndex
+            }
         }
         return index
     }

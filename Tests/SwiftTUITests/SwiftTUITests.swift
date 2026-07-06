@@ -403,6 +403,23 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(block?.lines == ["한글", "AB  "])
 }
 
+@Test func textDropsRemainderWhenWideCharacterCannotFitProposedColumns() {
+    let block = ViewResolver.block(
+        from: Text("한A"),
+        in: RenderProposal(columns: 1)
+    )
+
+    #expect(block?.lines == [""])
+}
+
+@Test func fixedFrameClipsWideCharacterWhenNoColumnCanContainIt() {
+    let block = ViewResolver.block(
+        from: Text("한A").frame(width: 1, height: 1)
+    )
+
+    #expect(block?.lines == [" "])
+}
+
 @Test func textWrapsCJKWithoutSpacesUsingUnicodeLineBreaks() {
     let block = ViewResolver.block(
         from: Text("한국어문장"),
@@ -461,6 +478,214 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     )
 
     #expect(block?.lines == ["aa/", "bb "])
+}
+
+@Test func textWrapsCommaAndPeriodPunctuationAfterWords() {
+    let block = ViewResolver.block(
+        from: Text("Hello, world. Next"),
+        in: RenderProposal(columns: 7)
+    )
+
+    #expect(block?.lines == ["Hello,", "world.", "Next  "])
+}
+
+@Test func textDoesNotFallbackWrapBeforeCommaAndPeriodPunctuation() {
+    let block = ViewResolver.block(
+        from: Text("Hello, world. Next"),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(block?.lines == ["Hell", "o,  ", "worl", "d.  ", "Next"])
+}
+
+@Test func textWrapsExclamationAndQuestionPunctuationAfterWords() {
+    let block = ViewResolver.block(
+        from: Text("Wait! What? Yes."),
+        in: RenderProposal(columns: 6)
+    )
+
+    #expect(block?.lines == ["Wait!", "What?", "Yes. "])
+}
+
+@Test func textDoesNotFallbackWrapBeforeExclamationAndQuestionPunctuation() {
+    let block = ViewResolver.block(
+        from: Text("Wait! What? Yes."),
+        in: RenderProposal(columns: 4)
+    )
+
+    #expect(block?.lines == ["Wai ", "t!  ", "Wha ", "t?  ", "Yes."])
+}
+
+@Test func textAllowsStandalonePunctuationWhenWidthIsTooNarrowToKeepPreviousCharacter() {
+    let block = ViewResolver.block(
+        from: Text("Wait! What? Yes."),
+        in: RenderProposal(columns: 2)
+    )
+
+    #expect(block?.lines == ["Wa", "it", "! ", "Wh", "at", "? ", "Ye", "s."])
+}
+
+@Test func textWrapsColonAndSemicolonPunctuationAfterWords() {
+    let block = ViewResolver.block(
+        from: Text("Key: value; next"),
+        in: RenderProposal(columns: 7)
+    )
+
+    #expect(block?.lines == ["Key:  ", "value;", "next  "])
+}
+
+@Test func textDoesNotFallbackWrapBeforeColonAndSemicolonPunctuation() {
+    let block = ViewResolver.block(
+        from: Text("Key: value; next"),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(block?.lines == ["Key:", "valu", "e;  ", "next"])
+}
+
+@Test func textDoesNotFallbackWrapBeforeJapanesePunctuation() {
+    let block = ViewResolver.block(
+        from: Text("こんにちは。\n元気です。"),
+        in: RenderProposal(columns: 10)
+    )
+
+    #expect(block?.lines == ["こんにち  ", "は。      ", "元気です。"])
+}
+
+@Test func textWrapsQuotedPunctuationAsGroupedText() {
+    let doubleQuoted = ViewResolver.block(
+        from: Text("\"Hello\" next"),
+        in: RenderProposal(columns: 7)
+    )
+    let singleQuoted = ViewResolver.block(
+        from: Text("'Hello' next"),
+        in: RenderProposal(columns: 7)
+    )
+    let cornerQuoted = ViewResolver.block(
+        from: Text("「東京」へ行く"),
+        in: RenderProposal(columns: 8)
+    )
+
+    #expect(doubleQuoted?.lines == ["\"Hello\"", "next   "])
+    #expect(singleQuoted?.lines == ["'Hello'", "next   "])
+    #expect(cornerQuoted?.lines == ["「東京」", "へ行く  "])
+}
+
+@Test func textDoesNotFallbackWrapBeforeClosingQuotePunctuation() {
+    let block = ViewResolver.block(
+        from: Text("\"Hi\" 'Yo'"),
+        in: RenderProposal(columns: 3)
+    )
+
+    #expect(block?.lines == ["\"H", "i\"", "'Y", "o'"])
+}
+
+@Test func textWrapsBracketPunctuationAsGroupedText() {
+    let parentheses = ViewResolver.block(
+        from: Text("(AB) CD"),
+        in: RenderProposal(columns: 4)
+    )
+    let brackets = ViewResolver.block(
+        from: Text("[AB] CD"),
+        in: RenderProposal(columns: 4)
+    )
+    let braces = ViewResolver.block(
+        from: Text("{AB} CD"),
+        in: RenderProposal(columns: 4)
+    )
+
+    #expect(parentheses?.lines == ["(AB)", "CD  "])
+    #expect(brackets?.lines == ["[AB]", "CD  "])
+    #expect(braces?.lines == ["{AB}", "CD  "])
+}
+
+@Test func textDoesNotFallbackWrapBeforeClosingBracketPunctuation() {
+    let block = ViewResolver.block(
+        from: Text("(AB) [CD] {EF}"),
+        in: RenderProposal(columns: 3)
+    )
+
+    #expect(block?.lines == ["(A", "B)", "[C", "D]", "{E", "F}"])
+}
+
+@Test func textWrapsCJKPunctuationWithPrecedingCharacters() {
+    let block = ViewResolver.block(
+        from: Text("東京、京都。大阪！奈良？"),
+        in: RenderProposal(columns: 6)
+    )
+
+    #expect(block?.lines == ["東京、", "京都。", "大阪！", "奈良？"])
+}
+
+@Test func textWrapsNumericPunctuationTogether() {
+    let block = ViewResolver.block(
+        from: Text("ID 1,234.56% OK"),
+        in: RenderProposal(columns: 11)
+    )
+
+    #expect(block?.lines == ["ID       ", "1,234.56%", "OK       "])
+}
+
+@Test func textWrapsHyphenAndSlashPunctuationAtAllowedBoundaries() {
+    let block = ViewResolver.block(
+        from: Text("pre-fix / path/to/file"),
+        in: RenderProposal(columns: 8)
+    )
+
+    #expect(block?.lines == ["pre-    ", "fix /   ", "path/to/", "file    "])
+}
+
+@Test func unicodeLineBreakFindsZeroWidthSpaceOpportunity() {
+    #expect(lineBreakOffsets(in: "ab\u{200B}cd") == [3])
+    #expect(lineBreakKinds(in: "ab\u{200B}cd") == ["allowed"])
+}
+
+@Test func unicodeLineBreakSuppressesWordJoinerOpportunities() {
+    #expect(lineBreakOffsets(in: "A\u{2060}B C") == [4])
+}
+
+@Test func unicodeLineBreakAllowsGeneralPunctuationAndPostSpaceBreaks() {
+    #expect(lineBreakOffsets(in: "Hello, world. Next") == [7, 14])
+    #expect(lineBreakOffsets(in: "Wait! What? Yes.") == [6, 12])
+    #expect(lineBreakOffsets(in: "Key: value; next") == [5, 12])
+}
+
+@Test func unicodeLineBreakKeepsQuoteAndBracketPunctuationTogether() {
+    #expect(lineBreakOffsets(in: "\"Hello\" next") == [8])
+    #expect(lineBreakOffsets(in: "'Hello' next") == [8])
+    #expect(lineBreakOffsets(in: "(AB) CD") == [5])
+    #expect(lineBreakOffsets(in: "[AB] CD") == [5])
+    #expect(lineBreakOffsets(in: "{AB} CD") == [5])
+}
+
+@Test func unicodeLineBreakKeepsNumericPunctuationTogether() {
+    #expect(lineBreakOffsets(in: "A 1,234.56% B") == [2, 12])
+}
+
+@Test func unicodeLineBreakAllowsHyphenAndSlashPunctuationBreaks() {
+    #expect(lineBreakOffsets(in: "pre-fix / path/to/file") == [4, 10, 15, 18])
+}
+
+@Test func unicodeLineBreakMarksHardBreakOpportunities() {
+    #expect(lineBreakOffsets(in: "A\nB") == [2])
+    #expect(lineBreakKinds(in: "A\nB") == ["mandatory"])
+}
+
+private func lineBreakOffsets(in text: String) -> [Int] {
+    UnicodeLineBreak.opportunities(in: text).map {
+        text.distance(from: text.startIndex, to: $0.index)
+    }
+}
+
+private func lineBreakKinds(in text: String) -> [String] {
+    UnicodeLineBreak.opportunities(in: text).map {
+        switch $0.kind {
+        case .allowed:
+            "allowed"
+        case .mandatory:
+            "mandatory"
+        }
+    }
 }
 
 @Test func textFieldDisplaysBoundText() {
