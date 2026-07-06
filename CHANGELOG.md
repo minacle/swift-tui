@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the direct `swift-system` package dependency and tightened terminal
   platform imports around `System`, `SystemPackage`, `Glibc`, and `Darwin` so
   the package continues to build cleanly on macOS and Linux.
+- Reorganized the `SwiftTUI` source tree into `Public` and `Runtime`
+  directories without changing the public API, and updated Unicode line-break
+  data generation for the new runtime path.
 
 ## [0.3.0] - 2026-07-06
 

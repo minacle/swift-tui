@@ -3,6 +3,16 @@
 import argparse
 from pathlib import Path
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT = (
+    REPOSITORY_ROOT
+    / "Sources"
+    / "SwiftTUI"
+    / "Runtime"
+    / "Text"
+    / "UnicodeLineBreakDataText.swift"
+)
+
 
 def parse_line_break(path: Path):
     ranges = []
@@ -31,6 +41,7 @@ def emit(output: Path, ranges):
     for lower, upper, class_name in ranges:
         lines.append(f"{lower:X}\t{upper:X}\t{class_name}")
 
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         "\n".join(
             [
@@ -52,7 +63,7 @@ def emit(output: Path, ranges):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("output", type=Path, nargs="?", default=DEFAULT_OUTPUT)
     arguments = parser.parse_args()
 
     emit(arguments.output, parse_line_break(arguments.input))

@@ -9,37 +9,10 @@ public protocol Scene {}
 /// A marker protocol for scene-builder results created from limited-availability branches.
 public protocol _LimitedAvailabilitySceneMarker {}
 
-protocol RootScene: Scene {
-
-    associatedtype Root: View
-
-    var root: Root { get }
-}
-
-protocol SceneRootResolving {
-
-    var resolvedRootScene: (any RootScene)? { get }
-}
-
-enum SceneResolver {
-
-    static func rootScene<Content: Scene>(from scene: Content) -> (any RootScene)? {
-        if let root = scene as? any RootScene {
-            return root
-        }
-
-        if let resolving = scene as? any SceneRootResolving {
-            return resolving.resolvedRootScene
-        }
-
-        return nil
-    }
-}
-
 /// The single terminal window used by a SwiftTUI app.
 ///
 /// A `WindowGroup` supplies the root view hierarchy for the terminal session.
-public nonisolated struct WindowGroup<Content: View>: RootScene {
+public nonisolated struct WindowGroup<Content: View>: Scene {
 
     let root: Content
 
@@ -49,13 +22,6 @@ public nonisolated struct WindowGroup<Content: View>: RootScene {
     @MainActor
     public init(@ViewBuilder content: () -> Content) {
         self.root = content()
-    }
-}
-
-extension WindowGroup: SceneRootResolving {
-
-    var resolvedRootScene: (any RootScene)? {
-        self
     }
 }
 
@@ -75,13 +41,6 @@ public nonisolated struct LimitedAvailabilityScene<Content: Scene>: Scene, _Limi
     }
 }
 
-extension LimitedAvailabilityScene: SceneRootResolving {
-
-    var resolvedRootScene: (any RootScene)? {
-        SceneResolver.rootScene(from: scene)
-    }
-}
-
 /// A scene builder result that includes availability-limited content when available.
 ///
 /// SwiftTUI uses this type for optional scene-builder branches that contain
@@ -95,17 +54,6 @@ public nonisolated struct OptionalScene<Content>: Scene where Content: Scene & _
     /// - Parameter scene: The scene to render, or `nil` to render no scene.
     public init(_ scene: Content?) {
         self.scene = scene
-    }
-}
-
-extension OptionalScene: SceneRootResolving {
-
-    var resolvedRootScene: (any RootScene)? {
-        guard let scene else {
-            return nil
-        }
-
-        return SceneResolver.rootScene(from: scene)
     }
 }
 
