@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added SwiftUI-compatible `DismissAction` and `EnvironmentValues.dismiss` for
   dismissing the current navigation presentation from the destination
-  environment.
+  environment, with dismiss actions scoped to their rendered destination while
+  `PushAction` and `PopAction` remain stack-scoped.
 - Added SwiftUI-compatible `View.navigationDestination(isPresented:)` and
   `View.navigationDestination(item:)` for binding-driven navigation stack
   presentations that dismiss by resetting their bindings.

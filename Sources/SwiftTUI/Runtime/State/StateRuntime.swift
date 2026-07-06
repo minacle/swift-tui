@@ -407,12 +407,12 @@ final class StateRuntime {
         }
     }
 
-    func navigationValueDismissToken(
+    func navigationValueDismissScope(
         at path: [Int],
         index: Int,
         value: AnyNavigationValue
-    ) -> Int? {
-        navigation.valueDismissToken(at: path, index: index, value: value)
+    ) -> NavigationActionScope? {
+        navigation.valueDismissScope(at: path, index: index, value: value)
     }
 
     func updateNavigationPresentedDestination(
@@ -462,8 +462,8 @@ final class StateRuntime {
         return true
     }
 
-    func dismissNavigationStack(at path: [Int], target: NavigationDismissTarget) -> Bool {
-        guard let removedPaths = navigation.dismiss(at: path, target: target) else {
+    func dismissNavigationStack(at path: [Int], scope: NavigationActionScope) -> Bool {
+        guard let removedPaths = navigation.dismiss(at: path, scope: scope) else {
             return false
         }
 

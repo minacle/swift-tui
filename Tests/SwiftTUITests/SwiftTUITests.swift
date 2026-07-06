@@ -6289,8 +6289,8 @@ func RootDismissActionIsNoOp() {
     #expect(runtime.block(from: view)?.text == "Dismiss")
 }
 
-@Test("Stale navigation dismiss action does not dismiss new presentation")
-func StaleNavigationDismissActionDoesNotDismissNewPresentation() {
+@Test("Navigation expired presented dismiss action no-ops after re-presentation")
+func NavigationExpiredPresentedDismissActionNoOpsAfterRePresentation() {
     var isPresented = true
     let probe = DismissActionProbe()
     let runtime = StateRuntime()
@@ -6316,11 +6316,279 @@ func StaleNavigationDismissActionDoesNotDismissNewPresentation() {
 
     isPresented = true
     #expect(runtime.block(from: view)?.text == "Close")
+    let currentDismiss = probe.dismiss
 
     staleDismiss?()
     #expect(isPresented)
     #expect(!runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "Close")
+
+    currentDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation expired direct dismiss action no-ops after direct destination is re-pushed")
+func NavigationExpiredDirectDismissActionNoOpsAfterDirectDestinationIsRePushed() {
+    let probe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationPushCapturedDirectActionView(probe: probe)
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+    let expiredDismiss = probe.dismiss
+
+    expiredDismiss?()
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Push")
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+    let currentDismiss = probe.dismiss
+    _ = runtime.consumeInvalidation()
+
+    expiredDismiss?()
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    currentDismiss?()
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Push")
+}
+
+@Test("Navigation expired value dismiss action no-ops after value destination is re-pushed")
+func NavigationExpiredValueDismissActionNoOpsAfterValueDestinationIsRePushed() {
+    var path: [Int] = []
+    let probe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationCapturedValueDismissActionView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        ),
+        probe: probe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(path == [1])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+    let expiredDismiss = probe.dismiss
+
+    expiredDismiss?()
+    #expect(path.isEmpty)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Push")
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(path == [1])
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+    let currentDismiss = probe.dismiss
+    _ = runtime.consumeInvalidation()
+
+    expiredDismiss?()
+    #expect(path == [1])
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    currentDismiss?()
+    #expect(path.isEmpty)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Push")
+}
+
+@Test("Navigation covered direct dismiss action no-ops while presented destination is current")
+func NavigationCoveredDirectDismissActionNoOpsWhilePresentedDestinationIsCurrent() {
+    var isPresented = false
+    let directProbe = NavigationActionProbe()
+    let presentedProbe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationPushDirectWithPresentedActionView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        ),
+        directProbe: directProbe,
+        presentedProbe: presentedProbe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+    let coveredDismiss = directProbe.dismiss
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "A")
+    let currentDismiss = presentedProbe.dismiss
+    _ = runtime.consumeInvalidation()
+
+    coveredDismiss?()
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    currentDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+}
+
+@Test("Navigation stack scoped pop bypasses expired dismiss action scope")
+func NavigationStackScopedPopBypassesExpiredDismissActionScope() {
+    var isPresented = true
+    let probe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationCapturedPresentedNavigationActionsView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        ),
+        probe: probe
+    )
+
+    #expect(runtime.block(from: view)?.text == "A")
+    let staleDismiss = probe.dismiss
+    let stalePop = probe.pop
+
+    staleDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "A")
+
+    staleDismiss?()
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    stalePop?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation stack scoped value push bypasses expired dismiss action scope")
+func NavigationStackScopedValuePushBypassesExpiredDismissActionScope() {
+    var isPresented = true
+    var path: [Int] = []
+    let probe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationCapturedPresentedNavigationPathActionsView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        ),
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        ),
+        probe: probe
+    )
+
+    #expect(runtime.block(from: view)?.text == "A")
+    let staleDismiss = probe.dismiss
+    let stalePush = probe.push
+
+    staleDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "A")
+
+    staleDismiss?()
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    stalePush?(1)
+    #expect(path == [1])
+    #expect(runtime.consumeInvalidation())
+
+    isPresented = false
+    #expect(runtime.block(from: view)?.text == "Value 1")
+}
+
+@Test("Navigation stack scoped direct push bypasses expired dismiss action scope")
+func NavigationStackScopedDirectPushBypassesExpiredDismissActionScope() {
+    var isPresented = true
+    let probe = NavigationActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationCapturedPresentedNavigationActionsView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        ),
+        probe: probe
+    )
+
+    #expect(runtime.block(from: view)?.text == "A")
+    let staleDismiss = probe.dismiss
+    let stalePush = probe.push
+
+    staleDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "A")
+
+    staleDismiss?()
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "A")
+
+    stalePush? {
+        Text("Direct")
+    }
+    #expect(runtime.consumeInvalidation())
+
+    isPresented = false
+    #expect(runtime.block(from: view)?.text == "Direct")
 }
 
 @Test("Default navigation environment actions are no-ops")
@@ -7644,6 +7912,118 @@ private struct NavigationPushDirectDismissActionButton: View {
     }
 }
 
+private struct NavigationPushCapturedDirectActionView: View {
+
+    let probe: NavigationActionProbe
+
+    var body: some View {
+        NavigationStack {
+            NavigationPushCapturedDirectActionButton(probe: probe)
+        }
+    }
+}
+
+private struct NavigationPushCapturedDirectActionButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    let probe: NavigationActionProbe
+
+    var body: some View {
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    CapturedNavigationActionsView(probe: probe)
+                }
+                return .handled
+            }
+    }
+}
+
+private struct NavigationCapturedValueDismissActionView: View {
+
+    let path: Binding<[Int]>
+
+    let probe: NavigationActionProbe
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationPushValueButton()
+                .navigationDestination(for: Int.self) { _ in
+                    CapturedNavigationActionsView(probe: probe)
+                }
+        }
+    }
+}
+
+private struct NavigationPushDirectWithPresentedActionView: View {
+
+    let isPresented: Binding<Bool>
+
+    let directProbe: NavigationActionProbe
+
+    let presentedProbe: NavigationActionProbe
+
+    var body: some View {
+        NavigationStack {
+            NavigationPushDirectWithPresentedActionButton(
+                isPresented: isPresented,
+                directProbe: directProbe,
+                presentedProbe: presentedProbe
+            )
+        }
+    }
+}
+
+private struct NavigationPushDirectWithPresentedActionButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    let isPresented: Binding<Bool>
+
+    let directProbe: NavigationActionProbe
+
+    let presentedProbe: NavigationActionProbe
+
+    var body: some View {
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    NavigationDirectWithPresentedActionDestination(
+                        isPresented: isPresented,
+                        directProbe: directProbe,
+                        presentedProbe: presentedProbe
+                    )
+                }
+                return .handled
+            }
+    }
+}
+
+private struct NavigationDirectWithPresentedActionDestination: View {
+
+    let isPresented: Binding<Bool>
+
+    let directProbe: NavigationActionProbe
+
+    let presentedProbe: NavigationActionProbe
+
+    var body: some View {
+        CapturedNavigationActionsView(probe: directProbe)
+            .navigationDestination(isPresented: isPresented) {
+                CapturedNavigationActionsView(probe: presentedProbe)
+            }
+    }
+}
+
 private struct NavigationRootDismissActionView: View {
 
     var body: some View {
@@ -7664,6 +8044,43 @@ private struct NavigationCapturedPresentedDismissActionView: View {
             Text("Root")
                 .navigationDestination(isPresented: isPresented) {
                     NavigationCapturedDismissActionDestination(probe: probe)
+                }
+        }
+    }
+}
+
+private struct NavigationCapturedPresentedNavigationActionsView: View {
+
+    let isPresented: Binding<Bool>
+
+    let probe: NavigationActionProbe
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    CapturedNavigationActionsView(probe: probe)
+                }
+        }
+    }
+}
+
+private struct NavigationCapturedPresentedNavigationPathActionsView: View {
+
+    let isPresented: Binding<Bool>
+
+    let path: Binding<[Int]>
+
+    let probe: NavigationActionProbe
+
+    var body: some View {
+        NavigationStack(path: path) {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    CapturedNavigationActionsView(probe: probe)
+                }
+                .navigationDestination(for: Int.self) { value in
+                    Text("Value \(value)")
                 }
         }
     }
