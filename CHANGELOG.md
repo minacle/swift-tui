@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added SwiftUI-compatible `Text` initializers for `StringProtocol`,
+  `verbatim` strings, and Foundation `AttributedString` content.
+- Added attributed `Text` rendering for bold, italic, strikethrough, and link
+  runs while preserving terminal wrapping, clipping, and final SGR styling.
+- Added `OpenURLAction`, `EnvironmentValues.openURL`, and `View.onOpenURL` so
+  apps can handle attributed text links explicitly without a default system URL
+  opener.
+- Added `View.tint(_:)` for setting terminal tint color used by controls and
+  attributed text links.
+
 ### Changed
 
 - Removed the direct `swift-system` package dependency and tightened terminal

@@ -195,6 +195,13 @@ struct TapGestureHandler {
     let action: () -> Void
 }
 
+struct LinkHandler {
+
+    let actionPath: [Int]?
+
+    let action: () -> Bool
+}
+
 protocol InputModifierRenderable {
 
     func renderedBlock(
@@ -227,6 +234,8 @@ final class InputRuntime {
 
     private var tapHandlersByPath: [[Int]: [TapGestureHandler]] = [:]
 
+    private var linkHandlersByPath: [[Int]: LinkHandler] = [:]
+
     private var hitRegions: [RenderedHitRegion] = []
 
     private var scrollRegions: [RenderedScrollRegion] = []
@@ -236,6 +245,8 @@ final class InputRuntime {
     private var rootFrame = TextFrame(text: "", row: 1, column: 1)
 
     private var pressedTapTarget: [Int]?
+
+    private var pressedLinkTarget: [Int]?
 
     private var tapSequence: TapSequence?
 
@@ -249,6 +260,7 @@ final class InputRuntime {
         handlersByPath = [:]
         globalHandlers = []
         tapHandlersByPath = [:]
+        linkHandlersByPath = [:]
     }
 
     func register(_ handler: KeyPressHandler, at path: [Int]) {
@@ -267,6 +279,10 @@ final class InputRuntime {
 
     func register(_ handler: TapGestureHandler, at path: [Int]) {
         tapHandlersByPath[path, default: []].append(handler)
+    }
+
+    func register(_ handler: LinkHandler, at path: [Int]) {
+        linkHandlersByPath[path] = handler
     }
 
     func updateHitRegions(_ hitRegions: [RenderedHitRegion]) {
@@ -351,6 +367,7 @@ final class InputRuntime {
         _ mouseEvent: MouseEvent,
         at date: Date,
         perform: ([Int], () -> Void) -> Void,
+        performLink: ([Int], () -> Bool) -> Bool,
         focus: ([Int]) -> Bool,
         scroll: ([Int], MouseEvent) -> KeyPress.Result
     ) -> KeyPress.Result {
@@ -358,11 +375,13 @@ final class InputRuntime {
 
         if mouseEvent.button.isScrollWheel {
             pressedTapTarget = nil
+            pressedLinkTarget = nil
             return dispatchScroll(mouseEvent, scroll: scroll)
         }
 
         guard mouseEvent.button == .left else {
             pressedTapTarget = nil
+            pressedLinkTarget = nil
             return .ignored
         }
 
@@ -371,9 +390,24 @@ final class InputRuntime {
             let focused = focusTargets(at: mouseEvent).contains {
                 focus($0)
             }
+            pressedLinkTarget = linkTarget(at: mouseEvent)
             pressedTapTarget = tapTarget(at: mouseEvent)
-            return focused || pressedTapTarget != nil ? .handled : .ignored
+            return focused || pressedLinkTarget != nil || pressedTapTarget != nil
+                ? .handled : .ignored
         case .up:
+            if let pressedLinkTarget {
+                defer {
+                    self.pressedLinkTarget = nil
+                    self.pressedTapTarget = nil
+                }
+
+                guard linkTarget(at: mouseEvent) == pressedLinkTarget else {
+                    return .ignored
+                }
+
+                return dispatchLink(at: pressedLinkTarget, perform: performLink)
+            }
+
             guard let pressedTapTarget else {
                 return .ignored
             }
@@ -418,6 +452,24 @@ final class InputRuntime {
         return hitRegions
             .filter {
                 tapHandlersByPath[$0.path] != nil
+                    && $0.frame.contains(column: column, row: row)
+            }
+            .max {
+                if $0.path.count != $1.path.count {
+                    return $0.path.count < $1.path.count
+                }
+
+                return $0.frame.area > $1.frame.area
+            }?
+            .path
+    }
+
+    private func linkTarget(at mouseEvent: MouseEvent) -> [Int]? {
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        return hitRegions
+            .filter {
+                linkHandlersByPath[$0.path] != nil
                     && $0.frame.contains(column: column, row: row)
             }
             .max {
@@ -525,6 +577,18 @@ final class InputRuntime {
         }
 
         return .handled
+    }
+
+    private func dispatchLink(
+        at path: [Int],
+        perform: ([Int], () -> Bool) -> Bool
+    ) -> KeyPress.Result {
+        guard let handler = linkHandlersByPath[path] else {
+            return .ignored
+        }
+
+        let actionPath = handler.actionPath ?? path
+        return perform(actionPath, handler.action) ? .handled : .ignored
     }
 
     private func performTapActions(

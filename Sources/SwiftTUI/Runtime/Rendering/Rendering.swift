@@ -31,16 +31,20 @@ nonisolated struct RenderedRun: Equatable, Sendable {
 
     var style: TextStyle
 
+    var link: URL?
+
     init(
         text: String,
         row: Int = 0,
         column: Int = 0,
-        style: TextStyle = .plain
+        style: TextStyle = .plain,
+        link: URL? = nil
     ) {
         self.text = text
         self.row = row
         self.column = column
         self.style = style
+        self.link = link
     }
 
     var width: Int {
@@ -56,7 +60,8 @@ nonisolated struct RenderedRun: Equatable, Sendable {
             text: text,
             row: row + y,
             column: column + x,
-            style: style
+            style: style,
+            link: link
         )
     }
 
@@ -75,7 +80,8 @@ nonisolated struct RenderedRun: Equatable, Sendable {
                 text: $0.text,
                 row: row - bounds.y,
                 column: $0.column - bounds.x,
-                style: $0.style
+                style: $0.style,
+                link: $0.link
             )
         }
     }
@@ -102,7 +108,8 @@ nonisolated struct RenderedRun: Equatable, Sendable {
                     text: text,
                     row: row,
                     column: startColumn,
-                    style: style
+                    style: style,
+                    link: link
                 )
             )
             text = ""
@@ -669,6 +676,8 @@ private nonisolated struct CompositedCell: Equatable {
 
     var style: TextStyle
 
+    var link: URL?
+
     static func runs(
         from blocks: [RenderedBlock],
         clippedTo bounds: RenderedRect
@@ -691,7 +700,8 @@ private nonisolated struct CompositedCell: Equatable {
                         text: $0.text,
                         row: row,
                         column: $0.column,
-                        style: $0.style
+                        style: $0.style,
+                        link: $0.link
                     )
                 }
             }
@@ -723,7 +733,8 @@ private nonisolated struct CompositedCell: Equatable {
                     row: run.row,
                     column: column,
                     width: width,
-                    style: run.style
+                    style: run.style,
+                    link: run.link
                 ),
                 to: &rows
             )
@@ -779,7 +790,8 @@ private extension [RenderedRun] {
             guard let last = runs.last,
                   last.row == run.row,
                   last.column + last.width == run.column,
-                  last.style == run.style else {
+                  last.style == run.style,
+                  last.link == run.link else {
                 runs.append(run)
                 continue
             }
@@ -788,7 +800,8 @@ private extension [RenderedRun] {
                 text: last.text + run.text,
                 row: last.row,
                 column: last.column,
-                style: last.style
+                style: last.style,
+                link: last.link
             )
         }
         return runs
@@ -1194,7 +1207,12 @@ extension ForEach: FlattenableViewContent where Content: View {
 
 enum TextLayoutRenderer {
 
-    static func block(for text: Text, in proposal: RenderProposal?) -> RenderedBlock {
+    static func block(
+        for text: Text,
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock {
         let lineLimit = TextLineLimitContext.current
         var lines = TextLineWrapper.wrappedLines(for: text.content, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
@@ -1212,10 +1230,167 @@ enum TextLayoutRenderer {
             }
         }
 
-        return RenderedBlock(
-            lines: lines,
-            style: EnvironmentRenderContext.current.textStyle
+        let runs = TextRunLayoutMapper.renderedRuns(
+            for: lines,
+            text: text,
+            baseStyle: EnvironmentRenderContext.current.textStyle,
+            tint: EnvironmentRenderContext.current.tint
         )
+        var block = RenderedBlock(
+            runs: runs,
+            width: lines.map(TerminalText.columnWidth).max() ?? 0,
+            height: lines.count,
+            paddedRows: Set(
+                lines.enumerated().compactMap { row, line in
+                    line.isEmpty && !runs.isEmpty ? row : nil
+                }
+            )
+        )
+        registerLinks(in: runtime, path: path, runs: runs, block: &block)
+        return block
+    }
+
+    private static func registerLinks(
+        in runtime: StateRuntime?,
+        path: [Int],
+        runs: [RenderedRun],
+        block: inout RenderedBlock
+    ) {
+        var linkIndex = 0
+        for run in runs {
+            guard let url = run.link else {
+                continue
+            }
+
+            let linkPath = path + [linkIndex]
+            linkIndex += 1
+            block.hitRegions.append(
+                RenderedHitRegion(
+                    path: linkPath,
+                    frame: RenderedRect(
+                        x: run.column,
+                        y: run.row,
+                        width: run.width,
+                        height: 1
+                    )
+                )
+            )
+            runtime?.registerLinkHandler(
+                LinkHandler(
+                    actionPath: linkPath,
+                    action: {
+                        EnvironmentRenderContext.current.openURL.result(for: url).accepted
+                    }
+                ),
+                at: linkPath
+            )
+        }
+    }
+}
+
+private enum TextRunLayoutMapper {
+
+    private struct StyledCharacter {
+
+        var character: Character
+
+        var style: TextStyle
+
+        var link: URL?
+    }
+
+    static func renderedRuns(
+        for lines: [String],
+        text: Text,
+        baseStyle: TextStyle,
+        tint: AnyColor?
+    ) -> [RenderedRun] {
+        let characters = styledCharacters(for: text, baseStyle: baseStyle, tint: tint)
+        var sourceIndex = characters.startIndex
+        var renderedRuns: [RenderedRun] = []
+
+        for (row, line) in lines.enumerated() {
+            var column = 0
+            var pendingText = ""
+            var pendingColumn = 0
+            var pendingStyle: TextStyle?
+            var pendingLink: URL?
+
+            func flush() {
+                guard !pendingText.isEmpty, let style = pendingStyle else {
+                    return
+                }
+
+                renderedRuns.append(
+                    RenderedRun(
+                        text: pendingText,
+                        row: row,
+                        column: pendingColumn,
+                        style: style,
+                        link: pendingLink
+                    )
+                )
+                pendingText = ""
+                pendingStyle = nil
+                pendingLink = nil
+            }
+
+            for character in line {
+                let styledCharacter = nextStyledCharacter(
+                    matching: character,
+                    in: characters,
+                    from: &sourceIndex
+                )
+                let style = styledCharacter?.style ?? baseStyle
+                let link = styledCharacter?.link
+                if pendingStyle != style || pendingLink != link {
+                    flush()
+                    pendingColumn = column
+                    pendingStyle = style
+                    pendingLink = link
+                }
+
+                let characterText = String(character)
+                pendingText += characterText
+                column += TerminalText.columnWidth(characterText)
+            }
+
+            flush()
+        }
+
+        return renderedRuns
+    }
+
+    private static func styledCharacters(
+        for text: Text,
+        baseStyle: TextStyle,
+        tint: AnyColor?
+    ) -> [StyledCharacter] {
+        text.runs.flatMap { run -> [StyledCharacter] in
+            var style = baseStyle.merged(with: run.style)
+            if run.link != nil, let tint {
+                style.foregroundStyle = tint
+            }
+
+            return run.text.map {
+                StyledCharacter(character: $0, style: style, link: run.link)
+            }
+        }
+    }
+
+    private static func nextStyledCharacter(
+        matching character: Character,
+        in characters: [StyledCharacter],
+        from index: inout [StyledCharacter].Index
+    ) -> StyledCharacter? {
+        while index < characters.endIndex {
+            let styledCharacter = characters[index]
+            index = characters.index(after: index)
+            if styledCharacter.character == character {
+                return styledCharacter
+            }
+        }
+        return nil
     }
 }
 
@@ -1456,6 +1631,10 @@ enum ViewResolver {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
+        if let modifier = view as? any OpenURLModifierRenderable {
+            return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
+        }
+
         if let modifier = view as? any FocusModifierRenderable {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
@@ -1578,6 +1757,14 @@ enum ViewResolver {
             )
         }
 
+        if let modifier = view as? any OpenURLModifierRenderable {
+            return modifier.renderedElement(
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+
         if let modifier = view as? any FocusModifierRenderable {
             return modifier.renderedElement(
                 in: proposal,
@@ -1616,7 +1803,14 @@ enum ViewResolver {
         runtime: StateRuntime?
     ) -> BlockResolution {
         if let text = view as? Text {
-            return .resolved(TextLayoutRenderer.block(for: text, in: proposal))
+            return .resolved(
+                TextLayoutRenderer.block(
+                    for: text,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            )
         }
 
         if view is EmptyView {

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 public import Terminal
 
 /// A terminal SGR color.
@@ -61,14 +61,69 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// The body type for this primitive view.
     public typealias Body = Never
 
+    nonisolated let runs: [TextRun]
+
     /// The string rendered by this text view.
-    public let content: String
+    public var content: String {
+        runs.map(\.text).joined()
+    }
 
     /// Creates a text view from a string.
     ///
     /// - Parameter content: The string to render in the terminal.
-    public init(_ content: String) {
-        self.content = content
+    public init<S>(_ content: S) where S: StringProtocol {
+        self.runs = [TextRun(text: String(content))]
+    }
+
+    /// Creates a text view from a string without localization.
+    ///
+    /// - Parameter content: The string to render in the terminal.
+    public init(verbatim content: String) {
+        self.init(content)
+    }
+
+    /// Creates a text view from attributed string content.
+    ///
+    /// SwiftTUI renders the attributed string's characters and maps supported
+    /// Foundation attributes to terminal SGR text styles.
+    ///
+    /// - Parameter attributedContent: The attributed string to render.
+    public init(_ attributedContent: AttributedString) {
+        self.runs = TextRun.runs(from: attributedContent)
+    }
+}
+
+nonisolated struct TextRun: Equatable, Sendable {
+
+    var text: String
+
+    var style: TextStyle
+
+    var link: URL?
+
+    init(
+        text: String,
+        style: TextStyle = .plain,
+        link: URL? = nil
+    ) {
+        self.text = text
+        self.style = style
+        self.link = link
+    }
+
+    static func runs(from attributedString: AttributedString) -> [TextRun] {
+        attributedString.runs.compactMap { run -> TextRun? in
+            let text = String(attributedString.characters[run.range])
+            guard !text.isEmpty else {
+                return nil
+            }
+
+            return TextRun(
+                text: text,
+                style: TextStyle(inlinePresentationIntent: run.inlinePresentationIntent),
+                link: run.link
+            )
+        }
     }
 }
 
@@ -110,6 +165,49 @@ nonisolated struct TextStyle: Equatable, Sendable {
             && !isItalic
             && !isUnderline
             && !isStrikethrough
+    }
+
+    init() {
+    }
+
+    init(inlinePresentationIntent: InlinePresentationIntent?) {
+        guard let inlinePresentationIntent else {
+            return
+        }
+
+        isBold = inlinePresentationIntent.contains(.stronglyEmphasized)
+        isItalic = inlinePresentationIntent.contains(.emphasized)
+        isStrikethrough = inlinePresentationIntent.contains(.strikethrough)
+    }
+
+    func merged(with override: TextStyle) -> TextStyle {
+        TextStyle(
+            foregroundStyle: override.foregroundStyle ?? foregroundStyle,
+            backgroundStyle: override.backgroundStyle ?? backgroundStyle,
+            isBold: isBold || override.isBold,
+            isDim: isDim || override.isDim,
+            isItalic: isItalic || override.isItalic,
+            isUnderline: isUnderline || override.isUnderline,
+            isStrikethrough: isStrikethrough || override.isStrikethrough
+        )
+    }
+
+    init(
+        foregroundStyle: AnyColor? = nil,
+        backgroundStyle: AnyColor? = nil,
+        isBold: Bool = false,
+        isDim: Bool = false,
+        isItalic: Bool = false,
+        isUnderline: Bool = false,
+        isStrikethrough: Bool = false
+    ) {
+        self.foregroundStyle = foregroundStyle
+        self.backgroundStyle = backgroundStyle
+        self.isBold = isBold
+        self.isDim = isDim
+        self.isItalic = isItalic
+        self.isUnderline = isUnderline
+        self.isStrikethrough = isStrikethrough
     }
 }
 
@@ -312,6 +410,44 @@ public extension View {
         }
     }
 
+    /// Sets the terminal tint color for controls and links within this view.
+    ///
+    /// - Parameter tint: A 16-color terminal SGR style, or `nil` to clear tint.
+    /// - Returns: A view with the updated tint environment.
+    func tint(_ tint: Color16?) -> some View {
+        self.tint(tint.map { AnyColor($0) })
+    }
+
+    /// Sets the terminal tint color for controls and links within this view.
+    ///
+    /// - Parameter tint: A 256-color terminal SGR style, or `nil` to clear tint.
+    /// - Returns: A view with the updated tint environment.
+    func tint(_ tint: Color256?) -> some View {
+        self.tint(tint.map { AnyColor($0) })
+    }
+
+    /// Sets the terminal tint color for controls and links within this view.
+    ///
+    /// - Parameter tint: A true-color terminal SGR style, or `nil` to clear tint.
+    /// - Returns: A view with the updated tint environment.
+    func tint(_ tint: TrueColor?) -> some View {
+        self.tint(tint.map { AnyColor($0) })
+    }
+
+    /// Sets the terminal tint color for controls and links within this view.
+    ///
+    /// - Parameter tint: The default color reset style, or `nil` to clear tint.
+    /// - Returns: A view with the updated tint environment.
+    func tint(_ tint: DefaultColor?) -> some View {
+        self.tint(tint.map { AnyColor($0) })
+    }
+
+    private func tint(_ tint: AnyColor?) -> some View {
+        transformEnvironment(\.tint) {
+            $0 = tint
+        }
+    }
+
     /// Sets whether text within this view renders in bold.
     ///
     /// - Parameter isActive: Pass `true` to enable bold SGR styling, or `false`
@@ -405,11 +541,25 @@ extension EnvironmentValues {
             self[TextStyleKey.self] = newValue
         }
     }
+
+    var tint: AnyColor? {
+        get {
+            self[TintKey.self]
+        }
+        set {
+            self[TintKey.self] = newValue
+        }
+    }
 }
 
 private struct TextStyleKey: EnvironmentKey {
 
     nonisolated static let defaultValue = TextStyle.plain
+}
+
+private struct TintKey: EnvironmentKey {
+
+    nonisolated static let defaultValue: AnyColor? = nil
 }
 
 enum TextLineLimitContext {

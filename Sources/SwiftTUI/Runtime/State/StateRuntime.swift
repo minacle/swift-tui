@@ -34,6 +34,8 @@ final class StateRuntime {
 
     private var terminationHandler: TerminationHandler?
 
+    private var openURLHandlers: [OpenURLHandler] = []
+
     private var invalidated = false
 
     private var isObservingRender = false
@@ -65,6 +67,7 @@ final class StateRuntime {
         change.beginRender()
         scrollViewRenderOrder = []
         terminationHandler = nil
+        openURLHandlers = []
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
@@ -116,6 +119,7 @@ final class StateRuntime {
         change.beginRender()
         scrollViewRenderOrder = []
         terminationHandler = nil
+        openURLHandlers = []
         defer {
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
@@ -329,12 +333,32 @@ final class StateRuntime {
         )
     }
 
+    func registerLinkHandler(_ handler: LinkHandler, at path: [Int]) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringLinkHandler(handler),
+            at: path
+        )
+    }
+
     func registerTerminationHandler(_ handler: TerminationHandler) {
         guard !suppressRenderRegistrations else {
             return
         }
 
         terminationHandler = handler
+    }
+
+    func registerOpenURLHandler(_ handler: OpenURLHandler) {
+        guard !suppressRenderRegistrations else {
+            return
+        }
+
+        openURLHandlers.append(handler)
     }
 
     func registerLifecycleHandler(_ handler: LifecycleHandler, at path: [Int]) {
@@ -560,6 +584,9 @@ final class StateRuntime {
             perform: { path, operation in
                 withView(at: path, perform: operation)
             },
+            performLink: { path, operation in
+                withView(at: path, perform: operation)
+            },
             focus: { path in
                 let result = focus.requestFocus(at: path)
                 if result.changed {
@@ -593,6 +620,19 @@ final class StateRuntime {
                 terminationHandler.action()
             }
         }
+    }
+
+    func dispatchOpenURL(_ url: URL) -> KeyPress.Result {
+        var handled = false
+        for handler in openURLHandlers {
+            EnvironmentRenderContext.withValues(handler.environment) {
+                withView(at: handler.actionPath) {
+                    handler.action(url)
+                    handled = true
+                }
+            }
+        }
+        return handled ? .handled : .ignored
     }
 
     func updateRenderedFrame(_ frame: TextFrame) {
@@ -692,6 +732,20 @@ final class StateRuntime {
         return TapGestureHandler(
             actionPath: handler.actionPath,
             count: handler.count,
+            action: {
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action()
+                }
+            }
+        )
+    }
+
+    private func environmentRestoringLinkHandler(
+        _ handler: LinkHandler
+    ) -> LinkHandler {
+        let environment = EnvironmentRenderContext.current
+        return LinkHandler(
+            actionPath: handler.actionPath,
             action: {
                 EnvironmentRenderContext.withValues(environment) {
                     handler.action()
@@ -1186,6 +1240,15 @@ struct TerminationHandler {
     var environment: EnvironmentValues
 
     var action: () -> Void
+}
+
+struct OpenURLHandler {
+
+    var actionPath: [Int]
+
+    var environment: EnvironmentValues
+
+    var action: (URL) -> Void
 }
 
 enum StateRenderContextMode {

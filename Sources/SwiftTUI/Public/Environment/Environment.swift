@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 public import Observation
 
 /// An action that terminates the running SwiftTUI app.
@@ -19,6 +19,78 @@ public nonisolated struct TerminateAction {
     /// Requests termination by invoking the stored action.
     public func callAsFunction() {
         action()
+    }
+}
+
+/// An action that opens a URL.
+///
+/// SwiftTUI only invokes the installed handler. The default action discards
+/// URLs and does not call a platform URL opener.
+public nonisolated struct OpenURLAction: @unchecked Sendable {
+
+    /// The result of an open URL action.
+    public nonisolated struct Result: Equatable, Sendable {
+
+        private enum Storage: Equatable, Sendable {
+
+            case handled
+
+            case discarded
+
+            case systemAction(URL?)
+        }
+
+        private let storage: Storage
+
+        /// The handler opened the URL.
+        public static let handled = Result(storage: .handled)
+
+        /// The handler discarded the URL.
+        public static let discarded = Result(storage: .discarded)
+
+        /// The handler asks the system to open the original URL.
+        public static let systemAction = Result(storage: .systemAction(nil))
+
+        /// The handler asks the system to open the specified URL.
+        ///
+        /// SwiftTUI does not provide a default system opener, so this result is
+        /// only accepted when a custom handler treats it as handled.
+        public static func systemAction(_ url: URL) -> Result {
+            Result(storage: .systemAction(url))
+        }
+
+        var accepted: Bool {
+            storage == .handled
+        }
+    }
+
+    private let handler: (URL) -> Result
+
+    /// Creates an action that opens a URL.
+    ///
+    /// - Parameter handler: The closure to run for the given URL.
+    public init(handler: @escaping (URL) -> Result) {
+        self.handler = handler
+    }
+
+    /// Opens a URL by invoking the installed handler.
+    ///
+    /// - Parameter url: The URL to open.
+    public func callAsFunction(_ url: URL) {
+        _ = result(for: url)
+    }
+
+    /// Opens a URL by invoking the installed handler and reporting acceptance.
+    ///
+    /// - Parameters:
+    ///   - url: The URL to open.
+    ///   - completion: A closure that receives whether the handler accepted the URL.
+    public func callAsFunction(_ url: URL, completion: @escaping (Bool) -> Void) {
+        completion(result(for: url).accepted)
+    }
+
+    func result(for url: URL) -> Result {
+        handler(url)
     }
 }
 
@@ -115,6 +187,18 @@ public extension EnvironmentValues {
         }
         set {
             self[TerminateActionKey.self] = newValue
+        }
+    }
+
+    /// An action that opens a URL.
+    ///
+    /// The default action discards URLs and performs no system side effects.
+    var openURL: OpenURLAction {
+        get {
+            self[OpenURLActionKey.self]
+        }
+        set {
+            self[OpenURLActionKey.self] = newValue
         }
     }
 }
@@ -389,6 +473,61 @@ struct OnTerminateView<Content: View>: View, TerminationModifierRenderable,
     }
 }
 
+struct OnOpenURLView<Content: View>: View, OpenURLModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let actionPath: [Int]?
+
+    let action: (URL) -> Void
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        register(in: runtime, renderedPath: path)
+        return ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        register(in: runtime, renderedPath: path)
+        return ViewResolver.element(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+
+    private func register(in runtime: StateRuntime?, renderedPath: [Int]) {
+        runtime?.registerOpenURLHandler(
+            OpenURLHandler(
+                actionPath: actionPath ?? renderedPath,
+                environment: EnvironmentRenderContext.current,
+                action: action
+            )
+        )
+    }
+}
+
 protocol EnvironmentModifierRenderable {
 
     func renderedBlock(
@@ -405,6 +544,21 @@ protocol EnvironmentModifierRenderable {
 }
 
 protocol TerminationModifierRenderable {
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock?
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement?
+}
+
+protocol OpenURLModifierRenderable {
 
     func renderedBlock(
         in proposal: RenderProposal?,
@@ -517,6 +671,18 @@ public extension View {
             action: action
         )
     }
+
+    /// Performs an action when SwiftTUI dispatches an incoming URL to this view.
+    ///
+    /// - Parameter action: The action to run with the incoming URL.
+    /// - Returns: A view with an incoming URL handler attached.
+    func onOpenURL(perform action: @escaping (URL) -> Void) -> some View {
+        OnOpenURLView(
+            content: self,
+            actionPath: StateContext.currentPath,
+            action: action
+        )
+    }
 }
 
 enum EnvironmentRenderContext {
@@ -556,6 +722,13 @@ private struct IsEnabledKey: EnvironmentKey {
 
     nonisolated static var defaultValue: Bool {
         true
+    }
+}
+
+private struct OpenURLActionKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = OpenURLAction { _ in
+        .discarded
     }
 }
 

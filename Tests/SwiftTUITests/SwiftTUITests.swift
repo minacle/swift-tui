@@ -17,6 +17,144 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(text.content == "Hello")
 }
 
+@Test func textInitializersAcceptStringProtocolVerbatimLocalizedAndAttributedContent() {
+    let string = "Hello"
+    let substring = string[string.startIndex..<string.index(string.startIndex, offsetBy: 4)]
+    var attributed = AttributedString("Styled")
+    attributed.inlinePresentationIntent = .stronglyEmphasized
+
+    #expect(Text(string).content == "Hello")
+    #expect(Text(substring).content == "Hell")
+    #expect(Text(verbatim: "Literal").content == "Literal")
+    #expect(Text(LocalizedStringKey("Key")).content == "Key")
+    #expect(Text(attributed).content == "Styled")
+}
+
+@Test func attributedTextMapsInlinePresentationIntentToRuns() {
+    var attributed = AttributedString("Bold Italic Strike")
+    attributed[attributed.range(of: "Bold")!].inlinePresentationIntent = .stronglyEmphasized
+    attributed[attributed.range(of: "Italic")!].inlinePresentationIntent = .emphasized
+    attributed[attributed.range(of: "Strike")!].inlinePresentationIntent = .strikethrough
+
+    let block = ViewResolver.block(from: Text(attributed))
+
+    #expect(block?.runs == [
+        RenderedRun(text: "Bold", style: TextStyle(isBold: true)),
+        RenderedRun(text: " ", column: 4),
+        RenderedRun(text: "Italic", column: 5, style: TextStyle(isItalic: true)),
+        RenderedRun(text: " ", column: 11),
+        RenderedRun(text: "Strike", column: 12, style: TextStyle(isStrikethrough: true)),
+    ])
+}
+
+@Test func attributedTextMergesAttributesWithEnvironmentStyle() {
+    var attributed = AttributedString("Bold plain")
+    attributed[attributed.range(of: "Bold")!].inlinePresentationIntent = .stronglyEmphasized
+
+    let block = ViewResolver.block(from: Text(attributed).foregroundStyle(.red).italic())
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "Bold",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                isBold: true,
+                isItalic: true
+            )
+        ),
+        RenderedRun(
+            text: " plain",
+            column: 4,
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.red),
+                isItalic: true
+            )
+        ),
+    ])
+}
+
+@Test func attributedTextPreservesRunStylesAcrossWrapping() {
+    var attributed = AttributedString("Alpha Beta")
+    attributed[attributed.range(of: "Beta")!].inlinePresentationIntent = .stronglyEmphasized
+
+    let block = ViewResolver.block(from: Text(attributed), in: RenderProposal(columns: 5))
+
+    #expect(block?.runs == [
+        RenderedRun(text: "Alpha", row: 0),
+        RenderedRun(text: "Beta", row: 1, style: TextStyle(isBold: true)),
+    ])
+    #expect(block?.lines == ["Alpha", "Beta "])
+}
+
+@Test func attributedLinkIsClickableWithoutDefaultUnderline() {
+    var attributed = AttributedString("Visit")
+    let url = URL(string: "https://example.com")!
+    attributed.link = url
+    var opened: [URL] = []
+    let runtime = StateRuntime()
+    let view = Text(attributed)
+        .environment(\.openURL, OpenURLAction { opened.append($0); return .handled })
+
+    let block = runtime.block(from: view)
+
+    #expect(block?.runs == [
+        RenderedRun(text: "Visit", link: url),
+    ])
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(opened == [url])
+}
+
+@Test func attributedLinkUsesTintAsForegroundStyle() {
+    var attributed = AttributedString("Visit")
+    let url = URL(string: "https://example.com")!
+    attributed.link = url
+
+    let block = ViewResolver.block(from: Text(attributed).tint(.green))
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "Visit",
+            style: TextStyle(foregroundStyle: AnyColor(Color16.green)),
+            link: url
+        ),
+    ])
+}
+
+@Test func defaultOpenURLActionDiscardsLinkClicks() {
+    var attributed = AttributedString("Visit")
+    attributed.link = URL(string: "https://example.com")!
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: Text(attributed))?.text == "Visit")
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date
+        ) == .ignored
+    )
+}
+
+@Test func onOpenURLHandlesIncomingURL() {
+    let url = URL(string: "swift-tui://open")!
+    var received: [URL] = []
+    let runtime = StateRuntime()
+    let view = Text("A")
+        .onOpenURL {
+            received.append($0)
+        }
+
+    #expect(runtime.block(from: view)?.text == "A")
+    #expect(runtime.dispatchOpenURL(url) == .handled)
+    #expect(received == [url])
+}
+
 @Test func textStyleDoesNotChangePlainTextProjection() {
     let block = ViewResolver.block(
         from: Text("Lorem ipsum")
