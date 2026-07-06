@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-06
+
 ### Added
 
 - Added a SwiftUI-compatible `View.onChange(of:initial:_:)` overload that
@@ -27,8 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `View.italic(_:)`, `View.underline(_:)`, and
   `View.strikethrough(_:)` text styling modifiers for terminal SGR italic,
   underline, and strikethrough output.
+- Added the Swift DocC plugin dependency so package documentation can be
+  generated through SwiftPM.
 
-### Changed
+### Deprecated
 
 - Deprecated `View.color(_:)` in favor of `View.foregroundStyle(_:)`.
 
@@ -97,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/minacle/swift-tui/releases/tag/v0.3.0
 [0.2.0]: https://github.com/minacle/swift-tui/releases/tag/v0.2.0
 [0.1.0]: https://github.com/minacle/swift-tui/releases/tag/v0.1.0
