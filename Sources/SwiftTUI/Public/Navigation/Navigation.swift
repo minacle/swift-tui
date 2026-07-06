@@ -1019,10 +1019,38 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                         id: directDestination.id,
                         token: directDestination.token
                     )
+                    let dismiss = dismissAction(for: target, runtime: runtime, path: path)
+                    let destinations = collectDestinations(path: path, runtime: runtime) {
+                        _ = renderDestination(
+                            directDestination.destination,
+                            [1, directDestination.id],
+                            dismiss
+                        )
+                    }
+                    let presentedDestination = destinations.presentedDestination
+                    runtime?.updateNavigationPresentedDestination(
+                        presentedDestination,
+                        at: path
+                    )
+                    if let presentedDestination =
+                        runtime?.topPresentedNavigationDestination(at: path) ?? presentedDestination
+                    {
+                        let target = NavigationDismissTarget.presented(
+                            slot: presentedDestination.slot,
+                            identity: presentedDestination.identity,
+                            token: presentedDestination.token
+                        )
+                        return renderDestination(
+                            presentedDestination.destination,
+                            presentedDestination.renderPath(in: path),
+                            dismissAction(for: target, runtime: runtime, path: path)
+                        )
+                    }
+
                     return renderDestination(
                         directDestination.destination,
                         [1, directDestination.id],
-                        dismissAction(for: target, runtime: runtime, path: path)
+                        dismiss
                     )
                 }
 
@@ -1133,18 +1161,24 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> NavigationDestinationCollection {
+        collectDestinations(path: path, runtime: runtime) {
+            _ = ViewResolver.block(
+                from: root,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            )
+        }
+    }
+
+    private func collectDestinations(
+        path: [Int],
+        runtime: StateRuntime?,
+        render: () -> Void
+    ) -> NavigationDestinationCollection {
         let collection = NavigationDestinationCollection()
         NavigationDestinationCollectionContext.withCollection(collection) {
             NavigationStackContext.withStack(path: path, runtime: runtime) {
-                let render = {
-                    _ = ViewResolver.block(
-                        from: root,
-                        in: proposal,
-                        path: path + [0],
-                        runtime: runtime
-                    )
-                }
-
                 runtime?.withoutRenderRegistrations(render) ?? render()
             }
         }

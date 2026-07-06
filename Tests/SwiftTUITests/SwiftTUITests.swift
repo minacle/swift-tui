@@ -5979,6 +5979,50 @@ func NavigationDestinationIsPresentedBindingPresentsAndResetsOnEscape() {
     #expect(runtime.block(from: view)?.text == "Root")
 }
 
+@Test("Navigation destination isPresented state presents after global key press")
+func NavigationDestinationIsPresentedStatePresentsAfterGlobalKeyPress() {
+    let runtime = StateRuntime()
+    let view = NavigationPresentedBoolStateGlobalKeyView()
+
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Presented")
+}
+
+@Test("Navigation destination isPresented state presents after character global key press with onAppear")
+func NavigationDestinationIsPresentedStatePresentsAfterCharacterGlobalKeyPressWithOnAppear() {
+    let runtime = StateRuntime()
+    let view = NavigationPresentedBoolStateCharacterGlobalKeyOnAppearView()
+
+    #expect(runtime.block(from: view)?.text == "Root")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root appeared")
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Presented")
+}
+
+@Test("Navigation destination isPresented state presents from direct destination")
+func NavigationDestinationIsPresentedStatePresentsFromDirectDestination() {
+    let runtime = StateRuntime()
+    let view = NavigationPresentedBoolStateDirectDestinationView()
+
+    #expect(runtime.block(from: view)?.text == "Open")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Detail")
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Presented")
+}
+
 @Test("Navigation destination item binding presents and resets on Escape")
 func NavigationDestinationItemBindingPresentsAndResetsOnEscape() {
     var item: Int? = nil
@@ -7236,6 +7280,87 @@ private struct NavigationPresentedBoolView: View {
                     Text("Presented")
                 }
         }
+    }
+}
+
+private struct NavigationPresentedBoolStateGlobalKeyView: View {
+
+    @State
+    private var isPresented = false
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: $isPresented) {
+                    Text("Presented")
+                }
+                .onGlobalKeyPress("a") {
+                    isPresented = true
+                    return .handled
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedBoolStateCharacterGlobalKeyOnAppearView: View {
+
+    @State
+    private var didAppear = false
+
+    @State
+    private var isPresented = false
+
+    var body: some View {
+        NavigationStack {
+            Text(didAppear ? "Root appeared" : "Root")
+                .navigationDestination(isPresented: $isPresented) {
+                    Text("Presented")
+                }
+                .onAppear {
+                    didAppear = true
+                }
+                .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+                    _ in
+
+                    isPresented = true
+                    return .handled
+                }
+        }
+    }
+}
+
+private struct NavigationPresentedBoolStateDirectDestinationView: View {
+
+    @FocusState
+    private var isFocused: Bool = true
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink("Open") {
+                NavigationPresentedBoolStateDirectDestinationDetailView()
+            }
+            .focusable()
+            .focused($isFocused)
+        }
+    }
+}
+
+private struct NavigationPresentedBoolStateDirectDestinationDetailView: View {
+
+    @State
+    private var isPresented = false
+
+    var body: some View {
+        Text("Detail")
+            .navigationDestination(isPresented: $isPresented) {
+                Text("Presented")
+            }
+            .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+                _ in
+
+                isPresented = true
+                return .handled
+            }
     }
 }
 
