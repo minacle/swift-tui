@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `DismissAction` and `EnvironmentValues.dismiss` for
+  dismissing the current navigation presentation from the destination
+  environment.
 - Added SwiftUI-compatible `View.navigationDestination(isPresented:)` and
   `View.navigationDestination(item:)` for binding-driven navigation stack
   presentations that dismiss by resetting their bindings.
@@ -23,9 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opener.
 - Added `View.tint(_:)` for setting terminal tint color used by controls and
   attributed text links.
+- Added SwiftUI-compatible optional observable object lookup with
+  `@Environment(Type.self) var object: Type?`, returning `nil` when no matching
+  object is present in the environment.
+
+### Deprecated
+
+- Deprecated `EnvironmentValues.push`, `EnvironmentValues.pop`, `PushAction`,
+  and `PopAction` in favor of path bindings for programmatic navigation and
+  `EnvironmentValues.dismiss` for presentation dismissal.
 
 ### Changed
 
+- Changed `@Environment` to read from the environment snapshot materialized when
+  a view's `body` is evaluated, rather than re-reading the current render
+  context whenever `wrappedValue` is accessed.
 - Removed the direct `swift-system` package dependency and tightened terminal
   platform imports around `System`, `SystemPackage`, `Glibc`, and `Darwin` so
   the package continues to build cleanly on macOS and Linux.

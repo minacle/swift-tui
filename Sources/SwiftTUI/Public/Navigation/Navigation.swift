@@ -34,6 +34,7 @@ public extension Text {
 /// An action that pops the current navigation stack.
 ///
 /// Read this action with `Environment(\.pop)` inside a navigation stack.
+@available(*, deprecated, message: "Use EnvironmentValues.dismiss from a presented destination instead.")
 public nonisolated struct PopAction {
 
     private let action: @MainActor () -> Void
@@ -51,9 +52,27 @@ public nonisolated struct PopAction {
     }
 }
 
+/// An action that dismisses the current presentation.
+///
+/// Read this action with `Environment(\.dismiss)` inside a presented view.
+public nonisolated struct DismissAction: @unchecked Sendable {
+
+    private let action: @MainActor () -> Void
+
+    init(_ action: @escaping @MainActor () -> Void = {}) {
+        self.action = action
+    }
+
+    /// Dismisses the current presentation when a presentation-provided action is installed.
+    @MainActor public func callAsFunction() {
+        action()
+    }
+}
+
 /// An action that pushes a value or destination onto the current navigation stack.
 ///
 /// Read this action with `Environment(\.push)` inside a navigation stack.
+@available(*, deprecated, message: "Use a NavigationStack path binding for programmatic navigation instead.")
 public nonisolated struct PushAction {
 
     private let pushValue: @MainActor (AnyNavigationValue) -> Void
@@ -533,6 +552,8 @@ struct NavigationDirectDestination {
 
     let id: Int
 
+    let token: Int
+
     let destination: NavigationDestination
 }
 
@@ -546,6 +567,18 @@ struct NavigationPresentedDestination {
 
     let dismiss: () -> Void
 
+    let token: Int
+
+    func withToken(_ token: Int) -> NavigationPresentedDestination {
+        NavigationPresentedDestination(
+            slot: slot,
+            identity: identity,
+            destination: destination,
+            dismiss: dismiss,
+            token: token
+        )
+    }
+
     func renderPath(in stackPath: [Int]) -> [Int] {
         let suffix = slot.starts(with: stackPath)
             ? Array(slot.dropFirst(stackPath.count))
@@ -554,25 +587,38 @@ struct NavigationPresentedDestination {
     }
 }
 
+enum NavigationDismissTarget: Equatable {
+
+    case direct(id: Int, token: Int)
+
+    case presented(slot: [Int], identity: AnyHashable, token: Int)
+
+    case value(index: Int, value: AnyNavigationValue, token: Int)
+}
+
 struct NavigationDestination {
 
-    private let block: (RenderProposal?, [Int], StateRuntime?) -> RenderedBlock?
+    private let block: (RenderProposal?, [Int], StateRuntime?, DismissAction) -> RenderedBlock?
 
-    private let element: (RenderProposal?, [Int], StateRuntime?) -> RenderedElement?
+    private let element: (RenderProposal?, [Int], StateRuntime?, DismissAction) -> RenderedElement?
 
     init<Content: View>(
         environment: EnvironmentValues,
         contextPath: [Int]?,
         @ViewBuilder destination: @escaping () -> Content
     ) {
-        self.block = { proposal, path, runtime in
-            EnvironmentRenderContext.withValues(environment) {
-                let content = Self.makeDestination(
+        self.block = { proposal, path, runtime, dismiss in
+            let content = EnvironmentRenderContext.withValues(environment) {
+                Self.makeDestination(
                     destination,
                     contextPath: contextPath,
                     runtime: runtime
                 )
-                return ViewResolver.block(
+            }
+            var destinationEnvironment = environment
+            destinationEnvironment.dismiss = dismiss
+            return EnvironmentRenderContext.withValues(destinationEnvironment) {
+                ViewResolver.block(
                     from: content,
                     in: proposal,
                     path: path,
@@ -580,14 +626,18 @@ struct NavigationDestination {
                 )
             }
         }
-        self.element = { proposal, path, runtime in
-            EnvironmentRenderContext.withValues(environment) {
-                let content = Self.makeDestination(
+        self.element = { proposal, path, runtime, dismiss in
+            let content = EnvironmentRenderContext.withValues(environment) {
+                Self.makeDestination(
                     destination,
                     contextPath: contextPath,
                     runtime: runtime
                 )
-                return ViewResolver.element(
+            }
+            var destinationEnvironment = environment
+            destinationEnvironment.dismiss = dismiss
+            return EnvironmentRenderContext.withValues(destinationEnvironment) {
+                ViewResolver.element(
                     from: content,
                     in: proposal,
                     path: path,
@@ -600,17 +650,19 @@ struct NavigationDestination {
     func renderedBlock(
         in proposal: RenderProposal?,
         path: [Int],
-        runtime: StateRuntime?
+        runtime: StateRuntime?,
+        dismiss: DismissAction
     ) -> RenderedBlock? {
-        block(proposal, path, runtime)
+        block(proposal, path, runtime, dismiss)
     }
 
     func renderedElement(
         in proposal: RenderProposal?,
         path: [Int],
-        runtime: StateRuntime?
+        runtime: StateRuntime?,
+        dismiss: DismissAction
     ) -> RenderedElement? {
-        element(proposal, path, runtime)
+        element(proposal, path, runtime, dismiss)
     }
 
     private static func makeDestination<Content: View>(
@@ -766,7 +818,8 @@ struct NavigationPresentedDestinationView<Content: View, Destination: View>: Vie
                 ),
                 dismiss: {
                     writeIsPresented(false)
-                }
+                },
+                token: 0
             )
         )
     }
@@ -853,7 +906,8 @@ struct NavigationItemDestinationView<Content: View, Item: Hashable, Destination:
                 },
                 dismiss: {
                     writeItem(nil)
-                }
+                },
+                token: 0
             )
         )
     }
@@ -907,7 +961,7 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                 ViewResolver.block(from: root, in: proposal, path: path + [0], runtime: runtime)
             },
             renderDestination: {
-                $0.renderedBlock(in: proposal, path: path + $1, runtime: runtime)
+                $0.renderedBlock(in: proposal, path: path + $1, runtime: runtime, dismiss: $2)
             }
         )
     }
@@ -925,7 +979,7 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                 ViewResolver.element(from: root, in: proposal, path: path + [0], runtime: runtime)
             },
             renderDestination: {
-                $0.renderedElement(in: proposal, path: path + $1, runtime: runtime)
+                $0.renderedElement(in: proposal, path: path + $1, runtime: runtime, dismiss: $2)
             }
         )
     }
@@ -935,7 +989,7 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
         path: [Int],
         runtime: StateRuntime?,
         renderRoot: () -> Result,
-        renderDestination: (NavigationDestination, [Int]) -> Result
+        renderDestination: (NavigationDestination, [Int], DismissAction) -> Result
     ) -> Result {
         let accessor = makePathAccessor(runtime, path)
         runtime?.registerNavigationStack(at: path, accessor: accessor)
@@ -961,18 +1015,29 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                 )
 
                 if let directDestination = runtime?.topDirectNavigationDestination(at: path) {
+                    let target = NavigationDismissTarget.direct(
+                        id: directDestination.id,
+                        token: directDestination.token
+                    )
                     return renderDestination(
                         directDestination.destination,
-                        [1, directDestination.id]
+                        [1, directDestination.id],
+                        dismissAction(for: target, runtime: runtime, path: path)
                     )
                 }
 
                 if let presentedDestination =
                     runtime?.topPresentedNavigationDestination(at: path) ?? presentedDestination
                 {
+                    let target = NavigationDismissTarget.presented(
+                        slot: presentedDestination.slot,
+                        identity: presentedDestination.identity,
+                        token: presentedDestination.token
+                    )
                     return renderDestination(
                         presentedDestination.destination,
-                        presentedDestination.renderPath(in: path)
+                        presentedDestination.renderPath(in: path),
+                        dismissAction(for: target, runtime: runtime, path: path)
                     )
                 }
 
@@ -981,9 +1046,20 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
                 if let value = values.last,
                    let destination = destinations.destination(for: value) {
                     let index = values.count - 1
+                    let token = runtime?.navigationValueDismissToken(
+                        at: path,
+                        index: index,
+                        value: value
+                    ) ?? 0
+                    let target = NavigationDismissTarget.value(
+                        index: index,
+                        value: value,
+                        token: token
+                    )
                     return renderDestination(
                         destination,
-                        [2, index]
+                        [2, index],
+                        dismissAction(for: target, runtime: runtime, path: path)
                     )
                 }
 
@@ -1018,6 +1094,18 @@ extension NavigationStack: NavigationRenderable, LayoutTraitRenderable {
             }
         )
         return environment
+    }
+
+    private func dismissAction(
+        for target: NavigationDismissTarget,
+        runtime: StateRuntime?,
+        path: [Int]
+    ) -> DismissAction {
+        DismissAction {
+            [weak runtime] in
+
+            _ = runtime?.dismissNavigationStack(at: path, target: target)
+        }
     }
 
     private func registerBackHandler(in runtime: StateRuntime?, path: [Int]) {
@@ -1213,6 +1301,10 @@ final class NavigationRuntime {
         state(at: path).updateValues(values, stackPath: path)
     }
 
+    func valueDismissToken(at path: [Int], index: Int, value: AnyNavigationValue) -> Int? {
+        state(at: path).valueDismissToken(index: index, value: value)
+    }
+
     func updatePresentedDestination(
         _ destination: NavigationPresentedDestination?,
         at path: [Int]
@@ -1234,6 +1326,7 @@ final class NavigationRuntime {
         state.directDestinations.append(
             NavigationDirectDestination(
                 id: state.directDestinations.count,
+                token: state.nextDismissToken(),
                 destination: destination
             )
         )
@@ -1267,6 +1360,41 @@ final class NavigationRuntime {
         return [path + [2, removedIndex]]
     }
 
+    func dismiss(at path: [Int], target: NavigationDismissTarget) -> [[Int]]? {
+        let state = state(at: path)
+        switch target {
+        case .direct(let id, let token):
+            guard let destination = state.directDestinations.last,
+                  destination.id == id,
+                  destination.token == token else {
+                return nil
+            }
+
+            _ = state.directDestinations.popLast()
+            return [path + [1, destination.id]]
+        case .presented(let slot, let identity, let token):
+            guard let destination = state.presentedDestination,
+                  destination.slot == slot,
+                  destination.identity == identity,
+                  destination.token == token else {
+                return nil
+            }
+
+            state.presentedDestination = nil
+            destination.dismiss()
+            return [path + destination.renderPath(in: path)]
+        case .value(let index, let value, let token):
+            guard state.valueDismissToken(index: index, value: value) == token,
+                  state.pathAccessor?.count() == index + 1,
+                  state.pathAccessor?.topValue() == value,
+                  state.pathAccessor?.removeLast() == true else {
+                return nil
+            }
+
+            return [path + [2, index]]
+        }
+    }
+
     func removeStateSubtree(at path: [Int]) {
         stacks = stacks.filter {
             !$0.key.starts(with: path)
@@ -1298,25 +1426,51 @@ private final class NavigationStackState {
 
     private var valueDestinationValues: [AnyNavigationValue] = []
 
+    private var valueDestinationTokens: [Int] = []
+
+    private var dismissToken = 0
+
+    func nextDismissToken() -> Int {
+        dismissToken += 1
+        return dismissToken
+    }
+
     func updatePresentedDestination(
         _ destination: NavigationPresentedDestination?,
         stackPath: [Int]
     ) -> [[Int]] {
+        let next = tokenizedPresentedDestination(destination)
         defer {
-            presentedDestination = destination
+            presentedDestination = next
         }
 
         guard let current = presentedDestination else {
             return []
         }
 
-        guard let destination,
-              current.slot == destination.slot,
-              current.identity == destination.identity else {
+        guard let next,
+              current.slot == next.slot,
+              current.identity == next.identity else {
             return [stackPath + current.renderPath(in: stackPath)]
         }
 
         return []
+    }
+
+    private func tokenizedPresentedDestination(
+        _ destination: NavigationPresentedDestination?
+    ) -> NavigationPresentedDestination? {
+        guard let destination else {
+            return nil
+        }
+
+        if let current = presentedDestination,
+           current.slot == destination.slot,
+           current.identity == destination.identity {
+            return destination.withToken(current.token)
+        }
+
+        return destination.withToken(nextDismissToken())
     }
 
     func updateValues(_ values: [AnyNavigationValue], stackPath: [Int]) -> [[Int]] {
@@ -1336,13 +1490,24 @@ private final class NavigationStackState {
 
         if retainedCount < valueDestinationValues.count {
             valueDestinationValues.removeSubrange(retainedCount...)
+            valueDestinationTokens.removeSubrange(retainedCount...)
         }
 
         while valueDestinationValues.count < values.count {
             valueDestinationValues.append(values[valueDestinationValues.count])
+            valueDestinationTokens.append(nextDismissToken())
         }
 
         return removedPaths
+    }
+
+    func valueDismissToken(index: Int, value: AnyNavigationValue) -> Int? {
+        guard valueDestinationValues.indices.contains(index),
+              valueDestinationValues[index] == value else {
+            return nil
+        }
+
+        return valueDestinationTokens[index]
     }
 }
 

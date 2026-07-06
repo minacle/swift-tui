@@ -157,6 +157,7 @@ public extension EnvironmentValues {
     /// An action that pops the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
+    @available(*, deprecated, message: "Use dismiss from a presented destination instead.")
     var pop: PopAction {
         get {
             self[PopActionKey.self]
@@ -166,9 +167,22 @@ public extension EnvironmentValues {
         }
     }
 
+    /// An action that dismisses the current presentation.
+    ///
+    /// The default action does nothing outside a dismissible presentation.
+    internal(set) var dismiss: DismissAction {
+        get {
+            self[DismissActionKey.self]
+        }
+        set {
+            self[DismissActionKey.self] = newValue
+        }
+    }
+
     /// An action that pushes a value or destination onto the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
+    @available(*, deprecated, message: "Use a NavigationStack path binding for programmatic navigation instead.")
     var push: PushAction {
         get {
             self[PushActionKey.self]
@@ -207,23 +221,25 @@ public extension EnvironmentValues {
 @propertyWrapper
 public struct Environment<Value> {
 
-    private let readValue: (EnvironmentValues) -> Value
+    private let storage: EnvironmentStorage<Value>
 
     /// The current environment value at the wrapped key path.
     public var wrappedValue: Value {
-        readValue(EnvironmentRenderContext.current)
+        storage.value
     }
 
     /// A bindable projection of the environment value.
     public var projectedValue: EnvironmentBindable<Value> {
-        EnvironmentBindable(wrappedValue)
+        EnvironmentBindable(getValue: {
+            storage.value
+        })
     }
 
     /// Creates an environment reader for a key path.
     ///
     /// - Parameter keyPath: A key path into ``EnvironmentValues``.
     public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
-        self.readValue = {
+        self.storage = EnvironmentStorage {
             $0[keyPath: keyPath]
         }
     }
@@ -233,7 +249,7 @@ public struct Environment<Value> {
     /// - Parameter objectType: The observable object type to read from the
     ///   current environment.
     public init(_ objectType: Value.Type) where Value: AnyObject & Observable {
-        self.readValue = {
+        self.storage = EnvironmentStorage {
             values in
 
             guard let object = values.observableObject(for: objectType) else {
@@ -243,19 +259,37 @@ public struct Environment<Value> {
             return object
         }
     }
+
+    /// Creates an environment reader for an optional observable object type.
+    ///
+    /// - Parameter objectType: The observable object type to read from the
+    ///   current environment.
+    public init<T>(_ objectType: T.Type) where Value == T?, T: AnyObject & Observable {
+        self.storage = EnvironmentStorage {
+            values in
+
+            values.observableObject(for: objectType)
+        }
+    }
 }
 
 /// A dynamic-member projection that creates bindings to observable environment objects.
 @dynamicMemberLookup
 public struct EnvironmentBindable<Value> {
 
-    private let wrappedValue: Value
+    private let getValue: () -> Value
 
     /// Creates a projection around an environment value.
     ///
     /// - Parameter wrappedValue: The value read from the current environment.
     public init(_ wrappedValue: Value) {
-        self.wrappedValue = wrappedValue
+        self.getValue = {
+            wrappedValue
+        }
+    }
+
+    init(getValue: @escaping () -> Value) {
+        self.getValue = getValue
     }
 
     /// Creates a binding to a writable property of an observable environment object.
@@ -267,12 +301,57 @@ public struct EnvironmentBindable<Value> {
     ) -> Binding<Subject> where Value: AnyObject & Observable {
         Binding(
             get: {
-                wrappedValue[keyPath: keyPath]
+                getValue()[keyPath: keyPath]
             },
             set: { newValue in
-                wrappedValue[keyPath: keyPath] = newValue
+                let value = getValue()
+                value[keyPath: keyPath] = newValue
             }
         )
+    }
+}
+
+final class EnvironmentStorage<Value> {
+
+    private let readValue: (EnvironmentValues) -> Value
+
+    private var values = EnvironmentValues()
+
+    var value: Value {
+        readValue(values)
+    }
+
+    init(_ readValue: @escaping (EnvironmentValues) -> Value) {
+        self.readValue = readValue
+    }
+
+    func materialize(environment: EnvironmentValues) {
+        values = environment
+    }
+}
+
+protocol DynamicEnvironmentProperty {
+
+    func materialize(environment: EnvironmentValues)
+}
+
+extension Environment: DynamicEnvironmentProperty {
+
+    func materialize(environment: EnvironmentValues) {
+        storage.materialize(environment: environment)
+    }
+}
+
+func materializeDynamicEnvironmentProperties(
+    in value: Any,
+    environment: EnvironmentValues = EnvironmentRenderContext.current
+) {
+    for child in Mirror(reflecting: value).children {
+        guard let property = child.value as? any DynamicEnvironmentProperty else {
+            continue
+        }
+
+        property.materialize(environment: environment)
     }
 }
 
@@ -736,6 +815,13 @@ private struct PopActionKey: EnvironmentKey {
 
     nonisolated static var defaultValue: PopAction {
         PopAction()
+    }
+}
+
+private struct DismissActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: DismissAction {
+        DismissAction()
     }
 }
 

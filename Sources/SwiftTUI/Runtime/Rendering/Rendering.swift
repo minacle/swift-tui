@@ -1651,10 +1651,7 @@ enum ViewResolver {
             return modifier.renderedBlock(in: proposal, path: path, runtime: runtime)
         }
 
-        let body = runtime?.withView(at: path, mode: .render) {
-            runtime?.materializeDynamicProperties(in: view)
-            return view.body
-        } ?? view.body
+        let body = body(from: view, path: path, runtime: runtime)
         return block(from: body, in: proposal, path: path + [0], runtime: runtime)
     }
 
@@ -1801,10 +1798,7 @@ enum ViewResolver {
             )
         }
 
-        let body = runtime?.withView(at: path, mode: .render) {
-            runtime?.materializeDynamicProperties(in: view)
-            return view.body
-        } ?? view.body
+        let body = body(from: view, path: path, runtime: runtime)
         return element(from: body, in: proposal, path: path + [0], runtime: runtime)
     }
 
@@ -2162,7 +2156,23 @@ extension ViewResolver {
             return LayoutTraits()
         }
 
-        return layoutTraits(from: view.body)
+        return layoutTraits(from: body(from: view, path: [], runtime: nil))
+    }
+
+    private static func body<Content: View>(
+        from view: Content,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> Content.Body {
+        guard let runtime else {
+            materializeDynamicEnvironmentProperties(in: view)
+            return view.body
+        }
+
+        return runtime.withView(at: path, mode: .render) {
+            runtime.materializeDynamicProperties(in: view)
+            return view.body
+        }
     }
 
     static func rootProposal<Content: View>(

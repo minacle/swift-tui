@@ -407,6 +407,14 @@ final class StateRuntime {
         }
     }
 
+    func navigationValueDismissToken(
+        at path: [Int],
+        index: Int,
+        value: AnyNavigationValue
+    ) -> Int? {
+        navigation.valueDismissToken(at: path, index: index, value: value)
+    }
+
     func updateNavigationPresentedDestination(
         _ destination: NavigationPresentedDestination?,
         at path: [Int]
@@ -444,6 +452,18 @@ final class StateRuntime {
 
     func popNavigationStack(at path: [Int]) -> Bool {
         guard let removedPaths = navigation.pop(at: path) else {
+            return false
+        }
+
+        for removedPath in removedPaths {
+            removeStateSubtree(at: removedPath)
+        }
+        invalidated = true
+        return true
+    }
+
+    func dismissNavigationStack(at path: [Int], target: NavigationDismissTarget) -> Bool {
+        guard let removedPaths = navigation.dismiss(at: path, target: target) else {
             return false
         }
 
@@ -654,6 +674,8 @@ final class StateRuntime {
     }
 
     func materializeDynamicProperties(in value: Any) {
+        materializeDynamicEnvironmentProperties(in: value)
+
         for child in Mirror(reflecting: value).children {
             guard let property = child.value as? any DynamicStateProperty else {
                 continue

@@ -3895,6 +3895,12 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(ViewResolver.text(from: EnvironmentMarkerText()) == "default")
 }
 
+@Test func environmentWrapperReadsDefaultSnapshotBeforeMaterialization() {
+    let marker = Environment(\.testMarker)
+
+    #expect(marker.wrappedValue == "default")
+}
+
 @Test func environmentValueIsInheritedByChildBody() {
     let view = EnvironmentMarkerText()
         .environment(\.testMarker, "parent")
@@ -3945,6 +3951,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.text == "updated")
 }
 
+@Test func environmentValuePassedFromParentBodyKeepsParentSnapshot() {
+    let view = ParentCapturedEnvironmentMarkerView()
+        .environment(\.testMarker, "parent")
+
+    #expect(ViewResolver.text(from: view) == "captured parent direct child")
+}
+
 @Test func typedEnvironmentObjectIsInheritedByChildBody() {
     let model = TestObservableModel(count: 1)
     let objectProbe = ObjectProbe<TestObservableModel>()
@@ -3979,6 +3992,20 @@ private func lineBreakKinds(in text: String) -> [String] {
     .environment(parent)
 
     #expect(ViewResolver.block(from: view)?.lines == ["2", "1"])
+}
+
+@Test func optionalTypedEnvironmentObjectReadsNilWhenMissing() {
+    #expect(ViewResolver.text(from: OptionalTypedEnvironmentObjectMarkerText()) == "nil")
+}
+
+@Test func optionalTypedEnvironmentObjectReadsObjectWhenPresent() {
+    let model = TestObservableModel(count: 4)
+    let objectProbe = ObjectProbe<TestObservableModel>()
+    let view = OptionalTypedEnvironmentObjectMarkerText(objectProbe: objectProbe)
+        .environment(model)
+
+    #expect(ViewResolver.text(from: view) == "4")
+    #expect(objectProbe.object === model)
 }
 
 @Test func typedEnvironmentObjectComposesWithKeyPathEnvironment() {
@@ -6026,6 +6053,162 @@ func NavigationPopActionDismissesBindingDestination() {
     #expect(runtime.block(from: view)?.text == "Root")
 }
 
+@Test("Navigation dismiss action captured by parent no-ops for presented destination")
+func NavigationDismissActionCapturedByParentNoOpsForPresentedDestination() {
+    var isPresented = true
+    let runtime = StateRuntime()
+    let view = NavigationParentCapturedDismissActionView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Close")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Close")
+}
+
+@Test("Navigation dismiss action dismisses isPresented destination")
+func NavigationDismissActionDismissesIsPresentedDestination() {
+    var isPresented = true
+    let runtime = StateRuntime()
+    let view = NavigationPresentedDismissActionView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Close")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation dismiss action dismisses item destination")
+func NavigationDismissActionDismissesItemDestination() {
+    var item: Int? = 7
+    let runtime = StateRuntime()
+    let view = NavigationItemDismissActionView(
+        item: Binding(
+            get: {
+                item
+            },
+            set: {
+                item = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Item 7")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(item == nil)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation dismiss action removes bound path value")
+func NavigationDismissActionRemovesBoundPathValue() {
+    var path = [1]
+    let runtime = StateRuntime()
+    let view = NavigationDismissValueView(
+        path: Binding(
+            get: {
+                path
+            },
+            set: {
+                path = $0
+            }
+        )
+    )
+
+    #expect(runtime.block(from: view)?.text == "Value 1")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(path.isEmpty)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test("Navigation dismiss action dismisses direct destination")
+func NavigationDismissActionDismissesDirectDestination() {
+    let runtime = StateRuntime()
+    let view = NavigationPushDirectDismissActionView()
+
+    #expect(runtime.block(from: view)?.text == "Push")
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Close")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Push")
+}
+
+@Test("Root dismiss action is a no-op")
+func RootDismissActionIsNoOp() {
+    let runtime = StateRuntime()
+    let view = NavigationRootDismissActionView()
+
+    #expect(runtime.block(from: view)?.text == "Dismiss")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Dismiss")
+}
+
+@Test("Stale navigation dismiss action does not dismiss new presentation")
+func StaleNavigationDismissActionDoesNotDismissNewPresentation() {
+    var isPresented = true
+    let probe = DismissActionProbe()
+    let runtime = StateRuntime()
+    let view = NavigationCapturedPresentedDismissActionView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        ),
+        probe: probe
+    )
+
+    #expect(runtime.block(from: view)?.text == "Close")
+    let staleDismiss = probe.dismiss
+
+    staleDismiss?()
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "Close")
+
+    staleDismiss?()
+    #expect(isPresented)
+    #expect(!runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "Close")
+}
+
 @Test("Default navigation environment actions are no-ops")
 func DefaultNavigationEnvironmentActionsAreNoOps() {
     let probe = NavigationActionProbe()
@@ -6037,6 +6220,7 @@ func DefaultNavigationEnvironmentActionsAreNoOps() {
         Text("Detail")
     }
     probe.pop?()
+    probe.dismiss?()
 }
 
 @Suite(.serialized)
@@ -6759,25 +6943,32 @@ private struct NavigationStatefulDestination: View {
 
 private struct NavigationPushValueView: View {
 
-    @Environment(\.push) private var push
-
-    @FocusState var isFocused: Bool = true
-
     let path: Binding<[Int]>
 
     var body: some View {
         NavigationStack(path: path) {
-            Text("Push")
-                .focusable()
-                .focused($isFocused)
-                .onKeyPress(.return) {
-                    push(1)
-                    return .handled
-                }
+            NavigationPushValueButton()
                 .navigationDestination(for: Int.self) { value in
                     Text("Value \(value)")
                 }
         }
+    }
+}
+
+private struct NavigationPushValueButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push(1)
+                return .handled
+            }
     }
 }
 
@@ -6891,70 +7082,92 @@ private struct NavigationPushInitializedObservableObjectPathView: View {
 
 private struct NavigationPushDirectDestinationView: View {
 
+    var body: some View {
+        NavigationStack {
+            NavigationPushDirectDestinationButton()
+        }
+    }
+}
+
+private struct NavigationPushDirectDestinationButton: View {
+
     @Environment(\.push) private var push
 
     @FocusState var isFocused: Bool = true
 
     var body: some View {
-        NavigationStack {
-            Text("Push")
-                .focusable()
-                .focused($isFocused)
-                .onKeyPress(.return) {
-                    push {
-                        Text("Detail")
-                    }
-                    return .handled
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    Text("Detail")
                 }
-        }
+                return .handled
+            }
     }
 }
 
 private struct NavigationPushDirectStateMutationView: View {
 
-    @Environment(\.push) private var push
-
     @State var status = "empty"
-
-    @FocusState var isFocused: Bool = true
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading) {
-                Text("Push")
-                    .focusable()
-                    .focused($isFocused)
-                    .onKeyPress(.return) {
-                        push {
-                            NavigationStateMutationDestination(status: $status)
-                        }
-                        return .handled
-                    }
-
+                NavigationPushDirectStateMutationButton(status: $status)
                 Text(status)
             }
         }
     }
 }
 
+private struct NavigationPushDirectStateMutationButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    let status: Binding<String>
+
+    var body: some View {
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    NavigationStateMutationDestination(status: status)
+                }
+                return .handled
+            }
+    }
+}
+
 private struct NavigationPushDirectStateResetView: View {
+
+    var body: some View {
+        NavigationStack {
+            NavigationPushDirectStateResetButton()
+        }
+    }
+}
+
+private struct NavigationPushDirectStateResetButton: View {
 
     @Environment(\.push) private var push
 
     @FocusState var isFocused: Bool = true
 
     var body: some View {
-        NavigationStack {
-            Text("Push")
-                .focusable()
-                .focused($isFocused)
-                .onKeyPress(.return) {
-                    push {
-                        NavigationPoppableStatefulDestination()
-                    }
-                    return .handled
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    NavigationPoppableStatefulDestination()
                 }
-        }
+                return .handled
+            }
     }
 }
 
@@ -6992,12 +7205,23 @@ private struct NavigationPopValueView: View {
                     pop()
                 }
                 .navigationDestination(for: Int.self) { value in
-                    Text("Value \(value)")
-                        .onTapGesture {
-                            pop()
-                        }
+                    NavigationPopValueDestination(value: value)
                 }
         }
+    }
+}
+
+private struct NavigationPopValueDestination: View {
+
+    @Environment(\.pop) private var pop
+
+    let value: Int
+
+    var body: some View {
+        Text("Value \(value)")
+            .onTapGesture {
+                pop()
+            }
     }
 }
 
@@ -7069,15 +7293,186 @@ private struct NavigationPresentedPopDestination: View {
     }
 }
 
+private struct NavigationParentCapturedDismissActionView: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    let isPresented: Binding<Bool>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    NavigationPassedDismissActionDestination(dismiss: dismiss)
+                }
+        }
+    }
+}
+
+private struct NavigationPassedDismissActionDestination: View {
+
+    let dismiss: DismissAction
+
+    var body: some View {
+        Text("Close")
+            .onTapGesture {
+                dismiss()
+            }
+    }
+}
+
+private struct NavigationPresentedDismissActionView: View {
+
+    let isPresented: Binding<Bool>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    NavigationDismissActionDestination(label: "Close")
+                }
+        }
+    }
+}
+
+private struct NavigationItemDismissActionView: View {
+
+    let item: Binding<Int?>
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(item: item) { value in
+                    NavigationDismissActionDestination(label: "Item \(value)")
+                }
+        }
+    }
+}
+
+private struct NavigationDismissValueView: View {
+
+    let path: Binding<[Int]>
+
+    var body: some View {
+        NavigationStack(path: path) {
+            Text("Root")
+                .navigationDestination(for: Int.self) { value in
+                    NavigationDismissActionDestination(label: "Value \(value)")
+                }
+        }
+    }
+}
+
+private struct NavigationPushDirectDismissActionView: View {
+
+    var body: some View {
+        NavigationStack {
+            NavigationPushDirectDismissActionButton()
+        }
+    }
+}
+
+private struct NavigationPushDirectDismissActionButton: View {
+
+    @Environment(\.push) private var push
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        Text("Push")
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(.return) {
+                push {
+                    NavigationDismissActionDestination(label: "Close")
+                }
+                return .handled
+            }
+    }
+}
+
+private struct NavigationRootDismissActionView: View {
+
+    var body: some View {
+        NavigationStack {
+            NavigationDismissActionDestination(label: "Dismiss")
+        }
+    }
+}
+
+private struct NavigationCapturedPresentedDismissActionView: View {
+
+    let isPresented: Binding<Bool>
+
+    let probe: DismissActionProbe
+
+    var body: some View {
+        NavigationStack {
+            Text("Root")
+                .navigationDestination(isPresented: isPresented) {
+                    NavigationCapturedDismissActionDestination(probe: probe)
+                }
+        }
+    }
+}
+
+private struct NavigationCapturedDismissActionDestination: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    let probe: DismissActionProbe
+
+    var body: some View {
+        CapturedDismissAction(dismiss: dismiss, probe: probe)
+    }
+}
+
+private struct CapturedDismissAction: View {
+
+    init(dismiss: DismissAction, probe: DismissActionProbe) {
+        probe.capture(dismiss)
+    }
+
+    var body: some View {
+        NavigationDismissActionDestination(label: "Close")
+    }
+}
+
+private struct NavigationDismissActionDestination: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .onTapGesture {
+                dismiss()
+            }
+    }
+}
+
+private final class DismissActionProbe {
+
+    var dismiss: DismissAction?
+
+    func capture(_ dismiss: DismissAction) {
+        self.dismiss = dismiss
+    }
+}
+
 private final class NavigationActionProbe {
 
     var push: PushAction?
 
     var pop: PopAction?
 
-    func capture(push: PushAction, pop: PopAction) {
+    var dismiss: DismissAction?
+
+    func capture(push: PushAction, pop: PopAction, dismiss: DismissAction) {
         self.push = push
         self.pop = pop
+        self.dismiss = dismiss
     }
 }
 
@@ -7087,17 +7482,19 @@ private struct CapturedNavigationActionsView: View {
 
     @Environment(\.pop) private var pop
 
+    @Environment(\.dismiss) private var dismiss
+
     let probe: NavigationActionProbe
 
     var body: some View {
-        CapturedNavigationActions(push: push, pop: pop, probe: probe)
+        CapturedNavigationActions(push: push, pop: pop, dismiss: dismiss, probe: probe)
     }
 }
 
 private struct CapturedNavigationActions: View {
 
-    init(push: PushAction, pop: PopAction, probe: NavigationActionProbe) {
-        probe.capture(push: push, pop: pop)
+    init(push: PushAction, pop: PopAction, dismiss: DismissAction, probe: NavigationActionProbe) {
+        probe.capture(push: push, pop: pop, dismiss: dismiss)
     }
 
     var body: some View {
@@ -7299,6 +7696,43 @@ private struct CapturedTypedEnvironmentObjectMarker: View {
     }
 }
 
+private struct OptionalTypedEnvironmentObjectMarkerText: View {
+
+    @Environment(TestObservableModel.self) private var model: TestObservableModel?
+
+    let objectProbe: ObjectProbe<TestObservableModel>?
+
+    init(objectProbe: ObjectProbe<TestObservableModel>? = nil) {
+        self.objectProbe = objectProbe
+    }
+
+    var body: some View {
+        CapturedOptionalTypedEnvironmentObjectMarker(
+            model: model,
+            objectProbe: objectProbe
+        )
+    }
+}
+
+private struct CapturedOptionalTypedEnvironmentObjectMarker: View {
+
+    let model: TestObservableModel?
+
+    init(
+        model: TestObservableModel?,
+        objectProbe: ObjectProbe<TestObservableModel>?
+    ) {
+        self.model = model
+        if let model {
+            objectProbe?.capture(model)
+        }
+    }
+
+    var body: some View {
+        Text(model.map { "\($0.count)" } ?? "nil")
+    }
+}
+
 private struct TypedAndKeyPathEnvironmentMarkerText: View {
 
     @Environment(\.testMarker) private var marker
@@ -7444,6 +7878,27 @@ private struct EnvironmentStateMarkerView: View {
             probe: probe
         )
         .environment(\.testMarker, marker)
+    }
+}
+
+private struct ParentCapturedEnvironmentMarkerView: View {
+
+    @Environment(\.testMarker) private var marker
+
+    var body: some View {
+        CapturedEnvironmentMarkerText(capturedMarker: marker)
+            .environment(\.testMarker, "child")
+    }
+}
+
+private struct CapturedEnvironmentMarkerText: View {
+
+    @Environment(\.testMarker) private var directMarker
+
+    let capturedMarker: String
+
+    var body: some View {
+        Text("captured \(capturedMarker) direct \(directMarker)")
     }
 }
 
