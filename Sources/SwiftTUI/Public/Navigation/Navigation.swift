@@ -34,7 +34,6 @@ public extension Text {
 /// An action that pops the current navigation stack.
 ///
 /// Read this action with `Environment(\.pop)` inside a navigation stack.
-@available(*, deprecated, message: "Use EnvironmentValues.dismiss from a presented destination instead.")
 public nonisolated struct PopAction {
 
     private let action: @MainActor () -> Void
@@ -72,7 +71,6 @@ public nonisolated struct DismissAction: @unchecked Sendable {
 /// An action that pushes a value or destination onto the current navigation stack.
 ///
 /// Read this action with `Environment(\.push)` inside a navigation stack.
-@available(*, deprecated, message: "Use a NavigationStack path binding for programmatic navigation instead.")
 public nonisolated struct PushAction {
 
     private let pushValue: @MainActor (AnyNavigationValue) -> Void

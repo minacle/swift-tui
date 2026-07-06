@@ -157,7 +157,6 @@ public extension EnvironmentValues {
     /// An action that pops the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
-    @available(*, deprecated, message: "Use dismiss from a presented destination instead.")
     var pop: PopAction {
         get {
             self[PopActionKey.self]
@@ -182,7 +181,6 @@ public extension EnvironmentValues {
     /// An action that pushes a value or destination onto the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
-    @available(*, deprecated, message: "Use a NavigationStack path binding for programmatic navigation instead.")
     var push: PushAction {
         get {
             self[PushActionKey.self]

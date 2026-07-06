@@ -30,12 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@Environment(Type.self) var object: Type?`, returning `nil` when no matching
   object is present in the environment.
 
-### Deprecated
-
-- Deprecated `EnvironmentValues.push`, `EnvironmentValues.pop`, `PushAction`,
-  and `PopAction` in favor of path bindings for programmatic navigation and
-  `EnvironmentValues.dismiss` for presentation dismissal.
-
 ### Changed
 
 - Changed `@Environment` to read from the environment snapshot materialized when
