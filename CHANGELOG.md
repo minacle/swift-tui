@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-07
+
 ### Added
 
+- Added GitHub Pages documentation deployment for versioned SwiftTUI DocC
+  output, including release-tag documentation starting with `v0.3.0`.
 - Added SwiftTUI attributed string attributes for foreground color, background
   color, and horizontal text alignment in `Text(AttributedString)`.
 - Added public `AnyColor` as a type-erased alias for `Terminal.SGR.AnyColor`,
@@ -41,12 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed `@Environment` to read from the environment snapshot materialized when
   a view's `body` is evaluated, rather than re-reading the current render
   context whenever `wrappedValue` is accessed.
-- Removed the direct `swift-system` package dependency and tightened terminal
-  platform imports around `System`, `SystemPackage`, `Glibc`, and `Darwin` so
-  the package continues to build cleanly on macOS and Linux.
+- Updated the `swift-terminal` dependency, removed the direct `swift-system`
+  package dependency, and tightened terminal platform imports around `System`,
+  `SystemPackage`, `Glibc`, and `Darwin` so the package continues to build
+  cleanly on macOS and Linux.
 - Reorganized the `SwiftTUI` source tree into `Public` and `Runtime`
   directories without changing the public API, and updated Unicode line-break
   data generation for the new runtime path.
+- Clarified the README's library scope and terminal-runtime model without
+  changing the package API.
 
 ### Fixed
 
@@ -154,7 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/minacle/swift-tui/releases/tag/v0.4.0
 [0.3.0]: https://github.com/minacle/swift-tui/releases/tag/v0.3.0
 [0.2.0]: https://github.com/minacle/swift-tui/releases/tag/v0.2.0
 [0.1.0]: https://github.com/minacle/swift-tui/releases/tag/v0.1.0
