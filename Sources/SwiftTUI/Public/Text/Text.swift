@@ -22,6 +22,9 @@ public typealias Color256 = Terminal.SGR.Color256
 /// A true-color terminal SGR color.
 public typealias TrueColor = Terminal.SGR.TrueColor
 
+/// A type-erased terminal SGR color used for SwiftTUI text style storage.
+public typealias AnyColor = Terminal.SGR.AnyColor
+
 extension Color16: ShapeStyle {
 }
 
@@ -29,6 +32,61 @@ extension Color256: ShapeStyle {
 }
 
 extension TrueColor: ShapeStyle {
+}
+
+extension AnyColor: ShapeStyle {
+}
+
+public extension AnyColor {
+
+    /// A type-erased default terminal color.
+    @_disfavoredOverload
+    static var `default`: Self {
+        Self(DefaultColor.default)
+    }
+
+    /// Creates a type-erased color from a 16-color terminal SGR color.
+    ///
+    /// - Parameter color: The 16-color terminal SGR color to erase.
+    /// - Returns: A type-erased terminal SGR color.
+    static func color16(_ color: Color16) -> Self {
+        Self(color)
+    }
+
+    /// Creates a type-erased color from a 256-color terminal SGR index.
+    ///
+    /// - Parameter rawValue: The 256-color terminal SGR index to erase.
+    /// - Returns: A type-erased terminal SGR color.
+    static func color256(_ rawValue: UInt8) -> Self {
+        Self(Color256(rawValue: rawValue))
+    }
+
+    /// Creates a type-erased color from a 256-color terminal SGR color.
+    ///
+    /// - Parameter color: The 256-color terminal SGR color to erase.
+    /// - Returns: A type-erased terminal SGR color.
+    static func color256(_ color: Color256) -> Self {
+        Self(color)
+    }
+
+    /// Creates a type-erased color from true-color terminal SGR components.
+    ///
+    /// - Parameters:
+    ///   - red: The red channel value.
+    ///   - green: The green channel value.
+    ///   - blue: The blue channel value.
+    /// - Returns: A type-erased terminal SGR color.
+    static func trueColor(red: UInt8, green: UInt8, blue: UInt8) -> Self {
+        Self(TrueColor(red: red, green: green, blue: blue))
+    }
+
+    /// Creates a type-erased color from a true-color terminal SGR color.
+    ///
+    /// - Parameter color: The true-color terminal SGR color to erase.
+    /// - Returns: A type-erased terminal SGR color.
+    static func trueColor(_ color: TrueColor) -> Self {
+        Self(color)
+    }
 }
 
 /// The default terminal color.
@@ -124,18 +182,6 @@ nonisolated struct TextRun: Equatable, Sendable {
                 link: run.link
             )
         }
-    }
-}
-
-nonisolated struct AnyColor: Color {
-
-    let background: String
-
-    let foreground: String
-
-    init<C: Color>(_ color: C) {
-        self.background = color.background
-        self.foreground = color.foreground
     }
 }
 
@@ -398,13 +444,21 @@ public extension View {
         }
     }
 
-    private func foregroundStyle(_ style: AnyColor) -> some View {
+    /// Sets the terminal foreground style for text within this view.
+    ///
+    /// - Parameter style: A type-erased terminal SGR color style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func foregroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
             $0.foregroundStyle = style
         }
     }
 
-    private func backgroundStyle(_ style: AnyColor) -> some View {
+    /// Sets the terminal background style for text within this view.
+    ///
+    /// - Parameter style: A type-erased terminal SGR color style.
+    /// - Returns: A view that renders descendant text with the given style.
+    func backgroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
             $0.backgroundStyle = style
         }

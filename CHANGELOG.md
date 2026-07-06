@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added public `AnyColor` as a type-erased alias for `Terminal.SGR.AnyColor`,
+  with `.default`, `.color16(_:)`, `.color256(_:)`, and `.trueColor(...)`
+  conveniences for use anywhere SwiftTUI accepts a `ShapeStyle`.
 - Added SwiftUI-compatible `DismissAction` and `EnvironmentValues.dismiss` for
   dismissing the current navigation presentation from the destination
   environment, with dismiss actions scoped to their rendered destination while

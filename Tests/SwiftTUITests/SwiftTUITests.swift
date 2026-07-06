@@ -11,6 +11,41 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let foreground = "38;5;42"
 }
 
+@Test func anyColorConvenienceFactoriesCreateTypeErasedColors() {
+    let defaultColor: AnyColor = .default
+
+    #expect(defaultColor == AnyColor(DefaultColor.default))
+    #expect(AnyColor.color16(.red) == AnyColor(Color16.red))
+    #expect(AnyColor.color256(196) == AnyColor(Color256(rawValue: 196)))
+    #expect(AnyColor.color256(Color256(rawValue: 42)) == AnyColor(Color256(rawValue: 42)))
+    #expect(
+        AnyColor.trueColor(red: 1, green: 2, blue: 3)
+            == AnyColor(TrueColor(red: 1, green: 2, blue: 3))
+    )
+    #expect(
+        AnyColor.trueColor(TrueColor(red: 4, green: 5, blue: 6))
+            == AnyColor(TrueColor(red: 4, green: 5, blue: 6))
+    )
+}
+
+@Test func styleModifiersAcceptAnyColorConvenienceFactories() {
+    let block = ViewResolver.block(
+        from: Text("A")
+            .foregroundStyle(.color256(196))
+            .backgroundStyle(.trueColor(red: 1, green: 2, blue: 3))
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color256(rawValue: 196)),
+                backgroundStyle: AnyColor(TrueColor(red: 1, green: 2, blue: 3))
+            )
+        ),
+    ])
+}
+
 @Test func textPreservesContent() {
     let text = Text("Hello")
 
