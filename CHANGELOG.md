@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-09
+
 ### Added
 
 - Added `Rectangle`, `Shape`, `ShapeView`, `FillShapeView`, `FillStyle`,
@@ -14,12 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fills rendered with foreground-colored block glyphs.
 - Added `View.background(_:)` for filling a view's rendered bounds with a
   terminal shape style.
-
-### Changed
-
-- Changed the public geometry layout API to use `Terminal.Point`,
-  `Terminal.Size`, and `Terminal.Rect` instead of SwiftTUI-local
-  `GeometryPoint`, `GeometrySize`, and `GeometryFrame`.
 - Added tap-location gestures with `Terminal.Point` coordinates and named
   coordinate spaces for resolving tap positions.
 - Added `onLongPressGesture(minimumDuration:maximumDistance:perform:onPressingChanged:)`
@@ -28,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `HoverPhase` for terminal mouse hover handling.
 - Added click-and-drag-to-caret placement for `TextField`, `SecureField`,
   and `TextEditor`.
+
+### Changed
+
+- Changed the public geometry layout API to use `Terminal.Point`,
+  `Terminal.Size`, and `Terminal.Rect` instead of SwiftTUI-local
+  `GeometryPoint`, `GeometrySize`, and `GeometryFrame`.
 - Changed focused `onKeyPress` overloads to match SwiftUI's `nonisolated`
   signatures.
 - Changed Z-axis compositing so lower-layer background colors remain visible
@@ -221,7 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/minacle/swift-tui/releases/tag/v0.5.0
 [0.4.2]: https://github.com/minacle/swift-tui/releases/tag/v0.4.2
 [0.4.1]: https://github.com/minacle/swift-tui/releases/tag/v0.4.1
 [0.4.0]: https://github.com/minacle/swift-tui/releases/tag/v0.4.0
