@@ -60,7 +60,7 @@ import Testing
     #expect(block?.lines == [" C"])
 }
 
-@Test func zStackCarriesBackgroundForwardToPlainOverlappingText() {
+@Test func zStackForegroundRectangleDoesNotColorPlainOverlappingText() {
     let block = ViewResolver.block(
         from: ZStack(alignment: .topLeading) {
             Rectangle()
@@ -72,8 +72,7 @@ import Testing
 
     #expect(block?.runs == [
         RenderedRun(
-            text: "A",
-            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+            text: "A"
         ),
     ])
 }
@@ -291,7 +290,7 @@ import Testing
     #expect(block?.lines == ["C"])
 }
 
-@Test func overlayCarriesBackgroundForwardToPlainText() {
+@Test func overlayForegroundRectangleDoesNotColorPlainText() {
     let block = ViewResolver.block(
         from: Rectangle()
             .fill(.red)
@@ -303,8 +302,7 @@ import Testing
 
     #expect(block?.runs == [
         RenderedRun(
-            text: "A",
-            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+            text: "A"
         ),
     ])
 }

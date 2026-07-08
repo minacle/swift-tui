@@ -4,7 +4,7 @@ import Testing
 @Suite("Shape")
 struct ShapeTests {
 
-    @Test func rectangleFillRendersBackgroundCells() {
+    @Test func rectangleFillRendersForegroundBlockCells() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .fill(.red)
@@ -13,22 +13,22 @@ struct ShapeTests {
 
         #expect(block?.width == 3)
         #expect(block?.height == 2)
-        #expect(block?.lines == ["   ", "   "])
+        #expect(block?.lines == ["███", "███"])
         #expect(block?.runs == [
             RenderedRun(
-                text: "   ",
+                text: "███",
                 row: 0,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
             RenderedRun(
-                text: "   ",
+                text: "███",
                 row: 1,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
         ])
     }
 
-    @Test func rectangleFillEmitsBackgroundSGRSpaces() {
+    @Test func rectangleFillEmitsForegroundSGRBlocks() {
         let output = TextRenderer.screen(
             for: ViewResolver.block(
                 from: Rectangle()
@@ -38,7 +38,7 @@ struct ShapeTests {
             in: TerminalViewportSize(columns: 2, rows: 1)
         )
 
-        #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[41m  \u{001B}[49m\u{001B}[?25l")
+        #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[31m██\u{001B}[39m\u{001B}[?25l")
     }
 
     @Test func plainRectangleUsesForegroundStyleAsDefaultFill() {
@@ -50,8 +50,8 @@ struct ShapeTests {
 
         #expect(block?.runs == [
             RenderedRun(
-                text: "  ",
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                text: "██",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
         ])
     }
@@ -68,11 +68,11 @@ struct ShapeTests {
         #expect(block?.height == 3)
         #expect(block?.runs == [
             RenderedRun(
-                text: "  ",
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                text: "██",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
         ])
-        #expect(block?.lines == ["    ", "    ", "    "])
+        #expect(block?.lines == ["██  ", "    ", "    "])
     }
 
     @Test func shapeSizeWidthHeightMatchesTerminalSize() {
@@ -103,10 +103,10 @@ struct ShapeTests {
 
         #expect(block?.runs == [
             RenderedRun(
-                text: "  ",
+                text: "██",
                 row: 1,
                 column: 1,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
             ),
         ])
     }
@@ -155,8 +155,8 @@ struct ShapeTests {
 
         #expect(block?.runs == [
             RenderedRun(
-                text: "  ",
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                text: "██",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
         ])
     }
@@ -171,8 +171,8 @@ struct ShapeTests {
 
         #expect(block?.runs == [
             RenderedRun(
-                text: "  ",
-                style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+                text: "██",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
             ),
         ])
     }
@@ -199,19 +199,19 @@ struct ShapeTests {
 
         #expect(background?.width == 3)
         #expect(background?.height == 2)
-        #expect(background?.lines == ["A  ", "   "])
+        #expect(background?.lines == ["A██", "███"])
         #expect(overlay?.width == 3)
         #expect(overlay?.height == 2)
         #expect(overlay?.runs == [
             RenderedRun(
-                text: "   ",
+                text: "███",
                 row: 0,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
             RenderedRun(
-                text: "   ",
+                text: "███",
                 row: 1,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
             ),
         ])
     }

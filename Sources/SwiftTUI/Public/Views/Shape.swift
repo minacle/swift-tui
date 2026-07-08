@@ -415,13 +415,13 @@ enum ShapeRenderer {
             return []
         }
 
-        let text = String(repeating: " ", count: rect.width)
+        let text = String(repeating: "█", count: rect.width)
         return (rect.y..<(rect.y + rect.height)).map {
             RenderedRun(
                 text: text,
                 row: $0,
                 column: rect.x,
-                style: TextStyle(backgroundStyle: style)
+                style: TextStyle(foregroundStyle: style)
             )
         }
     }

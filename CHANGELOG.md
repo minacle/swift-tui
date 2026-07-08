@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `Rectangle`, `Shape`, `ShapeView`, `FillShapeView`, `FillStyle`,
   and shape `size`, `offset`, and `fill` APIs for terminal-cell rectangle
-  fills.
+  fills rendered with foreground-colored block glyphs.
 - Added `View.background(_:)` for filling a view's rendered bounds with a
   terminal shape style.
 
