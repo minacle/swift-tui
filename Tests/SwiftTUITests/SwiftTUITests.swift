@@ -31,7 +31,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let block = ViewResolver.block(
         from: Text("A")
             .foregroundStyle(.color256(196))
-            .backgroundStyle(.trueColor(red: 1, green: 2, blue: 3))
+            .background(.trueColor(red: 1, green: 2, blue: 3))
     )
 
     #expect(block?.runs == [
@@ -142,7 +142,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let block = ViewResolver.block(
         from: Text(attributed)
             .foregroundStyle(.red)
-            .backgroundStyle(.blue)
+            ._backgroundStyle(.blue)
     )
 
     #expect(block?.runs == [
@@ -369,7 +369,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let block = ViewResolver.block(
         from: Text("A")
             .foregroundStyle(CustomShapeStyle())
-            .backgroundStyle(CustomShapeStyle())
+            .background(CustomShapeStyle())
     )
 
     #expect(block?.runs == [
@@ -484,7 +484,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
             Text("A")
         }
         .foregroundStyle(.red)
-        .backgroundStyle(.blue)
+        ._backgroundStyle(.blue)
         .bold()
         .dim()
         .italic()
@@ -552,7 +552,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
             from: Box()
                 .frame(width: 1, height: 1)
                 .foregroundStyle(.red)
-                .backgroundStyle(.blue)
+                ._backgroundStyle(.blue)
                 .bold()
                 .dim()
                 .italic()
@@ -4393,7 +4393,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func screenOutputRendersBackgroundColorSGR() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("A").backgroundStyle(.red))!,
+        for: ViewResolver.block(from: Text("A").background(.red))!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
@@ -4402,7 +4402,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func screenOutputRendersColor256BackgroundSGR() {
     let output = TextRenderer.screen(
-        for: ViewResolver.block(from: Text("A").backgroundStyle(Color256(rawValue: 196)))!,
+        for: ViewResolver.block(from: Text("A").background(Color256(rawValue: 196)))!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
 
@@ -4417,7 +4417,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 @Test func screenOutputRendersTrueColorBackgroundSGR() {
     let output = TextRenderer.screen(
         for: ViewResolver.block(
-            from: Text("A").backgroundStyle(TrueColor(red: 1, green: 2, blue: 3))
+            from: Text("A").background(TrueColor(red: 1, green: 2, blue: 3))
         )!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )
@@ -4436,9 +4436,9 @@ private func lineBreakKinds(in text: String) -> [String] {
             from: VStack(alignment: .leading) {
                 Text("A")
                 Text("B")
-                    .backgroundStyle(.default)
+                    ._backgroundStyle(.default)
             }
-            .backgroundStyle(.red)
+            ._backgroundStyle(.red)
         )!,
         in: TerminalViewportSize(columns: 1, rows: 2)
     )
@@ -4507,7 +4507,7 @@ private func lineBreakKinds(in text: String) -> [String] {
                 .underline()
                 .strikethrough()
                 .foregroundStyle(.brightCyan)
-                .backgroundStyle(.blue)
+                .background(.blue)
         )!,
         in: TerminalViewportSize(columns: 1, rows: 1)
     )

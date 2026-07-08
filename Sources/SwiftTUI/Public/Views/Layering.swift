@@ -1,3 +1,5 @@
+import Terminal
+
 struct BackgroundView<Content: View, Background: View>: View,
     LayoutModifierRenderable,
     LayoutTraitRenderable
@@ -28,6 +30,51 @@ struct BackgroundView<Content: View, Background: View>: View,
             proposal: proposal,
             path: path,
             runtime: runtime
+        )
+    }
+}
+
+struct BackgroundStyleView<Content: View>: View,
+    LayoutModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let style: AnyColor
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        guard let contentBlock = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        return RenderedBlock.composited(
+            [
+                LayerModifierRenderer.backgroundBlock(
+                    width: contentBlock.width,
+                    height: contentBlock.height,
+                    style: style
+                ),
+                contentBlock,
+            ],
+            width: contentBlock.width,
+            height: contentBlock.height,
+            paddedRows: contentBlock.paddedRows
         )
     }
 }
@@ -74,6 +121,25 @@ enum LayerModifierPlacement {
 }
 
 enum LayerModifierRenderer {
+
+    static func backgroundBlock(width: Int, height: Int, style: AnyColor) -> RenderedBlock {
+        guard width > 0, height > 0 else {
+            return RenderedBlock(lines: [])
+        }
+
+        return RenderedBlock(
+            runs: (0..<height).map {
+                RenderedRun(
+                    text: String(repeating: " ", count: width),
+                    row: $0,
+                    style: TextStyle(backgroundStyle: style)
+                )
+            },
+            width: width,
+            height: height,
+            paddedRows: Set(0..<height)
+        )
+    }
 
     static func renderedBlock<Content: View, Decoration: View>(
         content: Content,
@@ -126,6 +192,66 @@ enum LayerModifierRenderer {
 }
 
 public extension View {
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: A 16-color terminal SGR style.
+    /// - Returns: A view with the given background style behind it.
+    func background(_ style: Color16) -> some View {
+        background(AnyColor(style))
+    }
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: A 256-color terminal SGR style.
+    /// - Returns: A view with the given background style behind it.
+    func background(_ style: Color256) -> some View {
+        background(AnyColor(style))
+    }
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: A true-color terminal SGR style.
+    /// - Returns: A view with the given background style behind it.
+    func background(_ style: TrueColor) -> some View {
+        background(AnyColor(style))
+    }
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: The terminal default color reset style.
+    /// - Returns: A view with the given background style behind it.
+    func background(_ style: DefaultColor) -> some View {
+        background(AnyColor(style))
+    }
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: A type-erased terminal SGR color style.
+    /// - Returns: A view with the given background style behind it.
+    func background(_ style: AnyColor) -> some View {
+        BackgroundStyleView(content: self, style: style)
+    }
+
+    /// Sets the view's background to a terminal shape style.
+    ///
+    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    ///
+    /// - Parameter style: A terminal shape style.
+    /// - Returns: A view with the given background style behind it.
+    func background<S>(_ style: S) -> some View where S: ShapeStyle {
+        BackgroundStyleView(content: self, style: style._swiftTUIAnyColor)
+    }
 
     /// Layers view-builder content behind this view.
     ///

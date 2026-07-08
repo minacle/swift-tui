@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `Rectangle`, `Shape`, `ShapeView`, `FillShapeView`, `FillStyle`,
   and shape `size`, `offset`, and `fill` APIs for terminal-cell rectangle
   fills.
+- Added `View.background(_:)` for filling a view's rendered bounds with a
+  terminal shape style.
 
 ### Changed
 
@@ -28,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `TextEditor`.
 - Changed Z-axis compositing so lower-layer background colors remain visible
   through overlapping cells that do not set their own background style.
+
+### Deprecated
+
+- Deprecated `View.backgroundStyle(_:)` in favor of `View.background(_:)`.
 
 ## [0.4.2] - 2026-07-08
 

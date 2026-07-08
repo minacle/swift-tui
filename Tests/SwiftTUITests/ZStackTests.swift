@@ -45,7 +45,7 @@ import Testing
         from: ZStack(alignment: .topLeading) {
             Text("AB")
                 .foregroundStyle(.red)
-                .backgroundStyle(.blue)
+                .background(.blue)
                 .bold()
             Text(" C")
         }
@@ -85,7 +85,7 @@ import Testing
                 .fill(.red)
                 .frame(width: 1, height: 1)
             Text("A")
-                .backgroundStyle(.default)
+                .background(.default)
         }
     )
 
@@ -104,7 +104,7 @@ import Testing
                 .fill(.red)
                 .frame(width: 1, height: 1)
             Text("A")
-                .backgroundStyle(.default)
+                .background(.default)
             Text("B")
         }
     )
@@ -157,6 +157,107 @@ import Testing
         "   ",
         " A ",
         "  B",
+    ])
+}
+
+@Test func backgroundModifierAppliesToTextCell() {
+    let block = ViewResolver.block(
+        from: Text("A")
+            .background(.red)
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
+}
+
+@Test func backgroundModifierFillsRenderedBounds() {
+    let block = ViewResolver.block(
+        from: Text("A")
+            .frame(width: 3, height: 2, alignment: .topLeading)
+            .background(.red)
+    )
+
+    #expect(block?.width == 3)
+    #expect(block?.height == 2)
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A  ",
+            row: 0,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+        RenderedRun(
+            text: "   ",
+            row: 1,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
+}
+
+@Test func backgroundModifierOrderControlsFilledBounds() {
+    let beforePadding = ViewResolver.block(
+        from: Text("A")
+            .background(.red)
+            .padding(.leading, 1)
+    )
+    let afterPadding = ViewResolver.block(
+        from: Text("A")
+            .padding(.leading, 1)
+            .background(.red)
+    )
+
+    #expect(beforePadding?.runs == [
+        RenderedRun(
+            text: "A",
+            row: 0,
+            column: 1,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
+    #expect(afterPadding?.runs == [
+        RenderedRun(
+            text: " A",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
+}
+
+@Test func backgroundModifierAcceptsCustomColorShapeStyle() {
+    let block = ViewResolver.block(
+        from: Text("A")
+            .background(CustomShapeStyle())
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(CustomShapeStyle()))
+        ),
+    ])
+}
+
+@Test func internalBackgroundStyleKeepsTextEnvironmentBehavior() {
+    let block = ViewResolver.block(
+        from: VStack(alignment: .leading) {
+            Text("A")
+            Text("B")
+        }
+        ._backgroundStyle(.red)
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+        RenderedRun(
+            text: "B",
+            row: 1,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
     ])
 }
 
