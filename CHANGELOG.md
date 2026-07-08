@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `TextEditor` rendering inside measured layouts so caret scrolling no
+  longer causes an invalidation loop after inserting a newline at the bottom of
+  its visible editor area.
+
 ## [0.4.1] - 2026-07-08
 
 ### Changed

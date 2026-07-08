@@ -1573,6 +1573,148 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
 }
 
+@Test func focusedTextEditorKeepsEditingAfterReturnAtViewportBottom() {
+    let runtime = StateRuntime()
+    let view = TextEditorEditingView()
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let bottomBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+    #expect(bottomBlock?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let scrolledBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+    #expect(scrolledBlock?.lines == ["   ", "   "])
+    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
+    #expect(editedBlock?.lines == ["   ", "b  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func framedTextEditorKeepsEditingAfterReturnAtFrameBottom() {
+    let runtime = StateRuntime()
+    let view = FramedTextEditorEditingView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let scrolledBlock = runtime.block(from: view)
+    #expect(scrolledBlock?.lines == ["   ", "   "])
+    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view)
+    #expect(editedBlock?.lines == ["   ", "b  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func filledTextEditorKeepsEditingAfterReturnAtFrameBottom() {
+    let runtime = StateRuntime()
+    let view = FramedTextEditorInitialTextView(text: "abcdef")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    let initialBlock = runtime.block(from: view)
+    #expect(initialBlock?.lines == ["abc", "def"])
+    #expect(initialBlock?.cursor == RenderedCursor(row: 1, column: 2))
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let scrolledBlock = runtime.block(from: view)
+    #expect(scrolledBlock?.lines == ["def", "   "])
+    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view)
+    #expect(editedBlock?.lines == ["def", "g  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func wrappingTextEditorKeepsEditingAfterCaretScrollsPastFrameBottom() {
+    let runtime = StateRuntime()
+    let view = FramedTextEditorEditingView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    for character in "abcdefg" {
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: KeyEquivalent(character), characters: String(character))
+            ) == .handled
+        )
+    }
+    #expect(runtime.consumeInvalidation())
+    let block = runtime.block(from: view)
+    #expect(block?.lines == ["def", "g  "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func boxedTextEditorBelowScrollViewKeepsEditingAtBottom() {
+    let runtime = StateRuntime()
+    let view = TextEditorBelowScrollViewView()
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let bottomBlock = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
+    #expect(bottomBlock?.cursor == RenderedCursor(row: 4, column: 1))
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
+    #expect(editedBlock?.lines.suffix(2) == ["│b     │", "└──────┘"])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 4, column: 2))
+}
+
+@Test func boxedTextEditorBelowScrollViewKeepsEditingAfterFillingVisibleRows() {
+    let runtime = StateRuntime()
+    let view = TextEditorBelowScrollViewView()
+    let proposal = RenderProposal(columns: 80, rows: 24)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    for _ in 0..<9 {
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    }
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let bottomBlock = runtime.block(from: view, in: proposal)
+    #expect(bottomBlock?.cursor == RenderedCursor(row: 22, column: 1))
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let scrolledBlock = runtime.block(from: view, in: proposal)
+    #expect(scrolledBlock?.cursor == RenderedCursor(row: 22, column: 1))
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let editedBlock = runtime.block(from: view, in: proposal)
+    #expect(editedBlock?.cursor == RenderedCursor(row: 22, column: 2))
+}
+
 @Test func clickingTextEditorBlankAreaRequestsFocus() {
     let runtime = StateRuntime()
     let focusProbe = FocusBindingProbe<Bool>()
@@ -10323,6 +10465,22 @@ private func focusParentCallbackKeyPressChild(in runtime: StateRuntime) {
     )
 }
 
+private func renderUntilStable<Content: View>(
+    _ runtime: StateRuntime,
+    view: Content,
+    in proposal: RenderProposal? = nil,
+    maximumPasses: Int = 8
+) -> Int {
+    for pass in 1...maximumPasses {
+        _ = runtime.block(from: view, in: proposal)
+        if !runtime.consumeInvalidation() {
+            return pass
+        }
+    }
+
+    return maximumPasses + 1
+}
+
 private struct DeferredParentStateMutationView: View {
 
     @State private var isOpen = false
@@ -10532,6 +10690,53 @@ private struct TextEditorEditingView: View {
     var body: some View {
         TextEditor(text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct FramedTextEditorEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .frame(width: 3, height: 2, alignment: .topLeading)
+            .focused($isFocused)
+    }
+}
+
+private struct FramedTextEditorInitialTextView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .frame(width: 3, height: 2, alignment: .topLeading)
+            .focused($isFocused)
+    }
+}
+
+private struct TextEditorBelowScrollViewView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        VStack {
+            ScrollView {
+                VStack {
+                    Text("")
+                }
+            }
+            Box {
+                TextEditor(text: $text)
+                    .focused($isFocused)
+            }
+        }
     }
 }
 

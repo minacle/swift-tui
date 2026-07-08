@@ -62,13 +62,16 @@ extension TextEditor {
         let currentText = editorState?.text ?? text.wrappedValue
         let layout = TextEditorLayout(text: currentText, maxWidth: proposal?.columns)
         let cursor = renderedCursor(state: editorState, layout: layout, runtime: runtime, path: path)
-        editorState?.updateScrollPoint(
-            for: cursor,
-            viewportWidth: proposal?.columns,
-            viewportHeight: proposal?.rows,
-            contentWidth: layout.width,
-            contentHeight: layout.height
-        )
+        if !LayoutMeasurementContext.isMeasuring
+            && runtime?.isSuppressingInteractiveRenderRegistrations != true {
+            editorState?.updateScrollPoint(
+                for: cursor,
+                viewportWidth: proposal?.columns,
+                viewportHeight: proposal?.rows,
+                contentWidth: layout.width,
+                contentHeight: layout.height
+            )
+        }
 
         let content = RenderedBlock(
             runs: layout.lines.enumerated().map {
