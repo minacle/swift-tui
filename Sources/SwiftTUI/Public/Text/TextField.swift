@@ -294,6 +294,22 @@ private enum TextInputRenderer {
             ),
             at: path
         )
+        runtime?.registerMouseDownPositionHandler(
+            MouseDownPositionHandler(
+                actionPath: path,
+                action: { point in
+                    guard let fieldState else {
+                        return
+                    }
+
+                    fieldState.move(
+                        toColumn: point.column,
+                        layoutText: displayMode.layoutText(for: fieldState.text)
+                    )
+                }
+            ),
+            at: path
+        )
 
         let currentText = fieldState?.text ?? text.wrappedValue
         let layoutText = displayMode.layoutText(for: currentText)
@@ -498,6 +514,14 @@ final class TextFieldState {
         self.offset = min(max(offset, 0), text.count)
     }
 
+    func move(toColumn column: Int, layoutText: String) {
+        let scrollColumn = TerminalText.columnWidth(
+            layoutText,
+            upToCharacterOffset: horizontalScrollOffset
+        )
+        move(to: Self.offset(in: layoutText, nearestColumn: scrollColumn + column))
+    }
+
     func updateHorizontalScrollOffset(maxWidth: Int, layoutText: String) {
         guard maxWidth > 0 else {
             horizontalScrollOffset = 0
@@ -570,6 +594,21 @@ final class TextFieldState {
         text.removeCharacter(atOffset: offset)
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
+    }
+
+    private static func offset(in text: String, nearestColumn column: Int) -> Int {
+        var currentColumn = 0
+        var offset = 0
+        for character in text {
+            let characterWidth = TerminalText.columnWidth(String(character))
+            guard currentColumn + characterWidth <= column else {
+                break
+            }
+
+            currentColumn += characterWidth
+            offset += 1
+        }
+        return min(offset, text.count)
     }
 }
 

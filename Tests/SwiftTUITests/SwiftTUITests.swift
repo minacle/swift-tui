@@ -1115,6 +1115,38 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
 }
 
+@Test func clickingSecureFieldMovesCaretWithinMaskedText() {
+    let runtime = StateRuntime()
+    let probe = BindingProbe<String>()
+    let view = SecureFieldEditingView(textProbe: probe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    for character in "secret" {
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: KeyEquivalent(character), characters: String(character))
+            ) == .handled
+        )
+    }
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 3, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    #expect(probe.binding?.wrappedValue == "seXcret")
+    #expect(runtime.block(from: view)?.text == "•••••••")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+}
+
 @Test func focusedSecureFieldUsesMaskedColumnWidthForCursorAndScroll() {
     let runtime = StateRuntime()
     let view = SecureFieldInitialTextView(text: "한ABC")
@@ -1404,6 +1436,51 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
+@Test func clickingTextFieldMovesCaretToClickedColumn() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 3, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.text == "abXcd")
+    #expect(block?.cursor == RenderedCursor(column: 3))
+}
+
+@Test func clickingScrolledWideTextFieldMovesCaretByTerminalColumns() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "한ABC")
+        .frame(width: 3)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    var block = runtime.block(from: view)
+    #expect(block?.lines == ["BC "])
+    #expect(block?.cursor == RenderedCursor(column: 2))
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    block = runtime.block(from: view)
+    #expect(block?.lines == ["BXC"])
+    #expect(block?.cursor == RenderedCursor(column: 2))
+}
+
 @Test func clickingTextFieldMovesFocusAndSubsequentTyping() {
     let runtime = StateRuntime()
     let focusProbe = FocusBindingProbe<FocusField?>()
@@ -1491,6 +1568,51 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
     #expect(block?.lines == ["a", "b"])
     #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func clickingTextEditorMovesCaretToClickedLineAndColumn() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "ab\ncd")
+    let proposal = RenderProposal(columns: 4)
+
+    _ = runtime.block(from: view, in: proposal)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view, in: proposal)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 2, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["ab  ", "cXd "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+}
+
+@Test func clickingScrolledTextEditorMovesCaretThroughScrollPoint() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "a\nb\nc\nd")
+    let proposal = RenderProposal(columns: 3, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    var block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["c  ", "d  "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["cX ", "d  "])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
 }
 
 @Test func disabledTextEditorIgnoresFocusAndTyping() {

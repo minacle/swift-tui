@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GeometryPoint`, `GeometrySize`, and `GeometryFrame`.
 - Added tap-location gestures with `Terminal.Point` coordinates and named
   coordinate spaces for resolving tap positions.
+- Added click-to-caret placement for `TextField`, `SecureField`, and
+  `TextEditor`.
 
 ## [0.4.2] - 2026-07-08
 

@@ -1,4 +1,5 @@
 import Foundation
+import Terminal
 
 /// A control that displays editable multi-line text in the terminal.
 ///
@@ -58,6 +59,23 @@ extension TextEditor {
                 matches: TextEditorInput.matches,
                 action: {
                     handle($0, text: text, state: editorState)
+                }
+            ),
+            at: path
+        )
+        runtime?.registerMouseDownPositionHandler(
+            MouseDownPositionHandler(
+                actionPath: path,
+                action: { point in
+                    guard let editorState else {
+                        return
+                    }
+
+                    let layout = TextEditorLayout(
+                        text: editorState.text,
+                        maxWidth: editorState.layoutWidth
+                    )
+                    editorState.move(to: point, layout: layout)
                 }
             ),
             at: path
@@ -245,6 +263,15 @@ final class TextEditorState {
     func moveToLineEnd(layout: TextEditorLayout) {
         let current = layout.lineAndColumn(at: offset)
         move(to: layout.lines[current.lineIndex].upperOffset, preservesPreferredColumn: false)
+    }
+
+    func move(to point: Point, layout: TextEditorLayout) {
+        let lineIndex = min(max(scrollPoint.y + point.row, 0), layout.lines.count - 1)
+        let column = max(scrollPoint.x + point.column, 0)
+        move(
+            to: layout.offset(onLine: lineIndex, nearestColumn: column),
+            preservesPreferredColumn: false
+        )
     }
 
     func insert(_ newText: String, update binding: Binding<String>) {

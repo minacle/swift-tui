@@ -335,6 +335,21 @@ final class StateRuntime {
         )
     }
 
+    func registerMouseDownPositionHandler(
+        _ handler: MouseDownPositionHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringMouseDownPositionHandler(handler),
+            at: path
+        )
+    }
+
     func registerLinkHandler(_ handler: LinkHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled else {
@@ -771,6 +786,20 @@ final class StateRuntime {
             actionPath: handler.actionPath,
             count: handler.count,
             action: handler.action.restoringEnvironment(environment)
+        )
+    }
+
+    private func environmentRestoringMouseDownPositionHandler(
+        _ handler: MouseDownPositionHandler
+    ) -> MouseDownPositionHandler {
+        let environment = EnvironmentRenderContext.current
+        return MouseDownPositionHandler(
+            actionPath: handler.actionPath,
+            action: { point in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action(point)
+                }
+            }
         )
     }
 

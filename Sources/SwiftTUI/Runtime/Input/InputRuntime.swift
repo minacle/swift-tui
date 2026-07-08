@@ -268,6 +268,13 @@ struct LinkHandler {
     let action: () -> Bool
 }
 
+struct MouseDownPositionHandler {
+
+    let actionPath: [Int]?
+
+    let action: (Point) -> Void
+}
+
 protocol InputModifierRenderable {
 
     func renderedBlock(
@@ -302,6 +309,8 @@ final class InputRuntime {
 
     private var linkHandlersByPath: [[Int]: LinkHandler] = [:]
 
+    private var mouseDownPositionHandlersByPath: [[Int]: MouseDownPositionHandler] = [:]
+
     private var hitRegions: [RenderedHitRegion] = []
 
     private var scrollRegions: [RenderedScrollRegion] = []
@@ -329,6 +338,7 @@ final class InputRuntime {
         globalHandlers = []
         tapHandlersByPath = [:]
         linkHandlersByPath = [:]
+        mouseDownPositionHandlersByPath = [:]
     }
 
     func register(_ handler: KeyPressHandler, at path: [Int]) {
@@ -351,6 +361,10 @@ final class InputRuntime {
 
     func register(_ handler: LinkHandler, at path: [Int]) {
         linkHandlersByPath[path] = handler
+    }
+
+    func register(_ handler: MouseDownPositionHandler, at path: [Int]) {
+        mouseDownPositionHandlersByPath[path] = handler
     }
 
     func updateHitRegions(_ hitRegions: [RenderedHitRegion]) {
@@ -459,12 +473,20 @@ final class InputRuntime {
 
         switch mouseEvent.phase {
         case .down:
-            let focused = focusTargets(at: mouseEvent).contains {
+            let focusedPath = focusTargets(at: mouseEvent).first {
                 focus($0)
             }
+            let positioned = dispatchMouseDownPosition(
+                at: mouseEvent,
+                eligiblePaths: focusedPath.map { [$0] } ?? [],
+                perform: perform
+            )
             pressedLinkTarget = linkTarget(at: mouseEvent)
             pressedTapTarget = tapTarget(at: mouseEvent)
-            return focused || pressedLinkTarget != nil || pressedTapTarget != nil
+            return focusedPath != nil
+                || positioned
+                || pressedLinkTarget != nil
+                || pressedTapTarget != nil
                 ? .handled : .ignored
         case .up:
             if let pressedLinkTarget {
@@ -579,6 +601,59 @@ final class InputRuntime {
                 return $0.frame.area < $1.frame.area
             }
             .map(\.path)
+    }
+
+    private func dispatchMouseDownPosition(
+        at mouseEvent: MouseEvent,
+        eligiblePaths: [[Int]],
+        perform: ([Int], () -> Void) -> Void
+    ) -> Bool {
+        guard let target = mouseDownPositionTarget(
+            at: mouseEvent,
+            eligiblePaths: eligiblePaths
+        ),
+              let handler = mouseDownPositionHandlersByPath[target.path] else {
+            return false
+        }
+
+        perform(handler.actionPath ?? target.path) {
+            handler.action(target.location)
+        }
+        return true
+    }
+
+    private func mouseDownPositionTarget(
+        at mouseEvent: MouseEvent,
+        eligiblePaths: [[Int]]
+    ) -> (path: [Int], location: Point)? {
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        guard let region = focusRegions
+            .filter({
+                eligiblePaths.contains($0.path)
+                    && mouseDownPositionHandlersByPath[$0.path] != nil
+                    && $0.frame.contains(column: column, row: row)
+            })
+            .sorted(by: focusRegionPrecedes)
+            .first else {
+            return nil
+        }
+
+        return (
+            region.path,
+            Point(column: column - region.frame.x, row: row - region.frame.y)
+        )
+    }
+
+    private func focusRegionPrecedes(
+        _ lhs: RenderedFocusRegion,
+        _ rhs: RenderedFocusRegion
+    ) -> Bool {
+        if lhs.path.count != rhs.path.count {
+            return lhs.path.count > rhs.path.count
+        }
+
+        return lhs.frame.area < rhs.frame.area
     }
 
     private func dispatchScroll(
