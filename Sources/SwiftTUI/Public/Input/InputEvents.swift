@@ -236,6 +236,16 @@ public struct KeyPress: Equatable, Sendable {
     }
 }
 
+/// The current terminal-cell hover state and pointer location.
+public enum HoverPhase: Equatable, Sendable {
+
+    /// The pointer is inside the view at the specified terminal-cell location.
+    case active(Point)
+
+    /// The pointer exited the view.
+    case ended
+}
+
 
 public extension View {
 
@@ -286,6 +296,47 @@ public extension View {
                 actionPath: StateContext.currentPath,
                 count: count,
                 action: .location(coordinateSpace, action)
+            )
+        )
+    }
+
+    /// Performs an action when the pointer enters or exits this view's frame.
+    ///
+    /// The view registers its rendered terminal frame as a hover region. Mouse
+    /// motion inside that frame passes `true`; motion outside after entry
+    /// passes `false`.
+    ///
+    /// - Parameter action: The action to perform with the current hover state.
+    /// - Returns: A view with a hover handler attached.
+    func onHover(perform action: @escaping (Bool) -> Void) -> some View {
+        HoverGestureView(
+            content: self,
+            handler: HoverGestureHandler(
+                actionPath: StateContext.currentPath,
+                action: .state(action)
+            )
+        )
+    }
+
+    /// Performs an action when the pointer enters, moves within, or exits this
+    /// view's frame.
+    ///
+    /// The active phase reports terminal-cell coordinates in the requested
+    /// coordinate space.
+    ///
+    /// - Parameters:
+    ///   - coordinateSpace: The coordinate space for active hover locations.
+    ///   - action: The action to perform with each hover phase.
+    /// - Returns: A view with a continuous hover handler attached.
+    func onContinuousHover(
+        coordinateSpace: CoordinateSpace = .local,
+        perform action: @escaping (HoverPhase) -> Void
+    ) -> some View {
+        HoverGestureView(
+            content: self,
+            handler: HoverGestureHandler(
+                actionPath: StateContext.currentPath,
+                action: .phase(coordinateSpace, action)
             )
         )
     }

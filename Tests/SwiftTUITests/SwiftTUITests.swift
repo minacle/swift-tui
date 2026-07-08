@@ -5524,6 +5524,10 @@ private func lineBreakKinds(in text: String) -> [String] {
             )
     )
     #expect(
+        TerminalControl.input(for: Array("\u{001B}[<35;8;9M".utf8))
+            == .mouse(MouseEvent(button: .other(3), column: 8, row: 9, phase: .motion))
+    )
+    #expect(
         TerminalControl.input(for: Array("\u{001B}[<2;4;5M".utf8))
             == .mouse(MouseEvent(button: .right, column: 4, row: 5, phase: .down))
     )
@@ -7536,6 +7540,24 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events.isEmpty)
 }
 
+@Test func hoverGestureModifiersDoNotChangeRenderedOutput() {
+    let runtime = StateRuntime()
+    let hoverProbe = HoverProbe()
+
+    let block = runtime.block(
+        from: Text("A")
+            .onHover {
+                hoverProbe.record($0 ? "enter" : "exit")
+            }
+            .onContinuousHover { phase in
+                hoverProbe.record(String(describing: phase))
+            }
+    )
+
+    #expect(block?.text == "A")
+    #expect(hoverProbe.events.isEmpty)
+}
+
 @Test func hiddenSuppressesInteractiveRuntimeRegistrations() {
     let runtime = StateRuntime()
     let tapProbe = TapGestureProbe()
@@ -7555,6 +7577,12 @@ private struct ParentCallbackStateMutationTests {
             .onLongPressGesture {
                 tapProbe.record("long")
             }
+            .onHover { _ in
+                tapProbe.record("hover")
+            }
+            .onContinuousHover { _ in
+                tapProbe.record("continuous-hover")
+            }
         ScrollView(.vertical) {
             Text("A")
             Text("B")
@@ -7571,6 +7599,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatch(KeyPress(key: "k", characters: "k")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
     dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    dispatchHover(to: runtime, column: 1, row: 1, expecting: .ignored)
     #expect(runtime.dispatchExpiredLongPressActions() == .ignored)
     #expect(tapProbe.events.isEmpty)
 }
@@ -7591,6 +7620,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .ignored)
     dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    dispatchHover(to: runtime, column: 1, row: 1, expecting: .ignored)
     #expect(runtime.dispatchExpiredLongPressActions() == .ignored)
     #expect(keyProbe.events.isEmpty)
     #expect(tapProbe.events.isEmpty)
@@ -7847,6 +7877,163 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
+}
+
+@Test func hoverGestureReportsEnterAndExitWithoutRepeatingUnchangedState() {
+    let runtime = StateRuntime()
+    let hoverProbe = HoverProbe()
+    let view = Text("AB")
+        .onHover {
+            hoverProbe.record($0 ? "enter" : "exit")
+        }
+
+    _ = runtime.block(from: view)
+
+    dispatchHover(to: runtime, column: 1, row: 1)
+    dispatchHover(to: runtime, column: 2, row: 1)
+    dispatchHover(to: runtime, column: 3, row: 1)
+    dispatchHover(to: runtime, column: 4, row: 1, expecting: .ignored)
+
+    #expect(hoverProbe.events == ["enter", "exit"])
+}
+
+@Test func continuousHoverReportsActiveMovementAndEnded() {
+    let runtime = StateRuntime()
+    let hoverProbe = HoverProbe()
+    let view = Text("ABC")
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            hoverProbe.record(phase)
+        }
+
+    _ = runtime.block(from: view)
+
+    dispatchHover(to: runtime, column: 1, row: 1)
+    dispatchHover(to: runtime, column: 3, row: 1)
+    dispatchHover(to: runtime, column: 4, row: 1)
+
+    #expect(
+        hoverProbe.phases == [
+            .active(Point(column: 0, row: 0)),
+            .active(Point(column: 2, row: 0)),
+            .ended,
+        ]
+    )
+}
+
+@Test func continuousHoverReportsLocalGlobalAndNamedLocations() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = HStack(spacing: 0) {
+        Text("..")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("x")
+            Text("ABCD")
+                .frame(width: 2)
+                .onContinuousHover(coordinateSpace: .local) { phase in
+                    if case .active(let location) = phase {
+                        locationProbe.record("local", location)
+                    }
+                }
+                .onContinuousHover(coordinateSpace: .global) { phase in
+                    if case .active(let location) = phase {
+                        locationProbe.record("global", location)
+                    }
+                }
+                .onContinuousHover(coordinateSpace: .named("stack")) { phase in
+                    if case .active(let location) = phase {
+                        locationProbe.record("named", location)
+                    }
+                }
+        }
+        .coordinateSpace(.named("stack"))
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchHover(to: runtime, column: 4, row: 2)
+
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "named", location: Point(column: 1, row: 1)),
+            TapLocationEvent(name: "global", location: Point(column: 3, row: 1)),
+            TapLocationEvent(name: "local", location: Point(column: 1, row: 0)),
+        ]
+    )
+}
+
+@Test func hoverGestureKeepsParentActiveWhenPointerEntersAndExitsChild() {
+    let runtime = StateRuntime()
+    let hoverProbe = HoverProbe()
+    let view = VStack(alignment: .leading, spacing: 0) {
+        Text("A")
+            .onHover {
+                hoverProbe.record($0 ? "child-enter" : "child-exit")
+            }
+        Text("B")
+    }
+    .onHover {
+        hoverProbe.record($0 ? "parent-enter" : "parent-exit")
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchHover(to: runtime, column: 1, row: 2)
+    dispatchHover(to: runtime, column: 1, row: 1)
+    dispatchHover(to: runtime, column: 1, row: 2)
+    dispatchHover(to: runtime, column: 2, row: 2)
+
+    #expect(
+        hoverProbe.events == [
+            "parent-enter",
+            "child-enter",
+            "child-exit",
+            "parent-exit",
+        ]
+    )
+}
+
+@Test func hoverGestureRespectsFrameClipping() {
+    let runtime = StateRuntime()
+    let hoverProbe = HoverProbe()
+    let view = Text("ABCD")
+        .onHover {
+            hoverProbe.record($0 ? "enter" : "exit")
+        }
+        .frame(width: 2)
+
+    _ = runtime.block(from: view)
+
+    dispatchHover(to: runtime, column: 2, row: 1)
+    dispatchHover(to: runtime, column: 3, row: 1)
+
+    #expect(hoverProbe.events == ["enter", "exit"])
+}
+
+@Test func hoverGestureStateMutationInvalidatesView() {
+    let runtime = StateRuntime()
+    let view = HoverGestureStateMutationView()
+
+    #expect(runtime.block(from: view)?.text == "false:0")
+
+    dispatchHover(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "true:1")
+
+    dispatchHover(to: runtime, column: 10, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "false:1")
+}
+
+@Test func parentCallbackDirectStateMutationFromChildHoverUpdatesRenderedState() {
+    let runtime = StateRuntime()
+    let view = ParentCallbackDirectStateMutationHoverView()
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Hover", "empty"])
+
+    dispatchHover(to: runtime, column: 1, row: 1)
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Hover", "updated"])
 }
 
 @Test func tapGestureHitTestingUsesStackCoordinates() {
@@ -9355,6 +9542,21 @@ private final class TapGestureProbe {
     }
 }
 
+private final class HoverProbe {
+
+    var events: [String] = []
+
+    var phases: [HoverPhase] = []
+
+    func record(_ event: String) {
+        events.append(event)
+    }
+
+    func record(_ phase: HoverPhase) {
+        phases.append(phase)
+    }
+}
+
 private struct TapLocationEvent: Equatable {
 
     var name: String
@@ -10522,6 +10724,20 @@ private func dispatchWheel(
     )
 }
 
+private func dispatchHover(
+    to runtime: StateRuntime,
+    column: Int,
+    row: Int,
+    button: MouseButton = .other(3),
+    expecting result: KeyPress.Result = .handled
+) {
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: button, column: column, row: row, phase: .motion)
+        ) == result
+    )
+}
+
 private enum FocusField: Hashable {
 
     case first
@@ -11394,6 +11610,25 @@ private struct LongPressGestureStateMutationView: View {
     }
 }
 
+private struct HoverGestureStateMutationView: View {
+
+    @State private var isHovering = false
+
+    @State private var count = 0
+
+    var body: some View {
+        Text("\(isHovering):\(count)")
+            .onHover {
+                isHovering = $0
+            }
+            .onContinuousHover { phase in
+                if case .active = phase {
+                    count += 1
+                }
+            }
+    }
+}
+
 private struct ParentCallbackDirectStateMutationTapView: View {
 
     @State private var message = ""
@@ -11422,6 +11657,20 @@ private struct ParentCallbackDirectStateMutationLongPressView: View {
     }
 }
 
+private struct ParentCallbackDirectStateMutationHoverView: View {
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackHoverChildView {
+                message = "updated"
+            }
+            Text(message.isEmpty ? "empty" : message)
+        }
+    }
+}
+
 private struct ParentCallbackTapChildView: View {
 
     let action: () -> Void
@@ -11442,6 +11691,20 @@ private struct ParentCallbackLongPressChildView: View {
         Text("Press")
             .onLongPressGesture(minimumDuration: 0.1) {
                 action()
+            }
+    }
+}
+
+private struct ParentCallbackHoverChildView: View {
+
+    let action: () -> Void
+
+    var body: some View {
+        Text("Hover")
+            .onHover { isHovering in
+                if isHovering {
+                    action()
+                }
             }
     }
 }
@@ -12303,6 +12566,12 @@ private struct CapturedDisabledInputModifiersText: View {
             }
             .onTapGesture {
                 tapProbe.record("tap")
+            }
+            .onHover { _ in
+                tapProbe.record("hover")
+            }
+            .onContinuousHover { _ in
+                tapProbe.record("continuous-hover")
             }
     }
 }

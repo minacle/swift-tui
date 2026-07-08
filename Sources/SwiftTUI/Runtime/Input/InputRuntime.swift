@@ -222,6 +222,48 @@ struct LongPressGestureView<Content: View>: View, InputModifierRenderable,
     }
 }
 
+struct HoverGestureView<Content: View>: View, InputModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let handler: HoverGestureHandler
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        runtime?.registerHoverGestureHandler(handler, at: path)
+        guard var block = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+}
+
 struct CoordinateSpaceView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
 
     typealias Body = Never
@@ -302,6 +344,13 @@ struct LongPressGestureHandler {
     let onPressingChanged: ((Bool) -> Void)?
 }
 
+struct HoverGestureHandler {
+
+    let actionPath: [Int]?
+
+    let action: HoverGestureAction
+}
+
 enum TapGestureAction {
 
     case plain(() -> Void)
@@ -314,6 +363,31 @@ enum TapGestureAction {
             action()
         case .location(_, let action):
             action(location)
+        }
+    }
+}
+
+enum HoverGestureAction {
+
+    case state((Bool) -> Void)
+
+    case phase(CoordinateSpace, (HoverPhase) -> Void)
+
+    func performEnterOrMove(at location: Point) {
+        switch self {
+        case .state(let action):
+            action(true)
+        case .phase(_, let action):
+            action(.active(location))
+        }
+    }
+
+    func performExit() {
+        switch self {
+        case .state(let action):
+            action(false)
+        case .phase(_, let action):
+            action(.ended)
         }
     }
 }
@@ -366,6 +440,8 @@ final class InputRuntime {
 
     private var longPressHandlersByPath: [[Int]: [LongPressGestureHandler]] = [:]
 
+    private var hoverHandlersByPath: [[Int]: [HoverGestureHandler]] = [:]
+
     private var linkHandlersByPath: [[Int]: LinkHandler] = [:]
 
     private var mouseDownPositionHandlersByPath: [[Int]: MouseDownPositionHandler] = [:]
@@ -388,6 +464,8 @@ final class InputRuntime {
 
     private var longPressSequence: LongPressSequence?
 
+    private var activeHoverPaths: Set<[Int]> = []
+
     private let tapTimeout: TimeInterval = 0.5
 
     var nextTapDeadline: Date? {
@@ -403,6 +481,7 @@ final class InputRuntime {
         globalHandlers = []
         tapHandlersByPath = [:]
         longPressHandlersByPath = [:]
+        hoverHandlersByPath = [:]
         linkHandlersByPath = [:]
         mouseDownPositionHandlersByPath = [:]
     }
@@ -427,6 +506,10 @@ final class InputRuntime {
 
     func register(_ handler: LongPressGestureHandler, at path: [Int]) {
         longPressHandlersByPath[path, default: []].append(handler)
+    }
+
+    func register(_ handler: HoverGestureHandler, at path: [Int]) {
+        hoverHandlersByPath[path, default: []].append(handler)
     }
 
     func register(_ handler: LinkHandler, at path: [Int]) {
@@ -530,6 +613,21 @@ final class InputRuntime {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
 
+        if mouseEvent.phase == .motion {
+            let hoverResult = dispatchHoverMotion(mouseEvent, perform: perform)
+            guard mouseEvent.button == .left else {
+                let cancelled = cancelLongPress(perform: perform)
+                pressedTapTarget = nil
+                pressedLinkTarget = nil
+                return hoverResult == .handled || cancelled ? .handled : .ignored
+            }
+
+            let longPressResult = dispatchLongPressMotion(mouseEvent, perform: perform)
+            return hoverResult == .handled
+                || longPressResult == .handled
+                ? .handled : .ignored
+        }
+
         if mouseEvent.button.isScrollWheel {
             let cancelled = cancelLongPress(perform: perform)
             pressedTapTarget = nil
@@ -575,10 +673,7 @@ final class InputRuntime {
                 || longPressRecognized
                 ? .handled : .ignored
         case .motion:
-            return dispatchLongPressMotion(
-                mouseEvent,
-                perform: perform
-            )
+            return .ignored
         case .up:
             let longPressWasActive = longPressSequence != nil
             let longPressSucceeded = endLongPress(perform: perform)
@@ -737,6 +832,41 @@ final class InputRuntime {
         return handled || !remaining.isEmpty ? .handled : .ignored
     }
 
+    private func dispatchHoverMotion(
+        _ mouseEvent: MouseEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> KeyPress.Result {
+        let rootPoint = rootPoint(for: mouseEvent)
+        let targets = hoverTargets(at: mouseEvent)
+        let targetPaths = Set(targets.map(\.path))
+        let exitedPaths = activeHoverPaths.subtracting(targetPaths)
+        var handled = false
+
+        for path in exitedPaths.sorted(by: pathPrecedes) {
+            performHoverExit(at: path, perform: perform)
+            handled = true
+        }
+
+        for target in targets {
+            let didEnter = activeHoverPaths.insert(target.path).inserted
+            if didEnter {
+                performHoverEnter(at: target.path, rootPoint: rootPoint, perform: perform)
+                handled = true
+            }
+            else {
+                performContinuousHoverMove(
+                    at: target.path,
+                    rootPoint: rootPoint,
+                    perform: perform
+                )
+                handled = true
+            }
+        }
+
+        activeHoverPaths.subtract(exitedPaths)
+        return handled ? .handled : .ignored
+    }
+
     private func cancelLongPress(perform: ([Int], () -> Void) -> Void) -> Bool {
         guard let sequence = longPressSequence else {
             return false
@@ -820,6 +950,40 @@ final class InputRuntime {
                 return $0.frame.area > $1.frame.area
             }?
             .path
+    }
+
+    private func hoverTargets(at mouseEvent: MouseEvent) -> [RenderedHitRegion] {
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        var paths: Set<[Int]> = []
+        return hitRegions
+            .filter {
+                hoverHandlersByPath[$0.path] != nil
+                    && $0.frame.contains(column: column, row: row)
+            }
+            .sorted(by: hitRegionPrecedes)
+            .filter {
+                paths.insert($0.path).inserted
+            }
+    }
+
+    private func hitRegionPrecedes(
+        _ lhs: RenderedHitRegion,
+        _ rhs: RenderedHitRegion
+    ) -> Bool {
+        if lhs.path.count != rhs.path.count {
+            return lhs.path.count < rhs.path.count
+        }
+
+        return lhs.frame.area > rhs.frame.area
+    }
+
+    private func pathPrecedes(_ lhs: [Int], _ rhs: [Int]) -> Bool {
+        if lhs.count != rhs.count {
+            return lhs.count > rhs.count
+        }
+
+        return lhs.lexicographicallyPrecedes(rhs)
     }
 
     private func focusTargets(at mouseEvent: MouseEvent) -> [[Int]] {
@@ -1005,6 +1169,44 @@ final class InputRuntime {
         }
     }
 
+    private func performHoverEnter(
+        at path: [Int],
+        rootPoint: Point,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        for handler in hoverHandlersByPath[path] ?? [] {
+            let location = location(for: handler.action, path: path, rootPoint: rootPoint)
+            perform(handler.actionPath ?? path) {
+                handler.action.performEnterOrMove(at: location)
+            }
+        }
+    }
+
+    private func performContinuousHoverMove(
+        at path: [Int],
+        rootPoint: Point,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        for handler in hoverHandlersByPath[path] ?? []
+            where handler.action.isContinuous {
+            let location = location(for: handler.action, path: path, rootPoint: rootPoint)
+            perform(handler.actionPath ?? path) {
+                handler.action.performEnterOrMove(at: location)
+            }
+        }
+    }
+
+    private func performHoverExit(
+        at path: [Int],
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        for handler in hoverHandlersByPath[path] ?? [] {
+            perform(handler.actionPath ?? path) {
+                handler.action.performExit()
+            }
+        }
+    }
+
     private func rootPoint(for mouseEvent: MouseEvent) -> Point {
         Point(
             column: mouseEvent.column - rootFrame.column,
@@ -1021,6 +1223,19 @@ final class InputRuntime {
         case .plain:
             return rootPoint
         case .location(let coordinateSpace, _):
+            return location(in: coordinateSpace, path: path, rootPoint: rootPoint)
+        }
+    }
+
+    private func location(
+        for action: HoverGestureAction,
+        path: [Int],
+        rootPoint: Point
+    ) -> Point {
+        switch action {
+        case .state:
+            return rootPoint
+        case .phase(let coordinateSpace, _):
             return location(in: coordinateSpace, path: path, rootPoint: rootPoint)
         }
     }
@@ -1110,6 +1325,18 @@ private extension MouseButton {
             return true
         default:
             return false
+        }
+    }
+}
+
+private extension HoverGestureAction {
+
+    var isContinuous: Bool {
+        switch self {
+        case .state:
+            return false
+        case .phase:
+            return true
         }
     }
 }

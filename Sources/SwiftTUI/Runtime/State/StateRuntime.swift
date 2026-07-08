@@ -350,6 +350,21 @@ final class StateRuntime {
         )
     }
 
+    func registerHoverGestureHandler(
+        _ handler: HoverGestureHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringHoverGestureHandler(handler),
+            at: path
+        )
+    }
+
     func registerMouseDownPositionHandler(
         _ handler: MouseDownPositionHandler,
         at path: [Int]
@@ -839,6 +854,16 @@ final class StateRuntime {
         )
     }
 
+    private func environmentRestoringHoverGestureHandler(
+        _ handler: HoverGestureHandler
+    ) -> HoverGestureHandler {
+        let environment = EnvironmentRenderContext.current
+        return HoverGestureHandler(
+            actionPath: handler.actionPath,
+            action: handler.action.restoringEnvironment(environment)
+        )
+    }
+
     private func environmentRestoringMouseDownPositionHandler(
         _ handler: MouseDownPositionHandler
     ) -> MouseDownPositionHandler {
@@ -1301,6 +1326,26 @@ private extension TapGestureAction {
             return .location(coordinateSpace) { location in
                 EnvironmentRenderContext.withValues(environment) {
                     action(location)
+                }
+            }
+        }
+    }
+}
+
+private extension HoverGestureAction {
+
+    func restoringEnvironment(_ environment: EnvironmentValues) -> HoverGestureAction {
+        switch self {
+        case .state(let action):
+            return .state { isHovering in
+                EnvironmentRenderContext.withValues(environment) {
+                    action(isHovering)
+                }
+            }
+        case .phase(let coordinateSpace, let action):
+            return .phase(coordinateSpace) { phase in
+                EnvironmentRenderContext.withValues(environment) {
+                    action(phase)
                 }
             }
         }
