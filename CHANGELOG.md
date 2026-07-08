@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-08
+
 ### Changed
 
 - Pinned the `swift-terminal` dependency to version `0.0.1`.
@@ -165,7 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/minacle/swift-tui/releases/tag/v0.4.1
 [0.4.0]: https://github.com/minacle/swift-tui/releases/tag/v0.4.0
 [0.3.0]: https://github.com/minacle/swift-tui/releases/tag/v0.3.0
 [0.2.0]: https://github.com/minacle/swift-tui/releases/tag/v0.2.0
