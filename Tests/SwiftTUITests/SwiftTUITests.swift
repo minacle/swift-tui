@@ -7606,11 +7606,31 @@ private struct ParentCallbackStateMutationTests {
     _ = runtime.block(from: view)
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a", phase: .repeat)) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a", phase: .up)) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b", phase: .repeat)) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "c", characters: "c", phase: .repeat)) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "d", characters: "d", phase: .repeat)) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "5", characters: "5")) == .handled)
-    #expect(runtime.dispatch(KeyPress(key: "z", characters: "z", phase: .up)) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "5", characters: "5", phase: .repeat)) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "5", characters: "")) == .ignored)
+    #expect(runtime.dispatch(KeyPress(key: "q", characters: "q", phase: .up)) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "z", characters: "z")) == .ignored)
-    #expect(keyProbe.events == ["exact", "set", "characters", "phase"])
+    #expect(
+        keyProbe.events == [
+            "plain",
+            "plain",
+            "phase",
+            "exact",
+            "exact",
+            "set",
+            "set",
+            "characters",
+            "phase",
+        ]
+    )
 }
 
 @Test func globalKeyPressReceivesEventsWithoutFocus() {
@@ -12919,20 +12939,24 @@ private struct CapturedKeyPressOverloadText: View {
         Text("A")
             .focusable()
             .focused(focusBinding)
-            .onKeyPress("a", phases: [.down, .repeat]) { _ in
+            .onKeyPress(phases: .up) { _ in
+                keyProbe.record("phase")
+                return .handled
+            }
+            .onKeyPress("a") {
+                keyProbe.record("plain")
+                return .handled
+            }
+            .onKeyPress("b", phases: [.down, .repeat]) { _ in
                 keyProbe.record("exact")
                 return .handled
             }
-            .onKeyPress(keys: ["b", "c"]) { _ in
+            .onKeyPress(keys: ["c", "d"], phases: .repeat) { _ in
                 keyProbe.record("set")
                 return .handled
             }
-            .onKeyPress(characters: .decimalDigits) { _ in
+            .onKeyPress(characters: .decimalDigits, phases: .down) { _ in
                 keyProbe.record("characters")
-                return .handled
-            }
-            .onKeyPress(phases: .up) { _ in
-                keyProbe.record("phase")
                 return .handled
             }
     }

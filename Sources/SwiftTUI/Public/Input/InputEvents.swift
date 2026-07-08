@@ -40,7 +40,7 @@ public nonisolated struct CoordinateSpace: Equatable, Hashable, Sendable {
 }
 
 /// A set of key modifiers that can accompany an input event.
-public struct EventModifiers: OptionSet, Sendable {
+public nonisolated struct EventModifiers: OptionSet, Sendable {
 
     /// The raw option-set storage value.
     public let rawValue: Int
@@ -84,7 +84,7 @@ public struct EventModifiers: OptionSet, Sendable {
 /// `KeyEquivalent` stores a single character. Special keys use Unicode scalar
 /// values from the private-use/control ranges used by SwiftTUI's terminal input
 /// parser.
-public struct KeyEquivalent: Equatable, Hashable, Sendable,
+public nonisolated struct KeyEquivalent: Equatable, Hashable, Sendable,
     ExpressibleByExtendedGraphemeClusterLiteral,
     ExpressibleByStringLiteral,
     ExpressibleByUnicodeScalarLiteral
@@ -168,10 +168,10 @@ public struct KeyEquivalent: Equatable, Hashable, Sendable,
 }
 
 /// A hardware keyboard event delivered to a focused view.
-public struct KeyPress: Equatable, Sendable {
+public nonisolated struct KeyPress: Equatable, Sendable {
 
     /// Options for matching different phases of a key-press event.
-    public struct Phases: OptionSet, Sendable {
+    public nonisolated struct Phases: OptionSet, Sendable {
 
         /// The raw option-set storage value.
         public let rawValue: Int
@@ -195,7 +195,7 @@ public struct KeyPress: Equatable, Sendable {
     }
 
     /// A result value that indicates whether an action consumed the event.
-    public enum Result: Equatable, Hashable, Sendable {
+    public nonisolated enum Result: Equatable, Hashable, Sendable {
 
         /// The handler consumed the event and propagation should stop.
         case handled
@@ -392,7 +392,7 @@ public extension View {
     ///   - key: The key to match.
     ///   - action: The action to perform for matching key-down or repeat events.
     /// - Returns: A view with a focused key handler attached.
-    func onKeyPress(
+    nonisolated func onKeyPress(
         _ key: KeyEquivalent,
         action: @escaping () -> KeyPress.Result
     ) -> some View {
@@ -409,7 +409,7 @@ public extension View {
     ///   - phases: The key phases to match.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    func onKeyPress(
+    nonisolated func onKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
     ) -> some View {
@@ -432,7 +432,7 @@ public extension View {
     ///   - phases: The key phases to match.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    func onKeyPress(
+    nonisolated func onKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -447,7 +447,7 @@ public extension View {
     ///   - phases: The key phases to match.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    func onKeyPress(
+    nonisolated func onKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -472,7 +472,7 @@ public extension View {
     ///   - phases: The key phases to match.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    func onKeyPress(
+    nonisolated func onKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result

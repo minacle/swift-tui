@@ -56,7 +56,7 @@ struct MouseEvent: Equatable, Sendable {
     }
 }
 
-struct KeyPressView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
+nonisolated struct KeyPressView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
 
     typealias Body = Never
 
@@ -97,7 +97,7 @@ struct KeyPressView<Content: View>: View, InputModifierRenderable, LayoutTraitRe
     }
 }
 
-struct GlobalKeyPressView<Content: View>: View, InputModifierRenderable,
+nonisolated struct GlobalKeyPressView<Content: View>: View, InputModifierRenderable,
     LayoutTraitRenderable
 {
 
@@ -313,7 +313,7 @@ struct CoordinateSpaceView<Content: View>: View, InputModifierRenderable, Layout
     }
 }
 
-struct KeyPressHandler {
+nonisolated struct KeyPressHandler {
 
     let actionPath: [Int]?
 
