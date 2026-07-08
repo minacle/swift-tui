@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import Testing
-import Terminal
 @testable import SwiftTUI
 
 nonisolated struct CustomShapeStyle: Color, ShapeStyle {

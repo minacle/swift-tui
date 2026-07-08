@@ -13,18 +13,6 @@ public typealias Color = Terminal.SGR.Color
 public protocol ShapeStyle: Sendable {
 }
 
-/// A 16-color terminal SGR color.
-public typealias Color16 = Terminal.SGR.Color16
-
-/// A 256-color terminal SGR color.
-public typealias Color256 = Terminal.SGR.Color256
-
-/// A true-color terminal SGR color.
-public typealias TrueColor = Terminal.SGR.TrueColor
-
-/// A type-erased terminal SGR color used for SwiftTUI text style storage.
-public typealias AnyColor = Terminal.SGR.AnyColor
-
 extension Color16: ShapeStyle {
 }
 

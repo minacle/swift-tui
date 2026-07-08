@@ -1,5 +1,4 @@
 import Testing
-import Terminal
 @testable import SwiftTUI
 
 @Suite("AnyView")
