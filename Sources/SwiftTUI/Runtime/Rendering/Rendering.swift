@@ -811,6 +811,8 @@ private nonisolated struct CompositedCell: Equatable {
             }
         }
 
+        let cell = cell.inheritingBackground(from: overlappedCells)
+
         for overlappedCell in overlappedCells {
             for column in overlappedCell.column..<(overlappedCell.column + overlappedCell.width) {
                 cellsByColumn[column] = nil
@@ -821,6 +823,17 @@ private nonisolated struct CompositedCell: Equatable {
             cellsByColumn[column] = cell
         }
         rows[cell.row] = cellsByColumn
+    }
+
+    private func inheritingBackground(from cells: [CompositedCell]) -> CompositedCell {
+        guard style.backgroundStyle == nil,
+              let backgroundStyle = cells.lazy.compactMap(\.style.backgroundStyle).first else {
+            return self
+        }
+
+        var cell = self
+        cell.style.backgroundStyle = backgroundStyle
+        return cell
     }
 
     private static func uniqueCells(

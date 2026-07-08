@@ -52,9 +52,69 @@ import Testing
     )
 
     #expect(block?.runs == [
-        RenderedRun(text: " C"),
+        RenderedRun(
+            text: " C",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+        ),
     ])
     #expect(block?.lines == [" C"])
+}
+
+@Test func zStackCarriesBackgroundForwardToPlainOverlappingText() {
+    let block = ViewResolver.block(
+        from: ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(.red)
+                .frame(width: 1, height: 1)
+            Text("A")
+        }
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
+}
+
+@Test func zStackExplicitDefaultBackgroundBlocksInheritedBackground() {
+    let block = ViewResolver.block(
+        from: ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(.red)
+                .frame(width: 1, height: 1)
+            Text("A")
+                .backgroundStyle(.default)
+        }
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(DefaultColor.default))
+        ),
+    ])
+}
+
+@Test func zStackMiddleDefaultBackgroundBlocksDeeperBackground() {
+    let block = ViewResolver.block(
+        from: ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(.red)
+                .frame(width: 1, height: 1)
+            Text("A")
+                .backgroundStyle(.default)
+            Text("B")
+        }
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "B",
+            style: TextStyle(backgroundStyle: AnyColor(DefaultColor.default))
+        ),
+    ])
 }
 
 @Test func zStackUsesZIndexBeforeSourceOrder() {
@@ -128,6 +188,24 @@ import Testing
     )
 
     #expect(block?.lines == ["C"])
+}
+
+@Test func overlayCarriesBackgroundForwardToPlainText() {
+    let block = ViewResolver.block(
+        from: Rectangle()
+            .fill(.red)
+            .frame(width: 1, height: 1)
+            .overlay {
+                Text("A")
+            }
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "A",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.red))
+        ),
+    ])
 }
 
 @Test func customLayoutUsesZIndexForOverlappingPlacements() {

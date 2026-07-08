@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `HoverPhase` for terminal mouse hover handling.
 - Added click-and-drag-to-caret placement for `TextField`, `SecureField`,
   and `TextEditor`.
+- Changed Z-axis compositing so lower-layer background colors remain visible
+  through overlapping cells that do not set their own background style.
 
 ## [0.4.2] - 2026-07-08
 
