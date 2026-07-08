@@ -1,4 +1,5 @@
 import Foundation
+import Terminal
 
 enum MouseButton: Equatable, Hashable, Sendable {
 
@@ -177,6 +178,55 @@ struct TapGestureView<Content: View>: View, InputModifierRenderable, LayoutTrait
     }
 }
 
+struct CoordinateSpaceView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
+
+    typealias Body = Never
+
+    let content: Content
+
+    let coordinateSpace: CoordinateSpace
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        guard var block = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        if runtime?.isSuppressingInteractiveRenderRegistrations != true,
+           EnvironmentRenderContext.current.isEnabled,
+           let name = coordinateSpace.name {
+            block.coordinateSpaceRegions.append(
+                RenderedCoordinateSpaceRegion(
+                    name: name,
+                    path: path,
+                    frame: block.bounds
+                )
+            )
+        }
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+}
+
 struct KeyPressHandler {
 
     let actionPath: [Int]?
@@ -192,7 +242,23 @@ struct TapGestureHandler {
 
     let count: Int
 
-    let action: () -> Void
+    let action: TapGestureAction
+}
+
+enum TapGestureAction {
+
+    case plain(() -> Void)
+
+    case location(CoordinateSpace, (Point) -> Void)
+
+    func perform(at location: Point) {
+        switch self {
+        case .plain(let action):
+            action()
+        case .location(_, let action):
+            action(location)
+        }
+    }
 }
 
 struct LinkHandler {
@@ -241,6 +307,8 @@ final class InputRuntime {
     private var scrollRegions: [RenderedScrollRegion] = []
 
     private var focusRegions: [RenderedFocusRegion] = []
+
+    private var coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
 
     private var rootFrame = TextFrame(text: "", row: 1, column: 1)
 
@@ -295,6 +363,10 @@ final class InputRuntime {
 
     func updateFocusRegions(_ focusRegions: [RenderedFocusRegion]) {
         self.focusRegions = focusRegions
+    }
+
+    func updateCoordinateSpaceRegions(_ coordinateSpaceRegions: [RenderedCoordinateSpaceRegion]) {
+        self.coordinateSpaceRegions = coordinateSpaceRegions
     }
 
     func updateRootFrame(_ frame: TextFrame) {
@@ -421,7 +493,12 @@ final class InputRuntime {
                 return .ignored
             }
 
-            return dispatchTap(at: pressedTapTarget, date: date, perform: perform)
+            return dispatchTap(
+                at: pressedTapTarget,
+                location: rootPoint(for: mouseEvent),
+                date: date,
+                perform: perform
+            )
         }
     }
 
@@ -442,7 +519,12 @@ final class InputRuntime {
             return .ignored
         }
 
-        performTapActions(at: sequence.path, count: count, perform: perform)
+        performTapActions(
+            at: sequence.path,
+            count: count,
+            rootPoint: sequence.location,
+            perform: perform
+        )
         return .handled
     }
 
@@ -535,6 +617,7 @@ final class InputRuntime {
 
     private func dispatchTap(
         at path: [Int],
+        location: Point,
         date: Date,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
@@ -549,6 +632,7 @@ final class InputRuntime {
         }
 
         tapSequence?.count += 1
+        tapSequence?.location = location
         tapSequence?.deadline = date.addingTimeInterval(tapTimeout)
 
         guard let sequence = tapSequence else {
@@ -557,7 +641,12 @@ final class InputRuntime {
 
         if handlers.contains(where: { $0.count == sequence.count }) {
             if sequence.count >= maximumCount {
-                performTapActions(at: path, count: sequence.count, perform: perform)
+                performTapActions(
+                    at: path,
+                    count: sequence.count,
+                    rootPoint: location,
+                    perform: perform
+                )
                 resetTapSequence()
             }
             else {
@@ -594,11 +683,96 @@ final class InputRuntime {
     private func performTapActions(
         at path: [Int],
         count: Int,
+        rootPoint: Point,
         perform: ([Int], () -> Void) -> Void
     ) {
         for handler in tapHandlersByPath[path] ?? [] where handler.count == count {
-            perform(handler.actionPath ?? path, handler.action)
+            let location = location(for: handler.action, path: path, rootPoint: rootPoint)
+            perform(handler.actionPath ?? path) {
+                handler.action.perform(at: location)
+            }
         }
+    }
+
+    private func rootPoint(for mouseEvent: MouseEvent) -> Point {
+        Point(
+            column: mouseEvent.column - rootFrame.column,
+            row: mouseEvent.row - rootFrame.row
+        )
+    }
+
+    private func location(
+        for action: TapGestureAction,
+        path: [Int],
+        rootPoint: Point
+    ) -> Point {
+        switch action {
+        case .plain:
+            return rootPoint
+        case .location(let coordinateSpace, _):
+            return location(in: coordinateSpace, path: path, rootPoint: rootPoint)
+        }
+    }
+
+    private func location(
+        in coordinateSpace: CoordinateSpace,
+        path: [Int],
+        rootPoint: Point
+    ) -> Point {
+        switch coordinateSpace.storage {
+        case .local:
+            let frame = hitRegion(at: path, containing: rootPoint)?.frame
+                ?? RenderedRect()
+            return Point(column: rootPoint.column - frame.x, row: rootPoint.row - frame.y)
+        case .global:
+            return rootPoint
+        case .named(let name):
+            guard let region = coordinateSpaceRegion(
+                named: name,
+                containing: path
+            ) else {
+                preconditionFailure("No coordinate space named \(name) is registered.")
+            }
+            return Point(
+                column: rootPoint.column - region.frame.x,
+                row: rootPoint.row - region.frame.y
+            )
+        }
+    }
+
+    private func hitRegion(at path: [Int], containing point: Point) -> RenderedHitRegion? {
+        hitRegions
+            .filter {
+                $0.path == path
+                    && $0.frame.contains(column: point.column, row: point.row)
+            }
+            .max {
+                $0.frame.area > $1.frame.area
+            }
+    }
+
+    private func coordinateSpaceRegion(
+        named name: AnyHashable,
+        containing path: [Int]
+    ) -> RenderedCoordinateSpaceRegion? {
+        coordinateSpaceRegions
+            .filter {
+                $0.name == name && isPrefix($0.path, of: path)
+            }
+            .max {
+                if $0.path.count != $1.path.count {
+                    return $0.path.count < $1.path.count
+                }
+                return $0.frame.area > $1.frame.area
+            }
+    }
+
+    private func isPrefix(_ prefix: [Int], of path: [Int]) -> Bool {
+        guard prefix.count <= path.count else {
+            return false
+        }
+
+        return zip(prefix, path).allSatisfy(==)
     }
 
     private func resetTapSequence() {
@@ -623,6 +797,8 @@ private struct TapSequence {
     let path: [Int]
 
     var count = 0
+
+    var location = Point.zero
 
     var deadline = Date.distantPast
 

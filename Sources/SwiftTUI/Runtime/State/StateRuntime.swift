@@ -90,6 +90,7 @@ final class StateRuntime {
         input.updateHitRegions(block?.hitRegions ?? [])
         input.updateScrollRegions(block?.scrollRegions ?? [])
         input.updateFocusRegions(block?.focusRegions ?? [])
+        input.updateCoordinateSpaceRegions(block?.coordinateSpaceRegions ?? [])
         return block
     }
 
@@ -769,11 +770,7 @@ final class StateRuntime {
         return TapGestureHandler(
             actionPath: handler.actionPath,
             count: handler.count,
-            action: {
-                EnvironmentRenderContext.withValues(environment) {
-                    handler.action()
-                }
-            }
+            action: handler.action.restoringEnvironment(environment)
         )
     }
 
@@ -1208,6 +1205,26 @@ extension Optional: OptionalFocusValue {
 
     fileprivate static var nilValue: Any {
         Self.none as Any
+    }
+}
+
+private extension TapGestureAction {
+
+    func restoringEnvironment(_ environment: EnvironmentValues) -> TapGestureAction {
+        switch self {
+        case .plain(let action):
+            return .plain {
+                EnvironmentRenderContext.withValues(environment) {
+                    action()
+                }
+            }
+        case .location(let coordinateSpace, let action):
+            return .location(coordinateSpace) { location in
+                EnvironmentRenderContext.withValues(environment) {
+                    action(location)
+                }
+            }
+        }
     }
 }
 

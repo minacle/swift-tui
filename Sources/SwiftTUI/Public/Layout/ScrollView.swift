@@ -643,6 +643,13 @@ enum ScrollViewRenderer {
                     y: clampedY,
                     width: width,
                     height: height
+                ),
+                coordinateSpaceRegions: coordinateSpaceRegions(
+                    from: content.coordinateSpaceRegions,
+                    x: clampedX,
+                    y: clampedY,
+                    width: width,
+                    height: height
                 )
             ),
             point: ScrollPoint(x: clampedX, y: clampedY),
@@ -731,6 +738,19 @@ enum ScrollViewRenderer {
         width: Int,
         height: Int
     ) -> [RenderedIdentifiedRegion] {
+        let bounds = RenderedRect(width: width, height: height)
+        return regions.compactMap {
+            $0.offsetBy(x: -x, y: -y).clipped(to: bounds)
+        }
+    }
+
+    private static func coordinateSpaceRegions(
+        from regions: [RenderedCoordinateSpaceRegion],
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int
+    ) -> [RenderedCoordinateSpaceRegion] {
         let bounds = RenderedRect(width: width, height: height)
         return regions.compactMap {
             $0.offsetBy(x: -x, y: -y).clipped(to: bounds)

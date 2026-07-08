@@ -146,6 +146,11 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
                 block.focusRegions,
                 width: targetWidth,
                 height: targetHeight
+            ),
+            coordinateSpaceRegions: frameCoordinateSpaceRegions(
+                block.coordinateSpaceRegions,
+                width: targetWidth,
+                height: targetHeight
             )
         )
     }
@@ -198,6 +203,17 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
     ) -> [RenderedFocusRegion] {
         let bounds = RenderedRect(width: width, height: height)
         return focusRegions.compactMap {
+            $0.clipped(to: bounds)
+        }
+    }
+
+    private func frameCoordinateSpaceRegions(
+        _ coordinateSpaceRegions: [RenderedCoordinateSpaceRegion],
+        width: Int,
+        height: Int
+    ) -> [RenderedCoordinateSpaceRegion] {
+        let bounds = RenderedRect(width: width, height: height)
+        return coordinateSpaceRegions.compactMap {
             $0.clipped(to: bounds)
         }
     }

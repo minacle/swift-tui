@@ -277,6 +277,29 @@ nonisolated struct RenderedIdentifiedRegion: Equatable, @unchecked Sendable {
     }
 }
 
+nonisolated struct RenderedCoordinateSpaceRegion: Equatable, @unchecked Sendable {
+
+    var name: AnyHashable
+
+    var path: [Int]
+
+    var frame: RenderedRect
+
+    func offsetBy(x: Int, y: Int) -> RenderedCoordinateSpaceRegion {
+        RenderedCoordinateSpaceRegion(
+            name: name,
+            path: path,
+            frame: frame.offsetBy(x: x, y: y)
+        )
+    }
+
+    func clipped(to bounds: RenderedRect) -> RenderedCoordinateSpaceRegion? {
+        frame.clipped(to: bounds).map {
+            RenderedCoordinateSpaceRegion(name: name, path: path, frame: $0)
+        }
+    }
+}
+
 nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var runs: [RenderedRun]
@@ -298,6 +321,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var identifiedRegions: [RenderedIdentifiedRegion]
 
+    var coordinateSpaceRegions: [RenderedCoordinateSpaceRegion]
+
     init(
         lines: [String],
         style: TextStyle = .plain,
@@ -305,7 +330,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
-        identifiedRegions: [RenderedIdentifiedRegion] = []
+        identifiedRegions: [RenderedIdentifiedRegion] = [],
+        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
     ) {
         let minimumWidth = lines.map(TerminalText.columnWidth).max() ?? 0
         self.runs = lines.enumerated().compactMap { row, line in
@@ -323,6 +349,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
         self.identifiedRegions = identifiedRegions
+        self.coordinateSpaceRegions = coordinateSpaceRegions
     }
 
     init(
@@ -334,7 +361,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
-        identifiedRegions: [RenderedIdentifiedRegion] = []
+        identifiedRegions: [RenderedIdentifiedRegion] = [],
+        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
     ) {
         self.runs = runs.filter { !$0.isEmpty }
         self.minimumWidth = max(width ?? 0, 0)
@@ -345,6 +373,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
         self.identifiedRegions = identifiedRegions
+        self.coordinateSpaceRegions = coordinateSpaceRegions
     }
 
     var lines: [String] {
@@ -436,6 +465,12 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 y: y,
                 width: targetWidth,
                 height: targetHeight
+            ),
+            coordinateSpaceRegions: framedCoordinateSpaceRegions(
+                x: x,
+                y: y,
+                width: targetWidth,
+                height: targetHeight
             )
         )
     }
@@ -465,6 +500,9 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             },
             identifiedRegions: identifiedRegions.map {
                 $0.offsetBy(x: insets.leading, y: insets.top)
+            },
+            coordinateSpaceRegions: coordinateSpaceRegions.map {
+                $0.offsetBy(x: insets.leading, y: insets.top)
             }
         )
     }
@@ -492,6 +530,9 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             },
             identifiedRegions: identifiedRegions.compactMap {
+                $0.offsetBy(x: x, y: y).clipped(to: bounds)
+            },
+            coordinateSpaceRegions: coordinateSpaceRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             }
         )
@@ -537,7 +578,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             hitRegions: blocks.reversed().flatMap(\.hitRegions),
             scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
             focusRegions: blocks.reversed().flatMap(\.focusRegions),
-            identifiedRegions: blocks.reversed().flatMap(\.identifiedRegions)
+            identifiedRegions: blocks.reversed().flatMap(\.identifiedRegions),
+            coordinateSpaceRegions: blocks.reversed().flatMap(\.coordinateSpaceRegions)
         )
     }
 
@@ -627,6 +669,18 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     ) -> [RenderedIdentifiedRegion] {
         let bounds = RenderedRect(width: targetWidth, height: targetHeight)
         return identifiedRegions.compactMap {
+            $0.offsetBy(x: x, y: y).clipped(to: bounds)
+        }
+    }
+
+    private func framedCoordinateSpaceRegions(
+        x: Int,
+        y: Int,
+        width targetWidth: Int,
+        height targetHeight: Int
+    ) -> [RenderedCoordinateSpaceRegion] {
+        let bounds = RenderedRect(width: targetWidth, height: targetHeight)
+        return coordinateSpaceRegions.compactMap {
             $0.offsetBy(x: x, y: y).clipped(to: bounds)
         }
     }
@@ -2447,6 +2501,12 @@ enum StackRenderer {
                 height: height,
                 alignment: alignment
             )
+                .compactMap { $0.clipped(to: bounds) },
+            coordinateSpaceRegions: horizontalCoordinateSpaceRegions(
+                from: items,
+                height: height,
+                alignment: alignment
+            )
                 .compactMap { $0.clipped(to: bounds) }
         )
     }
@@ -2504,6 +2564,12 @@ enum StackRenderer {
             focusRegions: verticalFocusRegions(from: items, width: width, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             identifiedRegions: verticalIdentifiedRegions(
+                from: items,
+                width: width,
+                alignment: alignment
+            )
+                .compactMap { $0.clipped(to: bounds) },
+            coordinateSpaceRegions: verticalCoordinateSpaceRegions(
                 from: items,
                 width: width,
                 alignment: alignment
@@ -2956,6 +3022,27 @@ enum StackRenderer {
         }
     }
 
+    private static func horizontalCoordinateSpaceRegions(
+        from items: [HorizontalItem],
+        height: Int,
+        alignment: VerticalAlignment
+    ) -> [RenderedCoordinateSpaceRegion] {
+        items.flatMap { item -> [RenderedCoordinateSpaceRegion] in
+            guard let block = item.block else {
+                return []
+            }
+
+            let y = verticalOffset(
+                contentHeight: block.height,
+                containerHeight: height,
+                alignment: alignment
+            )
+            return block.coordinateSpaceRegions.map {
+                $0.offsetBy(x: item.x, y: y)
+            }
+        }
+    }
+
     private static func verticalCursor(
         from items: [VerticalItem],
         width: Int,
@@ -3058,6 +3145,27 @@ enum StackRenderer {
                 alignment: alignment
             )
             return block.identifiedRegions.map {
+                $0.offsetBy(x: x, y: item.y)
+            }
+        }
+    }
+
+    private static func verticalCoordinateSpaceRegions(
+        from items: [VerticalItem],
+        width: Int,
+        alignment: HorizontalAlignment
+    ) -> [RenderedCoordinateSpaceRegion] {
+        items.flatMap { item -> [RenderedCoordinateSpaceRegion] in
+            guard let block = item.block else {
+                return []
+            }
+
+            let x = horizontalOffset(
+                contentWidth: block.width,
+                containerWidth: width,
+                alignment: alignment
+            )
+            return block.coordinateSpaceRegions.map {
                 $0.offsetBy(x: x, y: item.y)
             }
         }

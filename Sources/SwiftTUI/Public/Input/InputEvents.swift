@@ -1,4 +1,43 @@
 public import Foundation
+public import Terminal
+
+/// A frame of reference for terminal-cell coordinates.
+public nonisolated struct CoordinateSpace: Equatable, Hashable, Sendable {
+
+    enum Storage: Equatable, Hashable, @unchecked Sendable {
+
+        case local
+
+        case global
+
+        case named(AnyHashable)
+    }
+
+    let storage: Storage
+
+    init(storage: Storage) {
+        self.storage = storage
+    }
+
+    var name: AnyHashable? {
+        guard case .named(let name) = storage else {
+            return nil
+        }
+
+        return name
+    }
+
+    /// The local coordinate space of the current view.
+    public static let local = CoordinateSpace(storage: .local)
+
+    /// The global coordinate space at the root of the view hierarchy.
+    public static let global = CoordinateSpace(storage: .global)
+
+    /// Creates a named coordinate space.
+    public static func named<ID>(_ name: ID) -> CoordinateSpace where ID: Hashable {
+        CoordinateSpace(storage: .named(AnyHashable(name)))
+    }
+}
 
 /// A set of key modifiers that can accompany an input event.
 public struct EventModifiers: OptionSet, Sendable {
@@ -221,9 +260,44 @@ public extension View {
             handler: TapGestureHandler(
                 actionPath: StateContext.currentPath,
                 count: count,
-                action: action
+                action: .plain(action)
             )
         )
+    }
+
+    /// Performs an action when this view recognizes a tap gesture, passing the
+    /// tap location in the requested terminal-cell coordinate space.
+    ///
+    /// - Parameters:
+    ///   - count: The number of consecutive taps required. Must be at least one.
+    ///   - coordinateSpace: The coordinate space for the reported location.
+    ///   - action: The action to perform with the tap location.
+    /// - Returns: A view with a tap gesture handler attached.
+    func onTapGesture(
+        count: Int = 1,
+        coordinateSpace: CoordinateSpace = .local,
+        perform action: @escaping (Point) -> Void
+    ) -> some View {
+        precondition(count >= 1, "onTapGesture count must be greater than zero.")
+
+        return TapGestureView(
+            content: self,
+            handler: TapGestureHandler(
+                actionPath: StateContext.currentPath,
+                count: count,
+                action: .location(coordinateSpace, action)
+            )
+        )
+    }
+
+    /// Assigns a name to this view's local coordinate space.
+    ///
+    /// Descendant tap-location handlers can request coordinates relative to
+    /// this view by using ``CoordinateSpace/named(_:)``.
+    func coordinateSpace(_ name: CoordinateSpace) -> some View {
+        precondition(name.name != nil, "coordinateSpace(_:) requires a named coordinate space.")
+
+        return CoordinateSpaceView(content: self, coordinateSpace: name)
     }
 
     /// Performs an action if the user presses a key while this view has focus.
@@ -440,4 +514,3 @@ public extension View {
         )
     }
 }
-

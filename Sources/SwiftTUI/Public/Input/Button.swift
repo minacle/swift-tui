@@ -192,7 +192,7 @@ extension Button {
             TapGestureHandler(
                 actionPath: actionPath ?? path,
                 count: 1,
-                action: {
+                action: .plain {
                     EnvironmentRenderContext.withValues(environment) {
                         action()
                     }

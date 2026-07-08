@@ -1246,7 +1246,7 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
             TapGestureHandler(
                 actionPath: path,
                 count: 1,
-                action: {
+                action: .plain {
                     _ = activate(
                         in: runtime,
                         stackPath: stackPath,

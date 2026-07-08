@@ -7508,6 +7508,114 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events == ["tap"])
 }
 
+@Test func tapGestureReportsLocalAndGlobalLocations() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = VStack(alignment: .leading, spacing: 0) {
+        Text("top")
+        HStack(spacing: 0) {
+            Text("..")
+            Text("ABCD")
+                .frame(width: 2)
+                .onTapGesture(coordinateSpace: .local) { location in
+                    locationProbe.record("local", location)
+                }
+                .onTapGesture(coordinateSpace: .global) { location in
+                    locationProbe.record("global", location)
+                }
+        }
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 4, row: 2)
+
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "global", location: Point(column: 3, row: 1)),
+            TapLocationEvent(name: "local", location: Point(column: 1, row: 0)),
+        ]
+    )
+}
+
+@Test func tapGestureReportsNamedCoordinateSpaceLocation() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = HStack(spacing: 0) {
+        Text("..")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("x")
+            Text("AB")
+                .onTapGesture(coordinateSpace: .named("stack")) { location in
+                    locationProbe.record("named", location)
+                }
+        }
+        .coordinateSpace(.named("stack"))
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 4, row: 2)
+
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "named", location: Point(column: 1, row: 1))
+        ]
+    )
+}
+
+@Test func tapGestureNamedCoordinateSpaceUsesDeepestMatchingAncestor() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = HStack(spacing: 0) {
+        Text("..")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("x")
+            Text("AB")
+                .onTapGesture(coordinateSpace: .named("space")) { location in
+                    locationProbe.record("named", location)
+                }
+        }
+        .coordinateSpace(.named("space"))
+    }
+    .coordinateSpace(.named("space"))
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 4, row: 2)
+
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "named", location: Point(column: 1, row: 1))
+        ]
+    )
+}
+
+@Test func tapGestureNamedCoordinateSpaceSurvivesLayoutTransforms() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = ZStack(alignment: .topLeading) {
+        Text("....")
+        Text("AB")
+            .onTapGesture(coordinateSpace: .named("target")) { location in
+                locationProbe.record("named", location)
+            }
+            .coordinateSpace(.named("target"))
+            .padding(.leading, 1)
+            .frame(width: 4, alignment: .trailing)
+    }
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 4, row: 1)
+
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "named", location: Point(column: 1, row: 0))
+        ]
+    )
+}
+
 @Test func tapGestureWaitsForLargerAvailableCounts() {
     let runtime = StateRuntime()
     let tapProbe = TapGestureProbe()
@@ -7544,6 +7652,37 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events == ["two"])
 }
 
+@Test func tapGestureTimeoutPerformsLargestReachedCountWithLastLocation() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = Text("ABCD")
+        .onTapGesture(count: 1, coordinateSpace: .local) { location in
+            locationProbe.record("one", location)
+        }
+        .onTapGesture(count: 2, coordinateSpace: .local) { location in
+            locationProbe.record("two", location)
+        }
+        .onTapGesture(count: 3, coordinateSpace: .local) { location in
+            locationProbe.record("three", location)
+        }
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 1, row: 1, at: date)
+    dispatchClick(to: runtime, column: 3, row: 1, at: date.addingTimeInterval(0.1))
+
+    #expect(locationProbe.events.isEmpty)
+    #expect(
+        runtime.dispatchExpiredTapActions(at: date.addingTimeInterval(0.61)) == .handled
+    )
+    #expect(
+        locationProbe.events == [
+            TapLocationEvent(name: "two", location: Point(column: 2, row: 0))
+        ]
+    )
+}
+
 @Test func tapGestureIgnoresOtherButtonsAndMismatchedTargets() {
     let runtime = StateRuntime()
     let tapProbe = TapGestureProbe()
@@ -7571,6 +7710,23 @@ private struct ParentCallbackStateMutationTests {
     )
 
     #expect(tapProbe.events.isEmpty)
+}
+
+@Test func disabledTapGestureWithNamedCoordinateSpaceIgnoresClicks() {
+    let runtime = StateRuntime()
+    let locationProbe = TapLocationProbe()
+    let view = Text("A")
+        .onTapGesture(coordinateSpace: .named("disabled")) { location in
+            locationProbe.record("tap", location)
+        }
+        .coordinateSpace(.named("disabled"))
+        .disabled(true)
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+
+    #expect(locationProbe.events.isEmpty)
 }
 
 @Test func buttonRendersLabelWithoutPerformingAction() {
@@ -8811,6 +8967,22 @@ private final class TapGestureProbe {
 
     func record(_ event: String) {
         events.append(event)
+    }
+}
+
+private struct TapLocationEvent: Equatable {
+
+    var name: String
+
+    var location: Point
+}
+
+private final class TapLocationProbe {
+
+    var events: [TapLocationEvent] = []
+
+    func record(_ name: String, _ location: Point) {
+        events.append(TapLocationEvent(name: name, location: location))
     }
 }
 
