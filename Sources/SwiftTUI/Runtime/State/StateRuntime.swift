@@ -1,4 +1,5 @@
 import Foundation
+import Terminal
 
 final class StateRuntime {
 
@@ -483,7 +484,7 @@ final class StateRuntime {
         axes: Axis.Set,
         point: ScrollPoint,
         maximumPoint: ScrollPoint,
-        viewportSize: GeometrySize,
+        viewportSize: Size,
         identifiedRegions: [RenderedIdentifiedRegion],
         binding: Binding<ScrollPosition>?
     ) {
@@ -913,7 +914,7 @@ final class StateRuntime {
         toReveal target: RenderedRect,
         anchor: UnitPoint?,
         axes: Axis.Set,
-        viewportSize: GeometrySize,
+        viewportSize: Size,
         maximumPoint: ScrollPoint
     ) -> ScrollPoint {
         ScrollPoint(
@@ -1262,7 +1263,7 @@ private struct ScrollViewState {
 
     var maximumPoint: ScrollPoint
 
-    var viewportSize: GeometrySize
+    var viewportSize: Size
 
     var identifiedRegions: [RenderedIdentifiedRegion]
 

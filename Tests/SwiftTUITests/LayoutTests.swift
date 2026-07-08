@@ -36,6 +36,18 @@ import Testing
     #expect(block?.lines == ["    ", "    "])
 }
 
+@Test func customLayoutNegativeSizeRendersAsZeroSizeBlock() {
+    let view = NegativeSizeLayout() {
+        Text("A")
+    }
+
+    let block = ViewResolver.block(from: view)
+
+    #expect(block?.width == 0)
+    #expect(block?.height == 0)
+    #expect(block?.lines == [])
+}
+
 @Test func customLayoutPlacesSubviewsWithAnchorsAndClipsToBounds() {
     let view = AnchoredLayout() {
         Text("AB")
@@ -174,10 +186,10 @@ private struct BasicVStackLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        subviews.reduce(GeometrySize()) { size, subview in
+    ) -> Size {
+        subviews.reduce(Size()) { size, subview in
             let childSize = subview.sizeThatFits(.unspecified)
-            return GeometrySize(
+            return Size(
                 columns: max(size.columns, childSize.columns),
                 rows: size.rows + childSize.rows
             )
@@ -185,7 +197,7 @@ private struct BasicVStackLayout: Layout {
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -193,7 +205,7 @@ private struct BasicVStackLayout: Layout {
         var row = bounds.origin.row
         for subview in subviews {
             subview.place(
-                at: GeometryPoint(column: bounds.origin.column, row: row),
+                at: Point(column: bounds.origin.column, row: row),
                 anchor: .topLeading,
                 proposal: .unspecified
             )
@@ -208,14 +220,14 @@ private struct ProposedWrappingLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
+    ) -> Size {
         subviews.first?.sizeThatFits(
             ProposedViewSize(columns: proposal.columns)
-        ) ?? GeometrySize()
+        ) ?? Size()
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -233,12 +245,12 @@ private struct SpacerMeasurementLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
+    ) -> Size {
         subviews[0].sizeThatFits(ProposedViewSize(columns: 4, rows: 2))
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -250,25 +262,45 @@ private struct SpacerMeasurementLayout: Layout {
     }
 }
 
+private struct NegativeSizeLayout: Layout {
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> Size {
+        Size(columns: -1, rows: -2)
+    }
+
+    func placeSubviews(
+        in bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        subviews.first?.place(at: .zero)
+    }
+}
+
 private struct AnchoredLayout: Layout {
 
     func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        GeometrySize(columns: 5, rows: 3)
+    ) -> Size {
+        Size(columns: 5, rows: 3)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
     ) {
-        subviews[0].place(at: GeometryPoint(column: 0, row: 1), anchor: .topLeading)
-        subviews[1].place(at: GeometryPoint(column: 5, row: 2), anchor: .bottomTrailing)
-        subviews[2].place(at: GeometryPoint(column: 3, row: 2), anchor: .topLeading)
+        subviews[0].place(at: Point(column: 0, row: 1), anchor: .topLeading)
+        subviews[1].place(at: Point(column: 5, row: 2), anchor: .bottomTrailing)
+        subviews[2].place(at: Point(column: 3, row: 2), anchor: .topLeading)
     }
 }
 
@@ -278,18 +310,18 @@ private struct RegionOffsetLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        GeometrySize(columns: 7, rows: 3)
+    ) -> Size {
+        Size(columns: 7, rows: 3)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
     ) {
         subviews.first?.place(
-            at: GeometryPoint(column: 1, row: 1),
+            at: Point(column: 1, row: 1),
             proposal: ProposedViewSize(columns: 5, rows: 1)
         )
     }
@@ -315,12 +347,12 @@ private struct PriorityWidthLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        GeometrySize(columns: Int(subviews[0].priority * 2), rows: 3)
+    ) -> Size {
+        Size(columns: Int(subviews[0].priority * 2), rows: 3)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -348,15 +380,15 @@ private struct LayoutValueRowLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
+    ) -> Size {
         let columns = subviews.reduce(0) { total, subview in
             total + subview[LeadingInsetKey.self] + subview[ColumnSpanKey.self]
         }
-        return GeometrySize(columns: columns, rows: 1)
+        return Size(columns: columns, rows: 1)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -365,7 +397,7 @@ private struct LayoutValueRowLayout: Layout {
         for subview in subviews {
             column += subview[LeadingInsetKey.self]
             subview.place(
-                at: GeometryPoint(column: column, row: bounds.origin.row),
+                at: Point(column: column, row: bounds.origin.row),
                 proposal: ProposedViewSize(
                     columns: subview[ColumnSpanKey.self],
                     rows: 1
@@ -382,12 +414,12 @@ private struct LayoutValueWidthLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        GeometrySize(columns: subviews[0][ColumnSpanKey.self], rows: 1)
+    ) -> Size {
+        Size(columns: subviews[0][ColumnSpanKey.self], rows: 1)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -414,19 +446,19 @@ private struct CacheBackedLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout Cache
-    ) -> GeometrySize {
+    ) -> Size {
         cache.column += subviews[0].sizeThatFits(.unspecified).columns
-        return GeometrySize(columns: cache.column + 1, rows: 1)
+        return Size(columns: cache.column + 1, rows: 1)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout Cache
     ) {
         subviews[0].place(
-            at: GeometryPoint(column: cache.column, row: 0),
+            at: Point(column: cache.column, row: 0),
             proposal: .unspecified
         )
     }

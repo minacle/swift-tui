@@ -2508,14 +2508,20 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(Spacer(minLength: -1).minLength == 0)
 }
 
-@Test func geometryValuesNormalizeNegativeComponents() {
-    let size = GeometrySize(columns: -1, rows: -2)
-    let point = GeometryPoint(column: -3, row: -4)
-    let frame = GeometryFrame(origin: point, size: size)
+@Test func terminalGeometryValuesPreserveNegativeComponents() {
+    let size = Size(columns: -1, rows: -2)
+    let point = Point(column: -3, row: -4)
+    let frame = Rect(origin: point, size: size)
 
-    #expect(size == GeometrySize())
-    #expect(point == GeometryPoint())
-    #expect(frame == GeometryFrame())
+    #expect(size.columns == -1)
+    #expect(size.rows == -2)
+    #expect(point.column == -3)
+    #expect(point.row == -4)
+    #expect(frame.origin == point)
+    #expect(frame.size == size)
+    #expect(Size() == .zero)
+    #expect(Point() == .zero)
+    #expect(Rect() == .zero)
 }
 
 @Test func geometryReaderPassesProposedSizeToProxy() {
@@ -2546,7 +2552,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(proxy.columns == 7)
     #expect(proxy.rows == 1)
-    #expect(proxy.frame == GeometryFrame(size: GeometrySize(columns: 7, rows: 1)))
+    #expect(proxy.frame == Rect(origin: .zero, size: Size(columns: 7, rows: 1)))
 }
 
 @Test func geometryReaderExposesLocalFrameFromProposal() {

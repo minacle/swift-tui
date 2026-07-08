@@ -1,3 +1,5 @@
+public import Terminal
+
 /// A proposed terminal-cell size for a view.
 ///
 /// `nil` means the corresponding terminal-cell dimension is unspecified.
@@ -32,7 +34,7 @@ public nonisolated struct ProposedViewSize: Equatable, Sendable {
 public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
 
     /// The measured size of the subview.
-    public let size: GeometrySize
+    public let size: Size
 
     /// The measured width in terminal columns.
     public var columns: Int {
@@ -57,7 +59,7 @@ public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
     /// Creates measured dimensions from a geometry size.
     ///
     /// - Parameter size: The measured terminal-cell size.
-    public init(size: GeometrySize) {
+    public init(size: Size) {
         self.size = size
     }
 }
@@ -95,10 +97,10 @@ public nonisolated struct LayoutSubview: Equatable {
     ///
     /// - Parameter proposal: The size proposal to pass to the subview.
     /// - Returns: The subview's measured terminal-cell size.
-    public func sizeThatFits(_ proposal: ProposedViewSize) -> GeometrySize {
+    public func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         child.render(proposal.renderProposal, true)?.layoutSize(
             proposal: proposal.renderProposal
-        ) ?? GeometrySize()
+        ) ?? Size()
     }
 
     /// Measures this subview and returns layout dimensions.
@@ -116,7 +118,7 @@ public nonisolated struct LayoutSubview: Equatable {
     ///   - anchor: The anchor within the subview aligned to `point`.
     ///   - proposal: The proposal used when rendering the placed subview.
     public func place(
-        at point: GeometryPoint,
+        at point: Point,
         anchor: Alignment = .topLeading,
         proposal: ProposedViewSize = .unspecified
     ) {
@@ -187,7 +189,7 @@ public nonisolated protocol Layout: Sendable {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout Cache
-    ) -> GeometrySize
+    ) -> Size
 
     /// Places child subviews within the resolved layout bounds.
     ///
@@ -197,7 +199,7 @@ public nonisolated protocol Layout: Sendable {
     ///   - subviews: The child subviews to place.
     ///   - cache: Mutable layout cache for this pass.
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout Cache
@@ -420,7 +422,7 @@ extension LayoutContainer: LayoutRenderable {
             subviews: subviews,
             cache: &cache
         )
-        let bounds = GeometryFrame(size: size)
+        let bounds = Rect(origin: .zero, size: size)
         layout.placeSubviews(
             in: bounds,
             proposal: proposedSize,
@@ -444,11 +446,13 @@ extension LayoutContainer: LayoutRenderable {
     }
 
     private func placedBlock(
-        size: GeometrySize,
+        size: Size,
         placements: [LayoutPlacement],
         subviews: LayoutSubviews
     ) -> RenderedBlock {
-        let bounds = RenderedRect(width: size.columns, height: size.rows)
+        let width = max(size.columns, 0)
+        let height = max(size.rows, 0)
+        let bounds = RenderedRect(width: width, height: height)
         let blocks = placements.enumerated()
             .sorted { lhs, rhs in
                 let lhsPlacement = lhs.element
@@ -484,9 +488,9 @@ extension LayoutContainer: LayoutRenderable {
 
         return RenderedBlock.composited(
             blocks,
-            width: size.columns,
-            height: size.rows,
-            paddedRows: Set(0..<size.rows)
+            width: width,
+            height: height,
+            paddedRows: Set(0..<height)
         )
     }
 
@@ -529,7 +533,7 @@ struct LayoutPlacement {
 
     var index: Int
 
-    var point: GeometryPoint
+    var point: Point
 
     var anchor: Alignment
 
@@ -549,12 +553,12 @@ private extension ProposedViewSize {
 
 private extension RenderedElement {
 
-    nonisolated func layoutSize(proposal: RenderProposal) -> GeometrySize {
+    nonisolated func layoutSize(proposal: RenderProposal) -> Size {
         switch self {
         case .block(let block):
-            return GeometrySize(columns: block.width, rows: block.height)
+            return Size(columns: block.width, rows: block.height)
         case .spacer(let minLength):
-            return GeometrySize(
+            return Size(
                 columns: max(proposal.columns ?? minLength, minLength),
                 rows: max(proposal.rows ?? minLength, minLength)
             )

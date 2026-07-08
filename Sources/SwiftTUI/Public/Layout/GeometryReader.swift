@@ -1,67 +1,10 @@
-/// A terminal-native size measured in character cells.
-public nonisolated struct GeometrySize: Equatable, Sendable {
-
-    /// The width in terminal columns.
-    public let columns: Int
-
-    /// The height in terminal rows.
-    public let rows: Int
-
-    /// Creates a terminal-cell size.
-    ///
-    /// Negative values are clamped to zero.
-    public init(columns: Int = 0, rows: Int = 0) {
-        self.columns = max(columns, 0)
-        self.rows = max(rows, 0)
-    }
-}
-
-/// A terminal-native point measured in character cells.
-public nonisolated struct GeometryPoint: Equatable, Sendable {
-
-    /// The zero-based terminal column.
-    public let column: Int
-
-    /// The zero-based terminal row.
-    public let row: Int
-
-    /// Creates a terminal-cell point.
-    ///
-    /// Negative values are clamped to zero.
-    public init(column: Int = 0, row: Int = 0) {
-        self.column = max(column, 0)
-        self.row = max(row, 0)
-    }
-}
-
-/// A terminal-native rectangle measured in character cells.
-public nonisolated struct GeometryFrame: Equatable, Sendable {
-
-    /// The frame origin in terminal-cell coordinates.
-    public let origin: GeometryPoint
-
-    /// The frame size in terminal cells.
-    public let size: GeometrySize
-
-    /// Creates a terminal-cell frame.
-    ///
-    /// - Parameters:
-    ///   - origin: The frame origin.
-    ///   - size: The frame size.
-    public init(
-        origin: GeometryPoint = GeometryPoint(),
-        size: GeometrySize = GeometrySize()
-    ) {
-        self.origin = origin
-        self.size = size
-    }
-}
+public import Terminal
 
 /// A proxy for access to the terminal size of a geometry reader.
 public nonisolated struct GeometryProxy: Equatable, Sendable {
 
     /// The size proposed to the geometry reader.
-    public let size: GeometrySize
+    public let size: Size
 
     /// The proposed width in terminal columns.
     public var columns: Int {
@@ -74,18 +17,18 @@ public nonisolated struct GeometryProxy: Equatable, Sendable {
     }
 
     /// A frame with zero origin and this proxy's size.
-    public var frame: GeometryFrame {
-        GeometryFrame(size: size)
+    public var frame: Rect {
+        Rect(origin: .zero, size: size)
     }
 
     /// Creates a geometry proxy from a terminal-cell size.
-    public init(size: GeometrySize = GeometrySize()) {
+    public init(size: Size = Size()) {
         self.size = size
     }
 
     /// Creates a geometry proxy from terminal columns and rows.
     public init(columns: Int = 0, rows: Int = 0) {
-        self.init(size: GeometrySize(columns: columns, rows: rows))
+        self.init(size: Size(columns: columns, rows: rows))
     }
 }
 

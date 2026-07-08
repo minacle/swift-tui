@@ -148,12 +148,12 @@ private struct OverlappingLayout: Layout {
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
-    ) -> GeometrySize {
-        GeometrySize(columns: 1, rows: 1)
+    ) -> Size {
+        Size(columns: 1, rows: 1)
     }
 
     func placeSubviews(
-        in bounds: GeometryFrame,
+        in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()

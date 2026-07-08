@@ -1,4 +1,5 @@
 import Foundation
+import Terminal
 
 /// A scrollable axis.
 public nonisolated enum Axis: Sendable {
@@ -460,7 +461,7 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             axes: axes,
             point: result.point,
             maximumPoint: result.maximumPoint,
-            viewportSize: GeometrySize(columns: result.block.width, rows: result.block.height),
+            viewportSize: Size(columns: result.block.width, rows: result.block.height),
             identifiedRegions: contentBlock.identifiedRegions,
             binding: binding
         )

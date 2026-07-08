@@ -1,3 +1,5 @@
+import Terminal
+
 /// A view that renders the first child whose ideal size fits the proposed size.
 ///
 /// `ViewThatFits` evaluates its children in declaration order. It measures each
@@ -128,12 +130,12 @@ private extension RenderedElement {
         return true
     }
 
-    func measuredSize(proposal: RenderProposal?) -> GeometrySize {
+    func measuredSize(proposal: RenderProposal?) -> Size {
         switch self {
         case .block(let block):
-            GeometrySize(columns: block.width, rows: block.height)
+            Size(columns: block.width, rows: block.height)
         case .spacer(let minLength):
-            GeometrySize(
+            Size(
                 columns: max(proposal?.columns ?? minLength, minLength),
                 rows: max(proposal?.rows ?? minLength, minLength)
             )
