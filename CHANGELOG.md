@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-08
+
 ### Fixed
 
 - Fixed `Text` and `TextEditor` wrapping so trailing spaces that overflow a
@@ -180,7 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/minacle/swift-tui/releases/tag/v0.4.2
 [0.4.1]: https://github.com/minacle/swift-tui/releases/tag/v0.4.1
 [0.4.0]: https://github.com/minacle/swift-tui/releases/tag/v0.4.0
 [0.3.0]: https://github.com/minacle/swift-tui/releases/tag/v0.3.0
