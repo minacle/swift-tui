@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `Text` and `TextEditor` wrapping so trailing spaces that overflow a
+  line no longer pull the preceding word onto the next wrapped row.
 - Fixed empty `ScrollView` layout so it still participates in stack expansion
   and receives its proposed viewport.
 - Fixed `TextEditor` caret placement so filling the last visible column moves

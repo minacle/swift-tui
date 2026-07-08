@@ -626,6 +626,32 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(block?.lines == ["ABC", "DEF", "GHI", "J  "])
 }
 
+@Test func textPreservesTrailingSpacesWhenTheyWrapPastProposedColumns() {
+    let line = "Lorem ipsum dolor sit amet."
+    let block = ViewResolver.block(
+        from: Text(line + "  "),
+        in: RenderProposal(columns: 28)
+    )
+
+    #expect(block?.lines == [
+        line + " ",
+        String(repeating: " ", count: 28),
+    ])
+}
+
+@Test func textPreservesTrailingSpacesBeforeNextWrappedCharacter() {
+    let line = "Lorem ipsum dolor sit amet."
+    let block = ViewResolver.block(
+        from: Text(line + "  a"),
+        in: RenderProposal(columns: 28)
+    )
+
+    #expect(block?.lines == [
+        line + " ",
+        " a" + String(repeating: " ", count: 26),
+    ])
+}
+
 @Test func textLineLimitTruncatesWithEllipsis() {
     let block = ViewResolver.block(
         from: Text("Lorem ipsum dolor").lineLimit(2),
@@ -1569,6 +1595,38 @@ private func lineBreakKinds(in text: String) -> [String] {
     block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["abc", "d  "])
     #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func focusedTextEditorPreservesTrailingSpacesWhenTheyWrapPastLineEnd() {
+    let runtime = StateRuntime()
+    let line = "Lorem ipsum dolor sit amet."
+    let view = TextEditorInitialTextView(text: line + "  ")
+    let proposal = RenderProposal(columns: 28, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let block = runtime.block(from: view, in: proposal)
+
+    #expect(block?.lines == [
+        line + " ",
+        String(repeating: " ", count: 28),
+    ])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func focusedTextEditorPreservesTrailingSpacesBeforeNextWrappedCharacter() {
+    let runtime = StateRuntime()
+    let line = "Lorem ipsum dolor sit amet."
+    let view = TextEditorInitialTextView(text: line + "  a")
+    let proposal = RenderProposal(columns: 28, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let block = runtime.block(from: view, in: proposal)
+
+    #expect(block?.lines == [
+        line + " ",
+        " a" + String(repeating: " ", count: 26),
+    ])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
 }
 
 @Test func focusedTextEditorCursorUsesTerminalColumnWidth() {

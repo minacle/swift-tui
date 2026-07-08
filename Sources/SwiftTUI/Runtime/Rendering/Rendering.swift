@@ -1492,22 +1492,32 @@ enum TextLineWrapper {
                 scanIndex = opportunities.index(after: scanIndex)
             }
 
+            let fallbackEnd = fittingCharacterBoundary(
+                in: paragraph,
+                from: start,
+                maxWidth: maxWidth
+            )
             if let bestBreak {
                 let lineEnd = trimmingTrailingWhitespace(
                     in: paragraph,
                     lowerBound: start,
                     upperBound: bestBreak.index
                 )
-                lines.append(String(paragraph[start..<lineEnd]))
-                start = skippingLeadingWhitespace(in: paragraph, from: bestBreak.index)
-                opportunityIndex = scanIndex
+                if shouldPreserveFittingBreakSpaces(
+                    in: paragraph,
+                    lowerBound: start,
+                    fallbackEnd: fallbackEnd
+                ) {
+                    lines.append(String(paragraph[start..<fallbackEnd]))
+                    start = fallbackEnd
+                }
+                else {
+                    lines.append(String(paragraph[start..<lineEnd]))
+                    start = skippingLeadingWhitespace(in: paragraph, from: bestBreak.index)
+                    opportunityIndex = scanIndex
+                }
             }
             else {
-                let fallbackEnd = fittingCharacterBoundary(
-                    in: paragraph,
-                    from: start,
-                    maxWidth: maxWidth
-                )
                 lines.append(String(paragraph[start..<fallbackEnd]))
                 if fallbackEnd > start {
                     start = skippingLeadingWhitespace(in: paragraph, from: fallbackEnd)
@@ -1551,6 +1561,38 @@ enum TextLineWrapper {
             }
         }
         return index
+    }
+
+    private static func shouldPreserveFittingBreakSpaces(
+        in text: String,
+        lowerBound: String.Index,
+        fallbackEnd: String.Index
+    ) -> Bool {
+        guard fallbackEnd > lowerBound else {
+            return false
+        }
+        if containsOnlyBreakSpaces(in: text, from: fallbackEnd) {
+            return true
+        }
+
+        let previousIndex = text.index(before: fallbackEnd)
+        return UnicodeLineBreak.isBreakSpace(text[previousIndex])
+            && fallbackEnd < text.endIndex
+            && UnicodeLineBreak.isBreakSpace(text[fallbackEnd])
+    }
+
+    private static func containsOnlyBreakSpaces(
+        in text: String,
+        from start: String.Index
+    ) -> Bool {
+        var index = start
+        while index < text.endIndex {
+            guard UnicodeLineBreak.isBreakSpace(text[index]) else {
+                return false
+            }
+            index = text.index(after: index)
+        }
+        return true
     }
 
     private static func trimmingTrailingWhitespace(
