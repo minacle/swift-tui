@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with terminal mouse motion tracking.
 - Added `onHover(perform:)`, `onContinuousHover(coordinateSpace:perform:)`,
   and `HoverPhase` for terminal mouse hover handling.
-- Added click-to-caret placement for `TextField`, `SecureField`, and
-  `TextEditor`.
+- Added click-and-drag-to-caret placement for `TextField`, `SecureField`,
+  and `TextEditor`.
 
 ## [0.4.2] - 2026-07-08
 

@@ -1147,6 +1147,43 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
 }
 
+@Test func draggingSecureFieldMovesCaretWithinMaskedText() {
+    let runtime = StateRuntime()
+    let probe = BindingProbe<String>()
+    let view = SecureFieldEditingView(textProbe: probe)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    for character in "secret" {
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: KeyEquivalent(character), characters: String(character))
+            ) == .handled
+        )
+    }
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    #expect(probe.binding?.wrappedValue == "secXret")
+    #expect(runtime.block(from: view)?.text == "•••••••")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 4))
+}
+
 @Test func focusedSecureFieldUsesMaskedColumnWidthForCursorAndScroll() {
     let runtime = StateRuntime()
     let view = SecureFieldInitialTextView(text: "한ABC")
@@ -1457,6 +1494,110 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.cursor == RenderedCursor(column: 3))
 }
 
+@Test func draggingTextFieldMovesCaretToPointerColumn() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.text == "abcXd")
+    #expect(block?.cursor == RenderedCursor(column: 4))
+}
+
+@Test func draggingTextFieldOutsideFrameScrollsToCaret() {
+    let runtime = StateRuntime()
+    let view = PrefixedNarrowTextFieldInitialTextView(text: "abcdef")
+
+    #expect(renderUntilStable(runtime, view: view) <= 3)
+    var block = runtime.block(from: view)
+    #expect(block?.lines == ["|ef "])
+    #expect(block?.cursor == RenderedCursor(column: 3))
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 4, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+        ) == .handled
+    )
+    #expect(renderUntilStable(runtime, view: view) <= 3)
+
+    block = runtime.block(from: view)
+    #expect(block?.lines == ["|def"])
+    #expect(block?.cursor == RenderedCursor(column: 1))
+}
+
+@Test func textFieldMouseMotionWithoutPressDoesNotMoveCaret() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+        ) == .ignored
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.text == "abcdX")
+    #expect(block?.cursor == RenderedCursor(column: 5))
+}
+
+@Test func textFieldMouseUpEndsCaretDrag() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+        ) == .ignored
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view)
+    #expect(block?.text == "Xabcd")
+    #expect(block?.cursor == RenderedCursor(column: 1))
+}
+
 @Test func clickingScrolledWideTextFieldMovesCaretByTerminalColumns() {
     let runtime = StateRuntime()
     let view = TextFieldInitialTextView(text: "한ABC")
@@ -1590,6 +1731,60 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["ab  ", "cXd "])
     #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+}
+
+@Test func draggingTextEditorMovesCaretToPointerLineAndColumn() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "ab\ncd")
+    let proposal = RenderProposal(columns: 4)
+
+    _ = runtime.block(from: view, in: proposal)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view, in: proposal)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 3, row: 2, phase: .motion)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    let block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["ab  ", "cdX "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 3))
+}
+
+@Test func draggingTextEditorOutsideFrameScrollsToCaret() {
+    let runtime = StateRuntime()
+    let view = PrefixedBoundedTextEditorInitialTextView(text: "a\nb\nc\nd")
+    let proposal = RenderProposal(columns: 4)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    var block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["top ", "c   ", "d   "])
+    #expect(block?.cursor == RenderedCursor(row: 2, column: 1))
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 3, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+        ) == .handled
+    )
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["top ", "b   ", "c   "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
 }
 
 @Test func clickingScrolledTextEditorMovesCaretThroughScrollPoint() {
@@ -12001,6 +12196,22 @@ private struct TextEditorInitialTextView: View {
     }
 }
 
+private struct PrefixedBoundedTextEditorInitialTextView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("top")
+            TextEditor(text: $text)
+                .focused($isFocused)
+                .frame(width: 4, height: 2, alignment: .leading)
+        }
+    }
+}
+
 private struct TextEditorSubmitView: View {
 
     @State var text = ""
@@ -12244,6 +12455,22 @@ private struct TextFieldInitialTextView: View {
     var body: some View {
         TextField("Name", text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct PrefixedNarrowTextFieldInitialTextView: View {
+
+    @State var text: String
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text("|")
+            TextField("Name", text: $text)
+                .focused($isFocused)
+                .frame(width: 3, alignment: .leading)
+        }
     }
 }
 

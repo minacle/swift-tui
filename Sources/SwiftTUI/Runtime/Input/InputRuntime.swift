@@ -432,6 +432,13 @@ final class InputRuntime {
         var handler: KeyPressHandler
     }
 
+    private struct ActiveMouseDownPositionTarget {
+
+        var path: [Int]
+
+        var frame: RenderedRect
+    }
+
     private var handlersByPath: [[Int]: [KeyPressHandler]] = [:]
 
     private var globalHandlers: [GlobalKeyPressHandler] = []
@@ -459,6 +466,8 @@ final class InputRuntime {
     private var pressedTapTarget: [Int]?
 
     private var pressedLinkTarget: [Int]?
+
+    private var activeMouseDownPositionTarget: ActiveMouseDownPositionTarget?
 
     private var tapSequence: TapSequence?
 
@@ -617,19 +626,26 @@ final class InputRuntime {
             let hoverResult = dispatchHoverMotion(mouseEvent, perform: perform)
             guard mouseEvent.button == .left else {
                 let cancelled = cancelLongPress(perform: perform)
+                activeMouseDownPositionTarget = nil
                 pressedTapTarget = nil
                 pressedLinkTarget = nil
                 return hoverResult == .handled || cancelled ? .handled : .ignored
             }
 
+            let positioned = dispatchActiveMouseDownPositionDrag(
+                at: mouseEvent,
+                perform: perform
+            )
             let longPressResult = dispatchLongPressMotion(mouseEvent, perform: perform)
             return hoverResult == .handled
+                || positioned
                 || longPressResult == .handled
                 ? .handled : .ignored
         }
 
         if mouseEvent.button.isScrollWheel {
             let cancelled = cancelLongPress(perform: perform)
+            activeMouseDownPositionTarget = nil
             pressedTapTarget = nil
             pressedLinkTarget = nil
             let result = dispatchScroll(mouseEvent, scroll: scroll)
@@ -638,6 +654,7 @@ final class InputRuntime {
 
         guard mouseEvent.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
+            activeMouseDownPositionTarget = nil
             pressedTapTarget = nil
             pressedLinkTarget = nil
             return cancelled ? .handled : .ignored
@@ -646,10 +663,11 @@ final class InputRuntime {
         switch mouseEvent.phase {
         case .down:
             _ = cancelLongPress(perform: perform)
+            activeMouseDownPositionTarget = nil
             let focusedPath = focusTargets(at: mouseEvent).first {
                 focus($0)
             }
-            let positioned = dispatchMouseDownPosition(
+            let positioned = beginMouseDownPositionDrag(
                 at: mouseEvent,
                 eligiblePaths: focusedPath.map { [$0] } ?? [],
                 perform: perform
@@ -676,6 +694,8 @@ final class InputRuntime {
             return .ignored
         case .up:
             let longPressWasActive = longPressSequence != nil
+            let mouseDownPositionWasActive = activeMouseDownPositionTarget != nil
+            activeMouseDownPositionTarget = nil
             let longPressSucceeded = endLongPress(perform: perform)
             if longPressSucceeded {
                 pressedLinkTarget = nil
@@ -697,7 +717,7 @@ final class InputRuntime {
             }
 
             guard let pressedTapTarget else {
-                return longPressWasActive ? .handled : .ignored
+                return longPressWasActive || mouseDownPositionWasActive ? .handled : .ignored
             }
 
             defer {
@@ -1003,7 +1023,7 @@ final class InputRuntime {
             .map(\.path)
     }
 
-    private func dispatchMouseDownPosition(
+    private func beginMouseDownPositionDrag(
         at mouseEvent: MouseEvent,
         eligiblePaths: [[Int]],
         perform: ([Int], () -> Void) -> Void
@@ -1016,8 +1036,34 @@ final class InputRuntime {
             return false
         }
 
+        activeMouseDownPositionTarget = ActiveMouseDownPositionTarget(
+            path: target.path,
+            frame: target.frame
+        )
         perform(handler.actionPath ?? target.path) {
             handler.action(target.location)
+        }
+        return true
+    }
+
+    private func dispatchActiveMouseDownPositionDrag(
+        at mouseEvent: MouseEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> Bool {
+        guard let target = activeMouseDownPositionTarget,
+              let handler = mouseDownPositionHandlersByPath[target.path] else {
+            activeMouseDownPositionTarget = nil
+            return false
+        }
+
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        let location = Point(
+            column: column - target.frame.x,
+            row: row - target.frame.y
+        )
+        perform(handler.actionPath ?? target.path) {
+            handler.action(location)
         }
         return true
     }
@@ -1025,7 +1071,7 @@ final class InputRuntime {
     private func mouseDownPositionTarget(
         at mouseEvent: MouseEvent,
         eligiblePaths: [[Int]]
-    ) -> (path: [Int], location: Point)? {
+    ) -> (path: [Int], frame: RenderedRect, location: Point)? {
         let column = mouseEvent.column - rootFrame.column
         let row = mouseEvent.row - rootFrame.row
         guard let region = focusRegions
@@ -1041,6 +1087,7 @@ final class InputRuntime {
 
         return (
             region.path,
+            region.frame,
             Point(column: column - region.frame.x, row: row - region.frame.y)
         )
     }
