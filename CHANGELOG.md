@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `TextEditor` caret placement so filling the last visible column moves
+  the caret to the next wrapped row instead of leaving it pinned to the right
+  edge.
 - Fixed `TextEditor` rendering inside measured layouts so caret scrolling no
   longer causes an invalidation loop after inserting a newline at the bottom of
   its visible editor area.

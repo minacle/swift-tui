@@ -1519,12 +1519,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func focusedTextEditorMovesCaretAcrossVisualLines() {
     let runtime = StateRuntime()
-    let view = TextEditorInitialTextView(text: "abcdef")
+    let view = TextEditorInitialTextView(text: "abcde")
 
     _ = runtime.block(from: view, in: RenderProposal(columns: 3))
     _ = runtime.consumeInvalidation()
     var block = runtime.block(from: view, in: RenderProposal(columns: 3))
-    #expect(block?.lines == ["abc", "def"])
+    #expect(block?.lines == ["abc", "de "])
     #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .upArrow, characters: "\u{F700}")) == .handled)
@@ -1537,11 +1537,38 @@ private func lineBreakKinds(in text: String) -> [String] {
     block = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(block?.cursor == RenderedCursor(row: 0, column: 0))
 
-    #expect(runtime.dispatch(KeyPress(key: .end, characters: "\u{F72B}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .handled)
     #expect(runtime.consumeInvalidation())
     block = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+}
+
+@Test func focusedTextEditorMovesCaretToNextRowWhenLineExactlyFilled() {
+    let runtime = StateRuntime()
+    let view = TextEditorEditingView()
+    let proposal = RenderProposal(columns: 3, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    for character in "abc" {
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: KeyEquivalent(character), characters: String(character))
+            ) == .handled
+        )
+    }
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    var block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["abc", "   "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "d", characters: "d")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["abc", "d  "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
 }
 
 @Test func focusedTextEditorCursorUsesTerminalColumnWidth() {
@@ -1630,8 +1657,8 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.block(from: view)
     _ = runtime.consumeInvalidation()
     let initialBlock = runtime.block(from: view)
-    #expect(initialBlock?.lines == ["abc", "def"])
-    #expect(initialBlock?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(initialBlock?.lines == ["def", "   "])
+    #expect(initialBlock?.cursor == RenderedCursor(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())

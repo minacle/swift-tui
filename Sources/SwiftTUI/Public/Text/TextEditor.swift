@@ -331,7 +331,11 @@ struct TextEditorLayout {
 
     init(text: String, maxWidth: Int?) {
         let displayLines = TextLineWrapper.wrappedLines(for: text, maxWidth: maxWidth)
-        self.lines = TextEditorLayout.mappedLines(from: displayLines, in: text)
+        self.lines = TextEditorLayout.lines(
+            from: displayLines,
+            in: text,
+            maxWidth: maxWidth
+        )
     }
 
     var width: Int {
@@ -349,7 +353,7 @@ struct TextEditorLayout {
 
     func lineAndColumn(at offset: Int) -> (lineIndex: Int, column: Int) {
         let offset = max(offset, 0)
-        let lineIndex = lines.firstIndex {
+        let lineIndex = lines.lastIndex {
             offset >= $0.lowerOffset && offset <= $0.upperOffset
         } ?? max(lines.count - 1, 0)
         let line = lines[lineIndex]
@@ -420,6 +424,31 @@ struct TextEditorLayout {
             }
         }
 
+        return lines
+    }
+
+    private static func lines(
+        from displayLines: [String],
+        in text: String,
+        maxWidth: Int?
+    ) -> [TextEditorLine] {
+        var lines = mappedLines(from: displayLines, in: text)
+        guard let maxWidth,
+              maxWidth > 0,
+              let lastLine = lines.last,
+              !lastLine.text.isEmpty,
+              TerminalText.columnWidth(lastLine.text) == maxWidth
+        else {
+            return lines
+        }
+
+        lines.append(
+            TextEditorLine(
+                text: "",
+                lowerOffset: lastLine.upperOffset,
+                upperOffset: lastLine.upperOffset
+            )
+        )
         return lines
     }
 }
