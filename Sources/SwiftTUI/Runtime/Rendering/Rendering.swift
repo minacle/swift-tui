@@ -2731,7 +2731,7 @@ enum StackRenderer {
             guard let content = child.render(
                 childProposal(nil, child.traits, proposal),
                 flexibleOnStackAxis
-            ), content.isRenderable else {
+            ), content.isRenderable || flexibleOnStackAxis else {
                 return nil
             }
 

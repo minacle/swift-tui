@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed empty `ScrollView` layout so it still participates in stack expansion
+  and receives its proposed viewport.
 - Fixed `TextEditor` caret placement so filling the last visible column moves
   the caret to the next wrapped row instead of leaving it pinned to the right
   edge.

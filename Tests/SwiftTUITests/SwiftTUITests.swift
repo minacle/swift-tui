@@ -3073,6 +3073,30 @@ private func lineBreakKinds(in text: String) -> [String] {
     ])
 }
 
+@Test func emptyScrollViewParticipatesInVStackExpansion() {
+    let stack = VStack(alignment: .leading) {
+        Box {
+            TextEditor(text: .constant("TextEditor"))
+        }
+        ScrollView {
+        }
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 14, rows: 6))
+
+    #expect(block?.lines == [
+        "┌────────────┐",
+        "│TextEditor  │",
+        "└────────────┘",
+        "              ",
+        "              ",
+        "              ",
+    ])
+    #expect(block?.scrollRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 3, width: 14, height: 3),
+    ])
+}
+
 @Test func scrollViewAndSpacerShareStackRemainder() {
     let stack = HStack {
         ScrollView(.horizontal) {

@@ -438,14 +438,12 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        guard let contentBlock = ViewResolver.block(
+        let contentBlock = ViewResolver.block(
             from: content,
             in: contentProposal(from: proposal),
             path: path + [0],
             runtime: runtime
-        ) else {
-            return nil
-        }
+        ) ?? RenderedBlock(lines: [])
 
         let binding = ScrollPositionContext.currentBinding
         let position = binding?.wrappedValue
