@@ -2197,7 +2197,21 @@ extension VStack: StackRenderable {
     }
 }
 
-extension ZStack: StackRenderable {
+extension ZStack: LayoutTraitRenderable, StackRenderable {
+
+    var layoutTraits: LayoutTraits {
+        let flexibleAxes = ViewResolver.stackChildren(
+            from: content,
+            in: nil,
+            path: [],
+            runtime: nil
+        )
+        .reduce(into: Axis.Set()) { axes, child in
+            axes.formUnion(child.traits.flexibleAxes)
+        }
+
+        return LayoutTraits(flexibleAxes: flexibleAxes)
+    }
 
     func renderedBlock(
         in proposal: RenderProposal?,

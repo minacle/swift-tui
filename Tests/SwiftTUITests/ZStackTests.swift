@@ -40,6 +40,20 @@ import Testing
     ])
 }
 
+@Test func zStackPropagatesFlexibleAxesFromLayeredContent() {
+    let runtime = StateRuntime()
+    let view = ZStackTextEditorLayoutView()
+    let proposal = RenderProposal(columns: 20, rows: 5)
+
+    _ = runtime.block(from: view, in: proposal)
+    _ = runtime.consumeInvalidation()
+    let block = runtime.block(from: view, in: proposal)
+
+    #expect(block?.width == 20)
+    #expect(block?.height == 5)
+    #expect(block?.lines.first == "┌── Text Editor ───┐")
+}
+
 @Test func zStackKeepsLayerStylesIndependent() {
     let block = ViewResolver.block(
         from: ZStack(alignment: .topLeading) {
@@ -337,6 +351,27 @@ private struct OverlappingLayout: Layout {
     ) {
         for subview in subviews {
             subview.place(at: bounds.origin)
+        }
+    }
+}
+
+private struct ZStackTextEditorLayoutView: View {
+
+    @State var text = "Lorem ipsum dolor sit amet."
+
+    var body: some View {
+        VStack {
+            ZStack {
+                Box {
+                    TextEditor(text: $text)
+                        .padding(.horizontal, 1)
+                }
+                .background(.red)
+                VStack {
+                    Text(" Text Editor ")
+                    Spacer()
+                }
+            }
         }
     }
 }

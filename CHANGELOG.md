@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed Z-axis compositing so lower-layer background colors remain visible
   through overlapping cells that do not set their own background style.
 
+### Fixed
+
+- Fixed `ZStack` layout so flexible layered content, such as a boxed
+  `TextEditor`, receives the parent stack's proposed space instead of collapsing
+  to its intrinsic height.
+
 ### Deprecated
 
 - Deprecated `View.backgroundStyle(_:)` in favor of `View.background(_:)`.
