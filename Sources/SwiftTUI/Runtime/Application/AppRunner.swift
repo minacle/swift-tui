@@ -43,10 +43,16 @@ struct AppRunner<Application: App> {
             _ = runtime.dispatchExpiredTapActions()
             _ = runtime.dispatchExpiredLongPressActions()
 
+            let currentViewport = TerminalControl.currentTerminalSize()
             if runtime.consumeInvalidation()
-                || viewportTracker.needsRedraw(for: TerminalControl.currentTerminalSize()) {
+                || viewportTracker.needsRedraw(for: currentViewport) {
                 viewportTracker.update(
-                    renderedViewport: render(root, using: runtime, termination: termination)
+                    renderedViewport: render(
+                        root,
+                        using: runtime,
+                        termination: termination,
+                        previousRender: viewportTracker.renderedViewport
+                    )
                 )
             }
 
@@ -59,8 +65,9 @@ struct AppRunner<Application: App> {
     private func render(
         _ root: any RootScene,
         using runtime: StateRuntime,
-        termination: TerminationController
-    ) -> TerminalViewportSize {
+        termination: TerminationController,
+        previousRender: RenderedTerminalViewport? = nil
+    ) -> RenderedTerminalViewport {
         while true {
             let viewport = TerminalControl.currentTerminalSize()
             guard let block = root.renderedBlock(
@@ -68,7 +75,7 @@ struct AppRunner<Application: App> {
                 using: runtime,
                 termination: termination
             ) else {
-                return viewport
+                return RenderedTerminalViewport(viewport: viewport, block: nil)
             }
 
             runtime.updateRenderedFrame(TextRenderer.frame(for: block, in: viewport))
@@ -76,13 +83,26 @@ struct AppRunner<Application: App> {
                 continue
             }
 
-            render(block, in: viewport)
-            return viewport
+            render(
+                block,
+                in: viewport,
+                previousRender: previousRender
+            )
+            return RenderedTerminalViewport(viewport: viewport, block: block)
         }
     }
 
-    private func render(_ block: RenderedBlock, in viewport: TerminalViewportSize) {
-        TerminalControl.write(TextRenderer.screen(for: block, in: viewport))
+    private func render(
+        _ block: RenderedBlock,
+        in viewport: TerminalViewportSize,
+        previousRender: RenderedTerminalViewport?
+    ) {
+        TerminalControl.write(TextRenderer.redraw(
+            from: previousRender?.block,
+            previousViewport: previousRender?.viewport,
+            to: block,
+            in: viewport
+        ))
     }
 
     private func inputTimeout(using runtime: StateRuntime) -> TimeInterval? {
@@ -94,15 +114,40 @@ struct AppRunner<Application: App> {
 
 struct TerminalViewportTracker {
 
-    private(set) var renderedViewport: TerminalViewportSize
+    private(set) var renderedViewport: RenderedTerminalViewport
+
+    init(renderedViewport: TerminalViewportSize) {
+        self.renderedViewport = RenderedTerminalViewport(
+            viewport: renderedViewport,
+            block: nil
+        )
+    }
+
+    init(renderedViewport: RenderedTerminalViewport) {
+        self.renderedViewport = renderedViewport
+    }
 
     func needsRedraw(for currentViewport: TerminalViewportSize) -> Bool {
-        currentViewport != renderedViewport
+        currentViewport != renderedViewport.viewport
+    }
+
+    mutating func update(renderedViewport: RenderedTerminalViewport) {
+        self.renderedViewport = renderedViewport
     }
 
     mutating func update(renderedViewport: TerminalViewportSize) {
-        self.renderedViewport = renderedViewport
+        self.renderedViewport = RenderedTerminalViewport(
+            viewport: renderedViewport,
+            block: renderedViewport == self.renderedViewport.viewport ? self.renderedViewport.block : nil
+        )
     }
+}
+
+struct RenderedTerminalViewport: Equatable, Sendable {
+
+    var viewport: TerminalViewportSize
+
+    var block: RenderedBlock?
 }
 
 private extension RootScene {

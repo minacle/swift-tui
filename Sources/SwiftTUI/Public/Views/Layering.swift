@@ -63,19 +63,7 @@ struct BackgroundStyleView<Content: View>: View,
             return nil
         }
 
-        return RenderedBlock.composited(
-            [
-                LayerModifierRenderer.backgroundBlock(
-                    width: contentBlock.width,
-                    height: contentBlock.height,
-                    style: style
-                ),
-                contentBlock,
-            ],
-            width: contentBlock.width,
-            height: contentBlock.height,
-            paddedRows: contentBlock.paddedRows
-        )
+        return contentBlock.fillingBackground(style)
     }
 }
 
@@ -109,6 +97,117 @@ struct OverlayView<Content: View, Overlay: View>: View,
             proposal: proposal,
             path: path,
             runtime: runtime
+        )
+    }
+}
+
+private extension RenderedBlock {
+
+    func fillingBackground(_ backgroundStyle: AnyColor) -> RenderedBlock {
+        guard width > 0, height > 0 else {
+            return self
+        }
+
+        let bounds = RenderedRect(width: width, height: height)
+        let clippedRuns = runs.flatMap {
+            $0.clipped(to: bounds)
+        }.sorted {
+            if $0.row == $1.row {
+                return $0.column < $1.column
+            }
+            return $0.row < $1.row
+        }
+
+        var runsByRow: [Int: [RenderedRun]] = [:]
+        for run in clippedRuns {
+            runsByRow[run.row, default: []].append(run)
+        }
+
+        var filledRuns: [RenderedRun] = []
+        for row in 0..<height {
+            var column = 0
+            for run in runsByRow[row] ?? [] {
+                if column < run.column {
+                    appendBackgroundRun(
+                        row: row,
+                        column: column,
+                        width: run.column - column,
+                        style: backgroundStyle,
+                        to: &filledRuns
+                    )
+                }
+
+                var styledRun = run
+                if styledRun.style.backgroundStyle == nil {
+                    styledRun.style.backgroundStyle = backgroundStyle
+                }
+                append(styledRun, to: &filledRuns)
+                column = max(column, run.column + run.width)
+            }
+
+            if column < width {
+                appendBackgroundRun(
+                    row: row,
+                    column: column,
+                    width: width - column,
+                    style: backgroundStyle,
+                    to: &filledRuns
+                )
+            }
+        }
+
+        return RenderedBlock(
+            runs: filledRuns,
+            width: width,
+            height: height,
+            paddedRows: Set(0..<height),
+            cursor: cursor,
+            hitRegions: hitRegions,
+            scrollRegions: scrollRegions,
+            focusRegions: focusRegions,
+            identifiedRegions: identifiedRegions,
+            coordinateSpaceRegions: coordinateSpaceRegions
+        )
+    }
+
+    func appendBackgroundRun(
+        row: Int,
+        column: Int,
+        width: Int,
+        style: AnyColor,
+        to runs: inout [RenderedRun]
+    ) {
+        guard width > 0 else {
+            return
+        }
+
+        append(
+            RenderedRun(
+                text: String(repeating: " ", count: width),
+                row: row,
+                column: column,
+                style: TextStyle(backgroundStyle: style)
+            ),
+            to: &runs
+        )
+    }
+
+    func append(_ run: RenderedRun, to runs: inout [RenderedRun]) {
+        guard let last = runs.last,
+              last.row == run.row,
+              last.column + last.width == run.column,
+              last.style == run.style,
+              last.link == run.link else {
+            runs.append(run)
+            return
+        }
+
+        runs[runs.count - 1] = RenderedRun(
+            text: last.text + run.text,
+            row: last.row,
+            column: last.column,
+            style: last.style,
+            link: last.link
         )
     }
 }

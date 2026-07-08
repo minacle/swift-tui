@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed slow redraws for large or full-screen styled backgrounds by diffing
+  terminal updates and avoiding full-cell background recomposition on each
+  invalidation.
 - Fixed `ZStack` layout so flexible layered content, such as a boxed
   `TextEditor`, receives the parent stack's proposed space instead of collapsing
   to its intrinsic height.

@@ -4600,6 +4600,98 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(output == "\u{001B}[2J\u{001B}[3;4H한A\u{001B}[?25h\u{001B}[3;7H")
 }
 
+@Test func screenOutputDiffUpdatesOnlyChangedCharacter() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["ABC"]),
+        to: RenderedBlock(lines: ["AXC"]),
+        in: TerminalViewportSize(columns: 3, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[1;2HX\u{001B}[?25l")
+}
+
+@Test func screenOutputDiffClearsRemovedTrailingText() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["ABCD"]),
+        to: RenderedBlock(runs: [RenderedRun(text: "A")], width: 4, height: 1),
+        in: TerminalViewportSize(columns: 4, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[1;2H   \u{001B}[?25l")
+}
+
+@Test func screenOutputDiffRendersStyleChanges() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["A"]),
+        to: ViewResolver.block(from: Text("A").foregroundStyle(.blue).bold())!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[1;1H\u{001B}[1m\u{001B}[34mA\u{001B}[22m\u{001B}[39m\u{001B}[?25l")
+}
+
+@Test func screenOutputDiffCanMoveOnlyCursor() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["A"], cursor: RenderedCursor(column: 0)),
+        to: RenderedBlock(lines: ["A"], cursor: RenderedCursor(column: 1)),
+        in: TerminalViewportSize(columns: 2, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[?25h\u{001B}[1;2H")
+}
+
+@Test func screenOutputRedrawUsesFullScreenWhenViewportChanges() {
+    let output = TextRenderer.redraw(
+        from: RenderedBlock(lines: ["A"]),
+        previousViewport: TerminalViewportSize(columns: 1, rows: 1),
+        to: RenderedBlock(lines: ["A"]),
+        in: TerminalViewportSize(columns: 2, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[2J\u{001B}[1;1HA\u{001B}[?25l")
+}
+
+@Test func screenOutputDiffClearsWideCharacterContinuationWhenReplacingWithNarrowText() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["한"]),
+        to: RenderedBlock(lines: ["A"]),
+        in: TerminalViewportSize(columns: 2, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[1;1HA \u{001B}[?25l")
+}
+
+@Test func screenOutputDiffOverwritesNextCellWhenReplacingNarrowTextWithWideCharacter() {
+    let output = TextRenderer.diff(
+        from: RenderedBlock(lines: ["AB"]),
+        to: RenderedBlock(lines: ["한"]),
+        in: TerminalViewportSize(columns: 2, rows: 1)
+    )
+
+    #expect(output == "\u{001B}[1;1H한\u{001B}[?25l")
+}
+
+@Test func screenOutputDiffKeepsFullScreenBackgroundTextEditorInputSmall() {
+    let runtime = StateRuntime()
+    let view = FullScreenBackgroundTextEditorEditingView()
+    let proposal = RenderProposal(columns: 6, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let previousBlock = runtime.block(from: view, in: proposal)!
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let block = runtime.block(from: view, in: proposal)!
+
+    let output = TextRenderer.diff(
+        from: previousBlock,
+        to: block,
+        in: TerminalViewportSize(columns: 6, rows: 2)
+    )
+
+    #expect(!output.contains(TerminalControl.clearScreenSequence))
+    #expect(output == "\u{001B}[1;1H\u{001B}[41ma\u{001B}[49m\u{001B}[?25h\u{001B}[1;2H")
+}
+
 @Test func terminalSessionSequencesAreStable() {
     #expect(TerminalControl.enterAlternateScreenSequence == "\u{001B}[?1049h")
     #expect(TerminalControl.hideCursorSequence == "\u{001B}[?25l")
@@ -12049,6 +12141,19 @@ private struct TextEditorEditingView: View {
     var body: some View {
         TextEditor(text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct FullScreenBackgroundTextEditorEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .focused($isFocused)
+            .background(.red)
     }
 }
 
