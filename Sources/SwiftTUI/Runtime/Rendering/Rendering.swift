@@ -1985,6 +1985,14 @@ enum ViewResolver {
             return .resolved(button.renderedBlock(in: proposal, path: path, runtime: runtime))
         }
 
+        if let fillShape = view as? any FillShapeRenderable {
+            return .resolved(fillShape.renderedBlock(in: proposal, path: path, runtime: runtime))
+        }
+
+        if let shape = view as? any ShapeRenderable {
+            return .resolved(ShapeRenderer.defaultBlock(shape: shape, proposal: proposal))
+        }
+
         if let box = view as? any BoxRenderable {
             return .resolved(box.renderedBlock(in: proposal, path: path, runtime: runtime))
         }

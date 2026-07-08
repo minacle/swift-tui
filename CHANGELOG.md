@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `Rectangle`, `Shape`, `ShapeView`, `FillShapeView`, `FillStyle`,
+  and shape `size`, `offset`, and `fill` APIs for terminal-cell rectangle
+  fills.
+
 ### Changed
 
 - Changed the public geometry layout API to use `Terminal.Point`,
