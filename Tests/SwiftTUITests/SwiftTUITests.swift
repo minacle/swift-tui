@@ -1650,6 +1650,166 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
 }
 
+@Test func maxHeightFramedTextEditorKeepsEditingAfterReturnAtFrameBottom() {
+    let runtime = StateRuntime()
+    let view = MaxHeightFramedTextEditorEditingView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    let initialBlock = runtime.block(from: view)
+    #expect(initialBlock?.lines == ["   "])
+    #expect(initialBlock?.cursor == RenderedCursor(row: 0, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let scrolledBlock = runtime.block(from: view)
+    #expect(scrolledBlock?.lines == ["   ", "   "])
+    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view)
+    #expect(editedBlock?.lines == ["   ", "b  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func maxHeightOnlyTextEditorAcceptsTyping() {
+    let runtime = StateRuntime()
+    let view = MaxHeightOnlyTextEditorEditingView()
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3))
+    _ = runtime.consumeInvalidation()
+    let initialBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(initialBlock?.lines == ["   "])
+    #expect(initialBlock?.cursor == RenderedCursor(row: 0, column: 0))
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(editedBlock?.lines == ["a  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 0, column: 1))
+}
+
+@Test func maxHeightOnlyTextEditorAcceptsTypingAfterClickFocus() {
+    let runtime = StateRuntime()
+    let view = MaxHeightOnlyTextEditorClickFocusView()
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.consumeInvalidation())
+    _ = runtime.block(from: view, in: RenderProposal(columns: 3))
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
+    #expect(editedBlock?.lines == ["a  "])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 0, column: 1))
+}
+
+@Test func maxHeightConstantTextEditorBelowScrollViewAcceptsTypingAfterClickFocus() {
+    let runtime = StateRuntime()
+    let view = MaxHeightConstantTextEditorBelowScrollViewView()
+    let proposal = RenderProposal(columns: 8, rows: 6)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 5, phase: .down)
+        ) == .handled
+    )
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let editedBlock = runtime.block(from: view, in: proposal)
+    #expect(editedBlock?.lines.suffix(2) == ["│a     │", "└──────┘"])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 4, column: 2))
+}
+
+@Test func maxHeightConstantTextEditorBelowScrollViewAcceptsTypingAfterClickFocusInTallViewport() {
+    let runtime = StateRuntime()
+    let view = MaxHeightConstantTextEditorBelowScrollViewView()
+    let proposal = RenderProposal(columns: 80, rows: 24)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 23, phase: .down)
+        ) == .handled
+    )
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    let editedBlock = runtime.block(from: view, in: proposal)
+    #expect(editedBlock?.lines.suffix(2) == [
+        "│a                                                                             │",
+        "└──────────────────────────────────────────────────────────────────────────────┘"
+    ])
+    #expect(editedBlock?.cursor == RenderedCursor(row: 22, column: 2))
+}
+
+@Test func maxHeightConstantTextEditorBelowScrollViewKeepsPriorLineVisibleAfterReturns() {
+    let runtime = StateRuntime()
+    let view = MaxHeightConstantTextEditorBelowScrollViewView()
+        .onTerminate {}
+    let proposal = RenderProposal(columns: 80)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 3, phase: .down)
+        ) == .handled
+    )
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    var block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines.suffix(3) == [
+        "┌──────────────────────────────────────────────────────────────────────────────┐",
+        "│a                                                                             │",
+        "└──────────────────────────────────────────────────────────────────────────────┘"
+    ])
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines.suffix(4) == [
+        "┌──────────────────────────────────────────────────────────────────────────────┐",
+        "│a                                                                             │",
+        "│                                                                              │",
+        "└──────────────────────────────────────────────────────────────────────────────┘"
+    ])
+
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines.suffix(4) == [
+        "┌──────────────────────────────────────────────────────────────────────────────┐",
+        "│a                                                                             │",
+        "│b                                                                             │",
+        "└──────────────────────────────────────────────────────────────────────────────┘"
+    ])
+
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines.suffix(5) == [
+        "┌──────────────────────────────────────────────────────────────────────────────┐",
+        "│a                                                                             │",
+        "│b                                                                             │",
+        "│                                                                              │",
+        "└──────────────────────────────────────────────────────────────────────────────┘"
+    ])
+}
+
 @Test func filledTextEditorKeepsEditingAfterReturnAtFrameBottom() {
     let runtime = StateRuntime()
     let view = FramedTextEditorInitialTextView(text: "abcdef")
@@ -10730,6 +10890,66 @@ private struct FramedTextEditorEditingView: View {
         TextEditor(text: $text)
             .frame(width: 3, height: 2, alignment: .topLeading)
             .focused($isFocused)
+    }
+}
+
+private struct MaxHeightFramedTextEditorEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .frame(width: 3, alignment: .topLeading)
+            .frame(maxHeight: 2, alignment: .topLeading)
+            .focused($isFocused)
+    }
+}
+
+private struct MaxHeightOnlyTextEditorEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        TextEditor(text: $text)
+            .frame(maxHeight: 2, alignment: .topLeading)
+            .focused($isFocused)
+    }
+}
+
+private struct MaxHeightOnlyTextEditorClickFocusView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused: Bool
+
+    var body: some View {
+        TextEditor(text: $text)
+            .frame(maxHeight: 2, alignment: .topLeading)
+            .focused($isFocused)
+    }
+}
+
+private struct MaxHeightConstantTextEditorBelowScrollViewView: View {
+
+    var body: some View {
+        VStack {
+            ScrollView {
+                VStack {
+                    Text("")
+                }
+            }
+            HStack {
+                Box {
+                    TextEditor(text: .constant(""))
+                        .frame(maxHeight: 4)
+                }
+                Spacer()
+            }
+        }
     }
 }
 

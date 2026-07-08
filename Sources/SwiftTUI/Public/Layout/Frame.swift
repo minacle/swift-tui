@@ -253,18 +253,33 @@ struct ConstrainedFrameView<Content: View>: View, LayoutModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        let traits = layoutTraits
+        let usesFlexibleMaximumWidth = usesFlexibleMaximum(
+            proposal?.columns,
+            ideal: idealWidth,
+            maximum: maxWidth,
+            isFlexible: traits.flexibleAxes.contains(.horizontal)
+        )
+        let usesFlexibleMaximumHeight = usesFlexibleMaximum(
+            proposal?.rows,
+            ideal: idealHeight,
+            maximum: maxHeight,
+            isFlexible: traits.flexibleAxes.contains(.vertical)
+        )
         let childProposal = RenderProposal(
             columns: proposedLength(
                 proposal?.columns,
                 ideal: idealWidth,
                 minimum: minWidth,
-                maximum: maxWidth
+                maximum: maxWidth,
+                isFlexible: traits.flexibleAxes.contains(.horizontal)
             ),
             rows: proposedLength(
                 proposal?.rows,
                 ideal: idealHeight,
                 minimum: minHeight,
-                maximum: maxHeight
+                maximum: maxHeight,
+                isFlexible: traits.flexibleAxes.contains(.vertical)
             )
         )
         guard let block = ViewResolver.block(
@@ -276,21 +291,71 @@ struct ConstrainedFrameView<Content: View>: View, LayoutModifierRenderable,
             return nil
         }
 
-        return block.framed(
-            width: resolvedLength(
-                content: block.width,
+        let naturalBlock = naturalBlock(
+            if: usesFlexibleMaximumWidth || usesFlexibleMaximumHeight,
+            proposal: RenderProposal(
+                columns: usesFlexibleMaximumWidth
+                    ? naturalProposedLength(
+                        proposal?.columns,
+                        ideal: idealWidth,
+                        minimum: minWidth,
+                        maximum: maxWidth
+                    )
+                    : childProposal.columns,
+                rows: usesFlexibleMaximumHeight
+                    ? naturalProposedLength(
+                        proposal?.rows,
+                        ideal: idealHeight,
+                        minimum: minHeight,
+                        maximum: maxHeight
+                    )
+                    : childProposal.rows
+            ),
+            path: path,
+            runtime: runtime
+        )
+
+        let resolvedWidth = resolvedLength(
+                content: contentLength(
+                    constrained: block.width,
+                    natural: naturalBlock?.width,
+                    usesFlexibleMaximum: usesFlexibleMaximumWidth
+                ),
                 proposal: proposal?.columns,
                 ideal: idealWidth,
                 minimum: minWidth,
                 maximum: maxWidth
-            ),
-            height: resolvedLength(
-                content: block.height,
+            )
+        let resolvedHeight = resolvedLength(
+                content: contentLength(
+                    constrained: block.height,
+                    natural: naturalBlock?.height,
+                    usesFlexibleMaximum: usesFlexibleMaximumHeight
+                ),
                 proposal: proposal?.rows,
                 ideal: idealHeight,
                 minimum: minHeight,
                 maximum: maxHeight
-            ),
+            )
+        let finalBlock: RenderedBlock
+        if usesFlexibleMaximumWidth || usesFlexibleMaximumHeight {
+            finalBlock = ViewResolver.block(
+                from: content,
+                in: RenderProposal(
+                    columns: usesFlexibleMaximumWidth ? resolvedWidth : childProposal.columns,
+                    rows: usesFlexibleMaximumHeight ? resolvedHeight : childProposal.rows
+                ),
+                path: path,
+                runtime: runtime
+            ) ?? block
+        }
+        else {
+            finalBlock = block
+        }
+
+        return finalBlock.framed(
+            width: resolvedWidth,
+            height: resolvedHeight,
             alignment: alignment
         )
     }
@@ -303,13 +368,64 @@ struct ConstrainedFrameView<Content: View>: View, LayoutModifierRenderable,
         return max(maximum, minimum ?? 0)
     }
 
+    private func usesFlexibleMaximum(
+        _ proposal: Int?,
+        ideal: Int?,
+        maximum: Int?,
+        isFlexible: Bool
+    ) -> Bool {
+        proposal == nil && ideal == nil && maximum != nil && isFlexible
+    }
+
     private func proposedLength(
+        _ proposal: Int?,
+        ideal: Int?,
+        minimum: Int?,
+        maximum: Int?,
+        isFlexible: Bool
+    ) -> Int? {
+        clamp(proposal ?? ideal ?? (isFlexible ? maximum : nil), minimum: minimum, maximum: maximum)
+    }
+
+    private func naturalProposedLength(
         _ proposal: Int?,
         ideal: Int?,
         minimum: Int?,
         maximum: Int?
     ) -> Int? {
         clamp(proposal ?? ideal, minimum: minimum, maximum: maximum)
+    }
+
+    private func contentLength(
+        constrained: Int,
+        natural: Int?,
+        usesFlexibleMaximum: Bool
+    ) -> Int {
+        usesFlexibleMaximum ? natural ?? constrained : constrained
+    }
+
+    private func naturalBlock(
+        if shouldMeasure: Bool,
+        proposal: RenderProposal,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        guard shouldMeasure else {
+            return nil
+        }
+
+        let render = {
+            ViewResolver.block(
+                from: content,
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+
+        return LayoutMeasurementContext.withMeasurement {
+            runtime?.withoutRenderRegistrations(render) ?? render()
+        }
     }
 
     private func resolvedLength(

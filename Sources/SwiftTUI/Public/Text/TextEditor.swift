@@ -44,9 +44,13 @@ extension TextEditor {
             at: path,
             initialText: text.wrappedValue
         )
-        editorState?.synchronize(with: text.wrappedValue)
-        editorState?.clamp()
-        editorState?.updateLayoutWidth(proposal?.columns)
+        let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
+            && runtime?.isSuppressingInteractiveRenderRegistrations != true
+        if updatesInteractiveState {
+            editorState?.synchronize(with: text.wrappedValue)
+            editorState?.clamp()
+            editorState?.updateLayoutWidth(proposal?.columns)
+        }
         runtime?.registerFocusable(true, at: path)
         runtime?.registerKeyPressHandler(
             KeyPressHandler(
@@ -62,8 +66,7 @@ extension TextEditor {
         let currentText = editorState?.text ?? text.wrappedValue
         let layout = TextEditorLayout(text: currentText, maxWidth: proposal?.columns)
         let cursor = renderedCursor(state: editorState, layout: layout, runtime: runtime, path: path)
-        if !LayoutMeasurementContext.isMeasuring
-            && runtime?.isSuppressingInteractiveRenderRegistrations != true {
+        if updatesInteractiveState {
             editorState?.updateScrollPoint(
                 for: cursor,
                 viewportWidth: proposal?.columns,
