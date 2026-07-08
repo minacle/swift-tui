@@ -26,6 +26,8 @@ struct MouseEvent: Equatable, Sendable {
 
         case down
 
+        case motion
+
         case up
     }
 
@@ -178,6 +180,48 @@ struct TapGestureView<Content: View>: View, InputModifierRenderable, LayoutTrait
     }
 }
 
+struct LongPressGestureView<Content: View>: View, InputModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let handler: LongPressGestureHandler
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        runtime?.registerLongPressGestureHandler(handler, at: path)
+        guard var block = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+}
+
 struct CoordinateSpaceView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
 
     typealias Body = Never
@@ -245,6 +289,19 @@ struct TapGestureHandler {
     let action: TapGestureAction
 }
 
+struct LongPressGestureHandler {
+
+    let actionPath: [Int]?
+
+    let minimumDuration: TimeInterval
+
+    let maximumDistance: Size
+
+    let action: () -> Void
+
+    let onPressingChanged: ((Bool) -> Void)?
+}
+
 enum TapGestureAction {
 
     case plain(() -> Void)
@@ -307,6 +364,8 @@ final class InputRuntime {
 
     private var tapHandlersByPath: [[Int]: [TapGestureHandler]] = [:]
 
+    private var longPressHandlersByPath: [[Int]: [LongPressGestureHandler]] = [:]
+
     private var linkHandlersByPath: [[Int]: LinkHandler] = [:]
 
     private var mouseDownPositionHandlersByPath: [[Int]: MouseDownPositionHandler] = [:]
@@ -327,16 +386,23 @@ final class InputRuntime {
 
     private var tapSequence: TapSequence?
 
+    private var longPressSequence: LongPressSequence?
+
     private let tapTimeout: TimeInterval = 0.5
 
     var nextTapDeadline: Date? {
         tapSequence?.deadline
     }
 
+    var nextLongPressDeadline: Date? {
+        longPressSequence?.nextDeadline
+    }
+
     func beginRender() {
         handlersByPath = [:]
         globalHandlers = []
         tapHandlersByPath = [:]
+        longPressHandlersByPath = [:]
         linkHandlersByPath = [:]
         mouseDownPositionHandlersByPath = [:]
     }
@@ -357,6 +423,10 @@ final class InputRuntime {
 
     func register(_ handler: TapGestureHandler, at path: [Int]) {
         tapHandlersByPath[path, default: []].append(handler)
+    }
+
+    func register(_ handler: LongPressGestureHandler, at path: [Int]) {
+        longPressHandlersByPath[path, default: []].append(handler)
     }
 
     func register(_ handler: LinkHandler, at path: [Int]) {
@@ -458,21 +528,26 @@ final class InputRuntime {
         scroll: ([Int], MouseEvent) -> KeyPress.Result
     ) -> KeyPress.Result {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
+        _ = dispatchExpiredLongPressActions(at: date, perform: perform)
 
         if mouseEvent.button.isScrollWheel {
+            let cancelled = cancelLongPress(perform: perform)
             pressedTapTarget = nil
             pressedLinkTarget = nil
-            return dispatchScroll(mouseEvent, scroll: scroll)
+            let result = dispatchScroll(mouseEvent, scroll: scroll)
+            return result == .handled || cancelled ? .handled : .ignored
         }
 
         guard mouseEvent.button == .left else {
+            let cancelled = cancelLongPress(perform: perform)
             pressedTapTarget = nil
             pressedLinkTarget = nil
-            return .ignored
+            return cancelled ? .handled : .ignored
         }
 
         switch mouseEvent.phase {
         case .down:
+            _ = cancelLongPress(perform: perform)
             let focusedPath = focusTargets(at: mouseEvent).first {
                 focus($0)
             }
@@ -483,12 +558,36 @@ final class InputRuntime {
             )
             pressedLinkTarget = linkTarget(at: mouseEvent)
             pressedTapTarget = tapTarget(at: mouseEvent)
+            let longPressStarted = beginLongPress(
+                at: mouseEvent,
+                date: date,
+                perform: perform
+            )
+            let longPressRecognized = dispatchExpiredLongPressActions(
+                at: date,
+                perform: perform
+            ) == .handled
             return focusedPath != nil
                 || positioned
                 || pressedLinkTarget != nil
                 || pressedTapTarget != nil
+                || longPressStarted
+                || longPressRecognized
                 ? .handled : .ignored
+        case .motion:
+            return dispatchLongPressMotion(
+                mouseEvent,
+                perform: perform
+            )
         case .up:
+            let longPressWasActive = longPressSequence != nil
+            let longPressSucceeded = endLongPress(perform: perform)
+            if longPressSucceeded {
+                pressedLinkTarget = nil
+                pressedTapTarget = nil
+                return .handled
+            }
+
             if let pressedLinkTarget {
                 defer {
                     self.pressedLinkTarget = nil
@@ -503,7 +602,7 @@ final class InputRuntime {
             }
 
             guard let pressedTapTarget else {
-                return .ignored
+                return longPressWasActive ? .handled : .ignored
             }
 
             defer {
@@ -522,6 +621,30 @@ final class InputRuntime {
                 perform: perform
             )
         }
+    }
+
+    func dispatchExpiredLongPressActions(
+        at date: Date,
+        perform: ([Int], () -> Void) -> Void
+    ) -> KeyPress.Result {
+        guard var sequence = longPressSequence else {
+            return .ignored
+        }
+
+        var handled = false
+        for index in sequence.candidates.indices
+            where !sequence.candidates[index].didPerform
+                && date >= sequence.candidates[index].deadline {
+            let handler = sequence.candidates[index].handler
+            perform(handler.actionPath ?? sequence.path) {
+                handler.action()
+            }
+            sequence.candidates[index].didPerform = true
+            handled = true
+        }
+
+        longPressSequence = sequence
+        return handled ? .handled : .ignored
     }
 
     func dispatchExpiredTapActions(
@@ -550,12 +673,125 @@ final class InputRuntime {
         return .handled
     }
 
+    private func beginLongPress(
+        at mouseEvent: MouseEvent,
+        date: Date,
+        perform: ([Int], () -> Void) -> Void
+    ) -> Bool {
+        guard let path = longPressTarget(at: mouseEvent),
+              let handlers = longPressHandlersByPath[path] else {
+            return false
+        }
+
+        let location = rootPoint(for: mouseEvent)
+        let candidates = handlers.map {
+            LongPressCandidate(
+                handler: $0,
+                deadline: date.addingTimeInterval($0.minimumDuration)
+            )
+        }
+        longPressSequence = LongPressSequence(
+            path: path,
+            startLocation: location,
+            candidates: candidates
+        )
+
+        for handler in handlers {
+            perform(handler.actionPath ?? path) {
+                handler.onPressingChanged?(true)
+            }
+        }
+        return true
+    }
+
+    private func dispatchLongPressMotion(
+        _ mouseEvent: MouseEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> KeyPress.Result {
+        guard var sequence = longPressSequence else {
+            return .ignored
+        }
+
+        let location = rootPoint(for: mouseEvent)
+        var remaining: [LongPressCandidate] = []
+        var handled = false
+        for candidate in sequence.candidates {
+            if candidate.didPerform
+                || isWithinExtent(
+                    from: sequence.startLocation,
+                    to: location,
+                    maximumDistance: candidate.handler.maximumDistance
+                ) {
+                remaining.append(candidate)
+            }
+            else {
+                perform(candidate.handler.actionPath ?? sequence.path) {
+                    candidate.handler.onPressingChanged?(false)
+                }
+                handled = true
+            }
+        }
+
+        sequence.candidates = remaining
+        longPressSequence = remaining.isEmpty ? nil : sequence
+        return handled || !remaining.isEmpty ? .handled : .ignored
+    }
+
+    private func cancelLongPress(perform: ([Int], () -> Void) -> Void) -> Bool {
+        guard let sequence = longPressSequence else {
+            return false
+        }
+
+        finishLongPress(sequence, perform: perform)
+        longPressSequence = nil
+        return true
+    }
+
+    private func endLongPress(perform: ([Int], () -> Void) -> Void) -> Bool {
+        guard let sequence = longPressSequence else {
+            return false
+        }
+
+        finishLongPress(sequence, perform: perform)
+        longPressSequence = nil
+        return sequence.didPerform
+    }
+
+    private func finishLongPress(
+        _ sequence: LongPressSequence,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        for candidate in sequence.candidates {
+            perform(candidate.handler.actionPath ?? sequence.path) {
+                candidate.handler.onPressingChanged?(false)
+            }
+        }
+    }
+
     private func tapTarget(at mouseEvent: MouseEvent) -> [Int]? {
         let column = mouseEvent.column - rootFrame.column
         let row = mouseEvent.row - rootFrame.row
         return hitRegions
             .filter {
                 tapHandlersByPath[$0.path] != nil
+                    && $0.frame.contains(column: column, row: row)
+            }
+            .max {
+                if $0.path.count != $1.path.count {
+                    return $0.path.count < $1.path.count
+                }
+
+                return $0.frame.area > $1.frame.area
+            }?
+            .path
+    }
+
+    private func longPressTarget(at mouseEvent: MouseEvent) -> [Int]? {
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        return hitRegions
+            .filter {
+                longPressHandlersByPath[$0.path] != nil
                     && $0.frame.contains(column: column, row: row)
             }
             .max {
@@ -853,6 +1089,17 @@ final class InputRuntime {
     private func resetTapSequence() {
         tapSequence = nil
     }
+
+    private func isWithinExtent(
+        from start: Point,
+        to end: Point,
+        maximumDistance: Size
+    ) -> Bool {
+        let columns = end.column - start.column
+        let rows = end.row - start.row
+        return abs(columns) <= maximumDistance.columns
+            && abs(rows) <= maximumDistance.rows
+    }
 }
 
 private extension MouseButton {
@@ -882,4 +1129,33 @@ private struct TapSequence {
     func isExpired(at date: Date) -> Bool {
         date >= deadline
     }
+}
+
+private struct LongPressSequence {
+
+    let path: [Int]
+
+    let startLocation: Point
+
+    var candidates: [LongPressCandidate]
+
+    var nextDeadline: Date? {
+        candidates
+            .filter { !$0.didPerform }
+            .map(\.deadline)
+            .min()
+    }
+
+    var didPerform: Bool {
+        candidates.contains { $0.didPerform }
+    }
+}
+
+private struct LongPressCandidate {
+
+    let handler: LongPressGestureHandler
+
+    let deadline: Date
+
+    var didPerform = false
 }

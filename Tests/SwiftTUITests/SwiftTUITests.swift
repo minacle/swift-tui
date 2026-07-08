@@ -4410,8 +4410,8 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.hideCursorSequence == "\u{001B}[?25l")
     #expect(TerminalControl.showCursorSequence == "\u{001B}[?25h")
     #expect(TerminalControl.exitAlternateScreenSequence == "\u{001B}[?1049l")
-    #expect(TerminalControl.enableMouseTrackingSequence == "\u{001B}[?1000h\u{001B}[?1006h")
-    #expect(TerminalControl.disableMouseTrackingSequence == "\u{001B}[?1006l\u{001B}[?1000l")
+    #expect(TerminalControl.enableMouseTrackingSequence == "\u{001B}[?1003h\u{001B}[?1006h")
+    #expect(TerminalControl.disableMouseTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")
 }
 
 @Test func terminalViewportTrackerIgnoresSameViewport() {
@@ -5504,6 +5504,22 @@ private func lineBreakKinds(in text: String) -> [String] {
                     row: 2,
                     modifiers: [.shift, .control],
                     phase: .down
+                )
+            )
+    )
+    #expect(
+        TerminalControl.input(for: Array("\u{001B}[<32;12;3M".utf8))
+            == .mouse(MouseEvent(button: .left, column: 12, row: 3, phase: .motion))
+    )
+    #expect(
+        TerminalControl.input(for: Array("\u{001B}[<52;1;2M".utf8))
+            == .mouse(
+                MouseEvent(
+                    button: .left,
+                    column: 1,
+                    row: 2,
+                    modifiers: [.shift, .control],
+                    phase: .motion
                 )
             )
     )
@@ -7505,6 +7521,21 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events.isEmpty)
 }
 
+@Test func longPressGestureModifierDoesNotChangeRenderedOutput() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+
+    let block = runtime.block(
+        from: Text("A")
+            .onLongPressGesture {
+                tapProbe.record("long")
+            }
+    )
+
+    #expect(block?.text == "A")
+    #expect(tapProbe.events.isEmpty)
+}
+
 @Test func hiddenSuppressesInteractiveRuntimeRegistrations() {
     let runtime = StateRuntime()
     let tapProbe = TapGestureProbe()
@@ -7520,6 +7551,9 @@ private struct ParentCallbackStateMutationTests {
             }
             .onTapGesture {
                 tapProbe.record("tap")
+            }
+            .onLongPressGesture {
+                tapProbe.record("long")
             }
         ScrollView(.vertical) {
             Text("A")
@@ -7537,6 +7571,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatch(KeyPress(key: "k", characters: "k")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
     dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.dispatchExpiredLongPressActions() == .ignored)
     #expect(tapProbe.events.isEmpty)
 }
 
@@ -7556,6 +7591,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .ignored)
     dispatchClick(to: runtime, column: 1, row: 1, expecting: .ignored)
+    #expect(runtime.dispatchExpiredLongPressActions() == .ignored)
     #expect(keyProbe.events.isEmpty)
     #expect(tapProbe.events.isEmpty)
 }
@@ -7584,6 +7620,233 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.runs.map(\.text) == ["Tap", "updated"])
+}
+
+@Test func longPressGestureRecognizesAfterMinimumDuration() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = Text("A")
+        .onLongPressGesture(
+            minimumDuration: 0.5,
+            maximumDistance: Size(columns: 10, rows: 10),
+            perform: {
+                tapProbe.record("long")
+            },
+            onPressingChanged: {
+                tapProbe.record($0 ? "pressing" : "ended")
+            }
+        )
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(runtime.nextLongPressDeadline == date.addingTimeInterval(0.5))
+    #expect(tapProbe.events == ["pressing"])
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.49)) == .ignored)
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.5)) == .handled)
+    #expect(tapProbe.events == ["pressing", "long"])
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date.addingTimeInterval(0.6)
+        ) == .handled
+    )
+    #expect(tapProbe.events == ["pressing", "long", "ended"])
+}
+
+@Test func longPressGestureReleaseBeforeDeadlineCancelsWithoutPerforming() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = Text("A")
+        .onLongPressGesture(
+            minimumDuration: 0.5,
+            perform: {
+                tapProbe.record("long")
+            },
+            onPressingChanged: {
+                tapProbe.record($0 ? "pressing" : "ended")
+            }
+        )
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date.addingTimeInterval(0.1)
+        ) == .handled
+    )
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.6)) == .ignored)
+    #expect(tapProbe.events == ["pressing", "ended"])
+}
+
+@Test func longPressGestureMotionBeyondMaximumDistanceCancels() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = Text("ABCDE")
+        .onLongPressGesture(
+            minimumDuration: 0.5,
+            maximumDistance: Size(columns: 2, rows: 0),
+            perform: {
+                tapProbe.record("long")
+            },
+            onPressingChanged: {
+                tapProbe.record($0 ? "pressing" : "ended")
+            }
+        )
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 4, row: 1, phase: .motion),
+            at: date.addingTimeInterval(0.1)
+        ) == .handled
+    )
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.6)) == .ignored)
+    #expect(tapProbe.events == ["pressing", "ended"])
+}
+
+@Test func longPressGestureUsesMostSpecificRegionAndRespectsFrameClipping() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = VStack {
+        Text("ABCD")
+            .frame(width: 2)
+            .onLongPressGesture(minimumDuration: 0.1) {
+                tapProbe.record("child")
+            }
+    }
+    .onLongPressGesture(minimumDuration: 0.1) {
+        tapProbe.record("parent")
+    }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 2, row: 1, phase: .up),
+            at: date.addingTimeInterval(0.2)
+        ) == .handled
+    )
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 3, row: 1, phase: .down),
+            at: date.addingTimeInterval(1)
+        ) == .ignored
+    )
+    #expect(tapProbe.events == ["child"])
+}
+
+@Test func longPressGestureSuccessfulPressSuppressesTap() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = Text("A")
+        .onTapGesture {
+            tapProbe.record("tap")
+        }
+        .onLongPressGesture(minimumDuration: 0.1) {
+            tapProbe.record("long")
+        }
+
+    _ = runtime.block(from: view)
+
+    dispatchClick(to: runtime, column: 1, row: 1, at: date)
+    #expect(tapProbe.events == ["tap"])
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date.addingTimeInterval(1)
+        ) == .handled
+    )
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(1.1)) == .handled)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date.addingTimeInterval(1.2)
+        ) == .handled
+    )
+    #expect(tapProbe.events == ["tap", "long"])
+}
+
+@Test func longPressGestureStateMutationInvalidatesView() {
+    let runtime = StateRuntime()
+    let view = LongPressGestureStateMutationView()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    #expect(runtime.block(from: view)?.text == "0:false")
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "0:true")
+
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "1:true")
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            at: date.addingTimeInterval(0.2)
+        ) == .handled
+    )
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "1:false")
+}
+
+@Test func parentCallbackDirectStateMutationFromChildLongPressUpdatesRenderedState() {
+    let runtime = StateRuntime()
+    let view = ParentCallbackDirectStateMutationLongPressView()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "empty"])
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.runs.map(\.text) == ["Press", "updated"])
 }
 
 @Test func tapGestureHitTestingUsesStackCoordinates() {
@@ -10715,6 +10978,9 @@ private struct ClickFocusTapGestureView: View {
             .onTapGesture {
                 tapProbe.record("tap")
             }
+            .onLongPressGesture {
+                tapProbe.record("long")
+            }
     }
 }
 
@@ -11108,6 +11374,26 @@ private struct TapGestureStateMutationView: View {
     }
 }
 
+private struct LongPressGestureStateMutationView: View {
+
+    @State private var count = 0
+
+    @State private var isPressing = false
+
+    var body: some View {
+        Text("\(count):\(isPressing)")
+            .onLongPressGesture(
+                minimumDuration: 0.1,
+                perform: {
+                    count += 1
+                },
+                onPressingChanged: {
+                    isPressing = $0
+                }
+            )
+    }
+}
+
 private struct ParentCallbackDirectStateMutationTapView: View {
 
     @State private var message = ""
@@ -11122,6 +11408,20 @@ private struct ParentCallbackDirectStateMutationTapView: View {
     }
 }
 
+private struct ParentCallbackDirectStateMutationLongPressView: View {
+
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ParentCallbackLongPressChildView {
+                message = "updated"
+            }
+            Text(message.isEmpty ? "empty" : message)
+        }
+    }
+}
+
 private struct ParentCallbackTapChildView: View {
 
     let action: () -> Void
@@ -11129,6 +11429,18 @@ private struct ParentCallbackTapChildView: View {
     var body: some View {
         Text("Tap")
             .onTapGesture {
+                action()
+            }
+    }
+}
+
+private struct ParentCallbackLongPressChildView: View {
+
+    let action: () -> Void
+
+    var body: some View {
+        Text("Press")
+            .onLongPressGesture(minimumDuration: 0.1) {
                 action()
             }
     }

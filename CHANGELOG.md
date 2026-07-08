@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GeometryPoint`, `GeometrySize`, and `GeometryFrame`.
 - Added tap-location gestures with `Terminal.Point` coordinates and named
   coordinate spaces for resolving tap positions.
+- Added `onLongPressGesture(minimumDuration:maximumDistance:perform:onPressingChanged:)`
+  with terminal mouse motion tracking.
 - Added click-to-caret placement for `TextField`, `SecureField`, and
   `TextEditor`.
 

@@ -43,9 +43,9 @@ enum TerminalControl {
 
     static let exitAlternateScreenSequence = "\u{001B}[?1049l"
 
-    static let enableMouseTrackingSequence = "\u{001B}[?1000h\u{001B}[?1006h"
+    static let enableMouseTrackingSequence = "\u{001B}[?1003h\u{001B}[?1006h"
 
-    static let disableMouseTrackingSequence = "\u{001B}[?1006l\u{001B}[?1000l"
+    static let disableMouseTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
 
     static func cursorPositionSequence(row: Int, column: Int) -> String {
         "\u{001B}[\(max(row, 1));\(max(column, 1))H"
@@ -369,12 +369,15 @@ enum TerminalControl {
             return nil
         }
 
+        let isMotion = encodedButton & 32 != 0
+        let encodedButtonWithoutMotion = encodedButton & ~32
+
         return MouseEvent(
-            button: mouseButton(for: encodedButton),
+            button: mouseButton(for: encodedButtonWithoutMotion),
             column: column,
             row: row,
-            modifiers: mouseModifiers(for: encodedButton),
-            phase: final == "M" ? .down : .up
+            modifiers: mouseModifiers(for: encodedButtonWithoutMotion),
+            phase: isMotion ? .motion : final == "M" ? .down : .up
         )
     }
 

@@ -290,6 +290,41 @@ public extension View {
         )
     }
 
+    /// Adds an action to perform when this view recognizes a long press gesture.
+    ///
+    /// The view registers its rendered terminal frame as a hit region. Mouse
+    /// input that remains pressed inside the allowed movement distance for at
+    /// least `minimumDuration` runs the action.
+    ///
+    /// - Parameters:
+    ///   - minimumDuration: The minimum duration of the long press.
+    ///   - maximumDistance: The maximum terminal-cell extent the press can move
+    ///     before the gesture fails.
+    ///   - action: The action to perform when the long press is recognized.
+    ///   - onPressingChanged: A closure to run when pressing starts or ends.
+    /// - Returns: A view with a long-press gesture handler attached.
+    func onLongPressGesture(
+        minimumDuration: Double = 0.5,
+        maximumDistance: Size = .zero,
+        perform action: @escaping () -> Void,
+        onPressingChanged: ((Bool) -> Void)? = nil
+    ) -> some View {
+        let normalizedMaximumDistance = Size(
+            columns: max(maximumDistance.columns, 0),
+            rows: max(maximumDistance.rows, 0)
+        )
+        return LongPressGestureView(
+            content: self,
+            handler: LongPressGestureHandler(
+                actionPath: StateContext.currentPath,
+                minimumDuration: max(minimumDuration, 0),
+                maximumDistance: normalizedMaximumDistance,
+                action: action,
+                onPressingChanged: onPressingChanged
+            )
+        )
+    }
+
     /// Assigns a name to this view's local coordinate space.
     ///
     /// Descendant tap-location handlers can request coordinates relative to

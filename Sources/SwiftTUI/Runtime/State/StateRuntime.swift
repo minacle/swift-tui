@@ -335,6 +335,21 @@ final class StateRuntime {
         )
     }
 
+    func registerLongPressGestureHandler(
+        _ handler: LongPressGestureHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringLongPressGestureHandler(handler),
+            at: path
+        )
+    }
+
     func registerMouseDownPositionHandler(
         _ handler: MouseDownPositionHandler,
         at path: [Int]
@@ -655,8 +670,18 @@ final class StateRuntime {
         input.nextTapDeadline
     }
 
+    var nextLongPressDeadline: Date? {
+        input.nextLongPressDeadline
+    }
+
     func dispatchExpiredTapActions(at date: Date = Date()) -> KeyPress.Result {
         input.dispatchExpiredTapActions(at: date) { path, operation in
+            withView(at: path, perform: operation)
+        }
+    }
+
+    func dispatchExpiredLongPressActions(at date: Date = Date()) -> KeyPress.Result {
+        input.dispatchExpiredLongPressActions(at: date) { path, operation in
             withView(at: path, perform: operation)
         }
     }
@@ -786,6 +811,31 @@ final class StateRuntime {
             actionPath: handler.actionPath,
             count: handler.count,
             action: handler.action.restoringEnvironment(environment)
+        )
+    }
+
+    private func environmentRestoringLongPressGestureHandler(
+        _ handler: LongPressGestureHandler
+    ) -> LongPressGestureHandler {
+        let environment = EnvironmentRenderContext.current
+        return LongPressGestureHandler(
+            actionPath: handler.actionPath,
+            minimumDuration: handler.minimumDuration,
+            maximumDistance: handler.maximumDistance,
+            action: {
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action()
+                }
+            },
+            onPressingChanged: handler.onPressingChanged.map { action in
+                {
+                    isPressing in
+
+                    EnvironmentRenderContext.withValues(environment) {
+                        action(isPressing)
+                    }
+                }
+            }
         )
     }
 

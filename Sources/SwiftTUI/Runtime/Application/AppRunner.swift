@@ -41,6 +41,7 @@ struct AppRunner<Application: App> {
             }
 
             _ = runtime.dispatchExpiredTapActions()
+            _ = runtime.dispatchExpiredLongPressActions()
 
             if runtime.consumeInvalidation()
                 || viewportTracker.needsRedraw(for: TerminalControl.currentTerminalSize()) {
@@ -85,7 +86,7 @@ struct AppRunner<Application: App> {
     }
 
     private func inputTimeout(using runtime: StateRuntime) -> TimeInterval? {
-        runtime.nextTapDeadline.map {
+        [runtime.nextTapDeadline, runtime.nextLongPressDeadline].compactMap(\.self).min().map {
             max($0.timeIntervalSinceNow, 0)
         }
     }
