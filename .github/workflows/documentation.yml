@@ -20,12 +20,17 @@ concurrency:
 jobs:
   build:
     name: Build DocC site
-    runs-on: macos-26
+    runs-on: ubuntu-latest
+    container:
+      image: swift:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Trust workspace for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Show Swift version
         run: swift --version
