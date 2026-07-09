@@ -1,0 +1,35 @@
+name: Linux
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.3.2-noble
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build --scratch-path "$RUNNER_TEMP/swift-tui"
+
+      - name: Test
+        run: swift test --scratch-path "$RUNNER_TEMP/swift-tui"
