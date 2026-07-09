@@ -29,7 +29,7 @@ Add the package to a SwiftPM package:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/minacle/swift-tui", from: "0.5.0"),
+    .package(url: "https://github.com/minacle/swift-tui", from: "0.5.1"),
 ]
 ```
 

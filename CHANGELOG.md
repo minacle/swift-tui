@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-09
+
+### Added
+
+- Added GitHub Actions coverage for macOS builds, Linux builds, and DocC
+  documentation generation so release compatibility is checked automatically.
+
 ### Fixed
 
 - Fixed Linux builds by avoiding Darwin-only attributed text presentation
@@ -229,7 +236,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/minacle/swift-tui/releases/tag/v0.5.1
 [0.5.0]: https://github.com/minacle/swift-tui/releases/tag/v0.5.0
 [0.4.2]: https://github.com/minacle/swift-tui/releases/tag/v0.4.2
 [0.4.1]: https://github.com/minacle/swift-tui/releases/tag/v0.4.1
