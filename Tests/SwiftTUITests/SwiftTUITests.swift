@@ -3252,6 +3252,108 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.lines == ["Text Field          "])
 }
 
+@Test func nestedHStackTextFieldReceivesParentProposal() {
+    let stack = HStack {
+        Text("A")
+        HStack {
+            TextField("Name", text: .constant(""))
+        }
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 10))
+
+    #expect(block?.width == 10)
+    #expect(block?.lines == ["AName     "])
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 1, y: 0, width: 9, height: 1),
+    ])
+}
+
+@Test func nestedHStackSpacerPropagatesHorizontalFlexibility() {
+    let stack = HStack {
+        HStack {
+            Text("Title")
+            Spacer()
+        }
+        Text("X")
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 10))
+
+    #expect(block?.width == 10)
+    #expect(block?.lines == ["Title    X"])
+}
+
+@Test func nestedVStackTextFieldReceivesParentProposal() {
+    let stack = HStack {
+        VStack {
+            HStack {
+                TextField("Name", text: .constant(""))
+            }
+        }
+        Text("X")
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 10))
+
+    #expect(block?.width == 10)
+    #expect(block?.lines == ["Name     X"])
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 0, y: 0, width: 9, height: 1),
+    ])
+}
+
+@Test func vStackLocalSpacerDoesNotPropagateHorizontalFlexibility() {
+    let stack = HStack {
+        VStack {
+            Text("A")
+            Spacer()
+        }
+        Text("X")
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 10, rows: 3))
+
+    #expect(block?.width == 2)
+    #expect(block?.lines == [
+        "A ",
+        " X",
+        "  ",
+    ])
+}
+
+@Test func overlaidTextFieldInNestedStacksUsesAvailableWidth() {
+    let stack = VStack(spacing: 1) {
+        HStack(spacing: 2) {
+            HStack(alignment: .top) {
+                Text("App Title")
+                    .bold()
+                Spacer()
+            }
+            HStack {
+                Text("[")
+                    .dim()
+                ZStack {
+                    TextField("Enter URL...", text: .constant(""))
+                    Text("Enter URL...")
+                        .dim()
+                }
+                Text("]")
+                    .dim()
+            }
+        }
+    }
+
+    let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 80, rows: 24))
+
+    #expect(block?.width == 80)
+    #expect(block?.lines.first?.count == 80)
+    #expect(block?.lines.first?.last == "]")
+    #expect(block?.focusRegions.map(\.frame) == [
+        RenderedRect(x: 42, y: 0, width: 37, height: 1),
+    ])
+}
+
 @Test func longFixedSiblingDoesNotMoveProposedStackOrigin() {
     let longText = String(repeating: "가나다라마바사아자차카타파하", count: 4)
     let stack = VStack {

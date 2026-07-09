@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed focused `TextField` rendering so text that exactly fits the field width
   preserves both its leading character and the caret position after the final
   character while editing without widening visible placeholders.
+- Fixed nested stack layout so flexible content, including `TextField` and
+  stack-local `Spacer` children, receives the parent stack's available width.
 
 ## [0.5.1] - 2026-07-09
 

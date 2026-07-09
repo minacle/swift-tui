@@ -968,6 +968,10 @@ nonisolated struct StackChild {
 
     var traits: LayoutTraits
 
+    var isSpacer: Bool = false
+
+    var suppressesVerticalFlexInParentStack: Bool = false
+
     var render: (RenderProposal?, Bool) -> RenderedElement?
 }
 
@@ -1013,6 +1017,8 @@ extension FlattenableViewContent {
             renderedElements(in: proposal, path: path, runtime: runtime).map { element in
                 StackChild(
                     traits: LayoutTraits(),
+                    isSpacer: element.isSpacer,
+                    suppressesVerticalFlexInParentStack: false,
                     render: { _, _ in element }
                 )
             },
@@ -2437,6 +2443,8 @@ protocol StackRenderable {
     ) -> RenderedBlock?
 }
 
+protocol VerticalStackFlexSuppressing {}
+
 extension StackRenderable {
 
     func renderedBlock(in proposal: RenderProposal?) -> RenderedBlock? {
@@ -2444,7 +2452,15 @@ extension StackRenderable {
     }
 }
 
-extension HStack: StackRenderable {
+extension HStack: LayoutTraitRenderable, StackRenderable, VerticalStackFlexSuppressing {
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.stackLayoutTraits(
+            from: content,
+            propagatedAxes: [.horizontal, .vertical],
+            spacerAxis: .horizontal
+        )
+    }
 
     func renderedBlock(
         in proposal: RenderProposal?,
@@ -2465,7 +2481,15 @@ extension HStack: StackRenderable {
     }
 }
 
-extension VStack: StackRenderable {
+extension VStack: LayoutTraitRenderable, StackRenderable {
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.stackLayoutTraits(
+            from: content,
+            propagatedAxes: [.horizontal, .vertical],
+            spacerAxis: .vertical
+        )
+    }
 
     func renderedBlock(
         in proposal: RenderProposal?,
@@ -2489,17 +2513,11 @@ extension VStack: StackRenderable {
 extension ZStack: LayoutTraitRenderable, StackRenderable {
 
     var layoutTraits: LayoutTraits {
-        let flexibleAxes = ViewResolver.stackChildren(
+        ViewResolver.stackLayoutTraits(
             from: content,
-            in: nil,
-            path: [],
-            runtime: nil
+            propagatedAxes: [.horizontal, .vertical],
+            spacerAxis: nil
         )
-        .reduce(into: Axis.Set()) { axes, child in
-            axes.formUnion(child.traits.flexibleAxes)
-        }
-
-        return LayoutTraits(flexibleAxes: flexibleAxes)
     }
 
     func renderedBlock(
@@ -2591,6 +2609,8 @@ extension ViewResolver {
         return [
             StackChild(
                 traits: traits,
+                isSpacer: view is Spacer,
+                suppressesVerticalFlexInParentStack: view is any VerticalStackFlexSuppressing,
                 render: { childProposal, suppressRegistrations in
                     let render = {
                         element(
@@ -2623,6 +2643,34 @@ extension ViewResolver {
         }
 
         return layoutTraits(from: body(from: view, path: [], runtime: nil))
+    }
+
+    static func stackLayoutTraits<Content: View>(
+        from content: Content,
+        propagatedAxes: Axis.Set,
+        spacerAxis: Axis?
+    ) -> LayoutTraits {
+        let flexibleAxes = stackChildren(
+            from: content,
+            in: nil,
+            path: [],
+            runtime: nil
+        )
+        .reduce(into: Axis.Set()) { axes, child in
+            axes.formUnion(child.traits.flexibleAxes.intersection(propagatedAxes))
+            guard child.isSpacer, let spacerAxis else {
+                return
+            }
+
+            switch spacerAxis {
+            case .horizontal:
+                axes.formUnion(.horizontal)
+            case .vertical:
+                axes.formUnion(.vertical)
+            }
+        }
+
+        return LayoutTraits(flexibleAxes: flexibleAxes)
     }
 
     private static func body<Content: View>(
@@ -2956,6 +3004,8 @@ enum StackRenderer {
 
         var traits: LayoutTraits
 
+        var suppressesVerticalFlexInParentStack: Bool
+
         var render: (RenderProposal?, Bool) -> RenderedElement?
     }
 
@@ -3157,7 +3207,8 @@ enum StackRenderer {
             case .horizontal:
                 flexibleOnStackAxis = child.traits.flexibleAxes.contains(.horizontal)
             case .vertical:
-                flexibleOnStackAxis = child.traits.flexibleAxes.contains(.vertical)
+                flexibleOnStackAxis = !child.suppressesVerticalFlexInParentStack
+                    && child.traits.flexibleAxes.contains(.vertical)
             }
 
             guard let content = child.render(
@@ -3170,6 +3221,7 @@ enum StackRenderer {
             return MeasuredChild(
                 content: content,
                 traits: child.traits,
+                suppressesVerticalFlexInParentStack: child.suppressesVerticalFlexInParentStack,
                 render: child.render
             )
         }
@@ -3559,6 +3611,10 @@ private extension StackRenderer.MeasuredChild {
     }
 
     var isVerticallyContentFlexible: Bool {
+        guard !suppressesVerticalFlexInParentStack else {
+            return false
+        }
+
         guard case .block = content else {
             return false
         }
@@ -3576,6 +3632,10 @@ private extension StackRenderer.MeasuredChild {
     }
 
     func isVerticallyFlexible(usingContentFlex: Bool) -> Bool {
+        guard !suppressesVerticalFlexInParentStack else {
+            return false
+        }
+
         switch content {
         case .block:
             return traits.flexibleAxes.contains(.vertical)
@@ -3599,6 +3659,14 @@ private extension StackRenderer.MeasuredChild {
 }
 
 private extension RenderedElement {
+
+    var isSpacer: Bool {
+        guard case .spacer = self else {
+            return false
+        }
+
+        return true
+    }
 
     var horizontalLength: Int {
         switch self {
