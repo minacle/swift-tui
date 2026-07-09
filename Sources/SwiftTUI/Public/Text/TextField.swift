@@ -333,6 +333,17 @@ private enum TextInputRenderer {
             prompt: prompt,
             label: label
         )
+        let cursor = renderedCursor(
+            state: fieldState,
+            isFocused: isFocused,
+            layoutText: layoutText
+        )
+        let displayTextWidth = TerminalText.columnWidth(displayText)
+        let reservesTrailingCaretCell = cursor != nil && !currentText.isEmpty
+        let contentWidth = max(
+            reservesTrailingCaretCell ? displayTextWidth + 1 : displayTextWidth,
+            1
+        )
         let content = RenderedBlock(
             runs: [
                 RenderedRun(
@@ -340,13 +351,9 @@ private enum TextInputRenderer {
                     style: EnvironmentRenderContext.current.textStyle
                 ),
             ],
-            width: max(TerminalText.columnWidth(displayText), 1),
+            width: contentWidth,
             height: 1,
-            cursor: renderedCursor(
-                state: fieldState,
-                isFocused: isFocused,
-                layoutText: layoutText
-            )
+            cursor: cursor
         )
 
         var block = ScrollViewRenderer.render(
@@ -528,14 +535,15 @@ final class TextFieldState {
             return
         }
 
-        let visibleTextWidth = offset == text.count && !text.isEmpty
-            ? maxWidth - 1
-            : maxWidth
-        if TerminalText.columnWidth(layoutText) <= visibleTextWidth {
+        let textWidth = TerminalText.columnWidth(layoutText)
+        if textWidth <= maxWidth {
             horizontalScrollOffset = 0
             return
         }
 
+        let visibleTextWidth = offset == text.count && !text.isEmpty
+            ? maxWidth - 1
+            : maxWidth
         if offset < horizontalScrollOffset {
             horizontalScrollOffset = offset
             return

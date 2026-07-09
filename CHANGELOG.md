@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed focused `TextField` rendering so text that exactly fits the field width
+  preserves both its leading character and the caret position after the final
+  character while editing without widening visible placeholders.
+
 ## [0.5.1] - 2026-07-09
 
 ### Added

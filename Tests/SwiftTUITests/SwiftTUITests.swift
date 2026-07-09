@@ -1109,7 +1109,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(probe.binding?.wrappedValue == "sec")
-    #expect(runtime.block(from: view)?.text == "•••")
+    #expect(runtime.block(from: view)?.text == "••• ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
 
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
@@ -1117,7 +1117,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(probe.binding?.wrappedValue == "sec")
-    #expect(runtime.block(from: view)?.text == "•••")
+    #expect(runtime.block(from: view)?.text == "••• ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
 }
 
@@ -1149,7 +1149,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     #expect(probe.binding?.wrappedValue == "seXcret")
-    #expect(runtime.block(from: view)?.text == "•••••••")
+    #expect(runtime.block(from: view)?.text == "••••••• ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
 }
 
@@ -1186,7 +1186,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     #expect(probe.binding?.wrappedValue == "secXret")
-    #expect(runtime.block(from: view)?.text == "•••••••")
+    #expect(runtime.block(from: view)?.text == "••••••• ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 4))
 }
 
@@ -1219,7 +1219,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.lines == ["•", "s"])
+    #expect(runtime.block(from: view)?.lines == ["• ", "s "])
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
@@ -1249,15 +1249,28 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "a")
+    #expect(runtime.block(from: view)?.text == "a ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "c", characters: "c", modifiers: .control)) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "a")
+    #expect(runtime.block(from: view)?.text == "a ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+}
+
+@Test func focusedEmptyTextFieldPlaceholderDoesNotReserveTrailingCaretCell() {
+    let runtime = StateRuntime()
+    let view = OverlayPlaceholderTextFieldView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == ["Placeholder"])
+    #expect(block?.width == 11)
+    #expect(block?.cursor == RenderedCursor(column: 0))
 }
 
 @Test func disabledTextFieldIgnoresFocusAndTyping() {
@@ -1287,22 +1300,22 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "ab")
+    #expect(runtime.block(from: view)?.text == "ab ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "ab")
+    #expect(runtime.block(from: view)?.text == "ab ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "acb")
+    #expect(runtime.block(from: view)?.text == "acb ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "acb")
+    #expect(runtime.block(from: view)?.text == "acb ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
 }
 
@@ -1329,7 +1342,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "한", characters: "한")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "A", characters: "A")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "한A")
+    #expect(runtime.block(from: view)?.text == "한A ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
 }
 
@@ -1387,8 +1400,26 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     let block = runtime.block(from: view)
 
-    #expect(block?.lines == [String(repeating: "ㅁ", count: 15) + "  "])
-    #expect(block?.cursor == RenderedCursor(column: 30))
+    #expect(block?.lines == [text])
+    #expect(block?.cursor == RenderedCursor(column: 31))
+}
+
+@Test func fixedSizeTextFieldRightBoundaryCursorDoesNotEnterTrailingSibling() {
+    let runtime = StateRuntime()
+    let view = ExactFitDelimitedFixedSizeTextFieldView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    let block = runtime.block(from: view)
+
+    #expect(block?.lines == ["[abc ]"])
+    #expect(block?.cursor == RenderedCursor(column: 4))
 }
 
 @Test func focusedTextFieldScrollsRightWhenNextWideCharacterIsHidden() {
@@ -1433,18 +1464,18 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func framedTextFieldInsertionAtTrailingCaretScrollsBeforeTrailingSibling() {
     let runtime = StateRuntime()
-    let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcde"
+    let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
     let view = DelimitedTextFieldView(text: text)
 
     _ = runtime.block(from: view)
     _ = runtime.consumeInvalidation()
     _ = runtime.block(from: view)
 
-    #expect(runtime.dispatch(KeyPress(key: "f", characters: "f")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .handled)
     #expect(runtime.consumeInvalidation())
     let block = runtime.block(from: view)
 
-    #expect(block?.lines == ["[BCDEFGHIJKLMNOPQRSTUVWXYZabcdef ]"])
+    #expect(block?.lines == ["[CDEFGHIJKLMNOPQRSTUVWXYZabcdefg ]"])
     #expect(block?.cursor == RenderedCursor(column: 32))
 }
 
@@ -1475,7 +1506,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .upArrow, characters: "\u{F700}")) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .ignored)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "a")
+    #expect(runtime.block(from: view)?.text == "a ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
@@ -1496,8 +1527,37 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
-    #expect(block?.text == "abXcd")
+    #expect(block?.text == "abXcd ")
     #expect(block?.cursor == RenderedCursor(column: 3))
+}
+
+@Test func clickingTextFieldTrailingCaretCellMovesCaretToEnd() {
+    let runtime = StateRuntime()
+    let view = ExactFitDelimitedFixedSizeTextFieldView()
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    var block = runtime.block(from: view)
+    #expect(block?.lines == ["[abc ]"])
+    #expect(block?.cursor == RenderedCursor(column: 3))
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 5, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(runtime.consumeInvalidation())
+
+    block = runtime.block(from: view)
+    #expect(block?.lines == ["[abcX ]"])
+    #expect(block?.cursor == RenderedCursor(column: 5))
 }
 
 @Test func draggingTextFieldMovesCaretToPointerColumn() {
@@ -1522,7 +1582,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
-    #expect(block?.text == "abcXd")
+    #expect(block?.text == "abcXd ")
     #expect(block?.cursor == RenderedCursor(column: 4))
 }
 
@@ -1569,7 +1629,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
-    #expect(block?.text == "abcdX")
+    #expect(block?.text == "abcdX ")
     #expect(block?.cursor == RenderedCursor(column: 5))
 }
 
@@ -1600,7 +1660,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
-    #expect(block?.text == "Xabcd")
+    #expect(block?.text == "Xabcd ")
     #expect(block?.cursor == RenderedCursor(column: 1))
 }
 
@@ -1680,7 +1740,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.lines == ["a", "a"])
+    #expect(runtime.block(from: view)?.lines == ["a ", "a "])
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
@@ -5021,13 +5081,13 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     objectProbe.object?.token = "abc"
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "abc")
+    #expect(runtime.block(from: view)?.text == "abc ")
 
     #expect(runtime.dispatch(KeyPress(key: .end, characters: "\u{F72B}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "d", characters: "d")) == .handled)
     #expect(objectProbe.object?.token == "abcd")
     #expect(runtime.consumeInvalidation())
-    #expect(runtime.block(from: view)?.text == "abcd")
+    #expect(runtime.block(from: view)?.text == "abcd ")
 }
 
 @Test func buttonSizingEnvironmentDefaultsToAutomatic() {
@@ -12093,6 +12153,24 @@ private struct TextFieldEditingView: View {
     }
 }
 
+private struct OverlayPlaceholderTextFieldView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        ZStack {
+            TextField("Placeholder", text: $text)
+                .focused($isFocused)
+            if text.isEmpty {
+                Text("Placeholder")
+                    .dim()
+            }
+        }
+    }
+}
+
 private struct DisabledFocusedTextFieldView: View {
 
     @State var text = ""
@@ -12629,6 +12707,23 @@ private struct DelimitedTextFieldView: View {
             TextField("Name", text: $text)
                 .focused($isFocused)
                 .frame(width: 32)
+            Text("]")
+        }
+    }
+}
+
+private struct ExactFitDelimitedFixedSizeTextFieldView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text("[")
+            TextField("Name", text: $text)
+                .fixedSize(horizontal: true, vertical: false)
+                .focused($isFocused)
             Text("]")
         }
     }
