@@ -274,8 +274,12 @@ private enum TextInputRenderer {
             at: path,
             initialText: text.wrappedValue
         )
-        fieldState?.synchronize(with: text.wrappedValue)
-        fieldState?.clamp()
+        let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
+            && runtime?.isSuppressingInteractiveRenderRegistrations != true
+        if updatesInteractiveState {
+            fieldState?.synchronize(with: text.wrappedValue)
+            fieldState?.clamp()
+        }
         runtime?.registerFocusable(true, at: path)
         runtime?.registerKeyPressHandler(
             KeyPressHandler(
@@ -314,7 +318,7 @@ private enum TextInputRenderer {
         let currentText = fieldState?.text ?? text.wrappedValue
         let layoutText = displayMode.layoutText(for: currentText)
         let isFocused = runtime?.isFocused(at: path) == true
-        if let maxWidth = proposal?.columns {
+        if updatesInteractiveState, let maxWidth = proposal?.columns {
             fieldState?.updateHorizontalScrollOffset(
                 maxWidth: maxWidth,
                 layoutText: layoutText
@@ -480,13 +484,7 @@ final class TextFieldState {
         }
     }
 
-    private(set) var horizontalScrollOffset = 0 {
-        didSet {
-            if horizontalScrollOffset != oldValue {
-                invalidate()
-            }
-        }
-    }
+    private(set) var horizontalScrollOffset = 0
 
     init(initialText: String, invalidate: @escaping () -> Void) {
         self.text = initialText

@@ -1494,6 +1494,64 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(!runtime.consumeInvalidation())
 }
 
+@Test func overlaidTextFieldInNestedStacksStabilizesAfterOverflowInput() {
+    let runtime = StateRuntime()
+    let view = NestedOverlaidURLTextFieldEditingView()
+    let proposal = RenderProposal(columns: 80, rows: 24)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    typeText(textFieldOverflowInput(), into: runtime)
+    #expect(runtime.consumeInvalidation())
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "Z", characters: "Z")) == .handled)
+    #expect(runtime.consumeInvalidation())
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    let block = runtime.block(from: view, in: proposal)
+    #expect(block?.width == 80)
+    #expect(block?.lines.first?.count == 80)
+}
+
+@Test func nestedZStackTextFieldStabilizesAfterOverflowInput() {
+    let runtime = StateRuntime()
+    let view = NestedZStackDelimitedTextFieldEditingView()
+    let proposal = RenderProposal(columns: 20, rows: 4)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    typeText(textFieldOverflowInput(), into: runtime)
+    #expect(runtime.consumeInvalidation())
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "Z", characters: "Z")) == .handled)
+}
+
+@Test func nestedHStackTextFieldStabilizesAfterOverflowInput() {
+    let runtime = StateRuntime()
+    let view = NestedHStackTextFieldEditingView()
+    let proposal = RenderProposal(columns: 20, rows: 4)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    typeText(textFieldOverflowInput(), into: runtime)
+    #expect(runtime.consumeInvalidation())
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "Z", characters: "Z")) == .handled)
+}
+
+@Test func nestedSecureFieldStabilizesAfterOverflowInput() {
+    let runtime = StateRuntime()
+    let view = NestedSecureFieldEditingView()
+    let proposal = RenderProposal(columns: 20, rows: 4)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+    typeText(textFieldOverflowInput(), into: runtime)
+    #expect(runtime.consumeInvalidation())
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
+
+    #expect(runtime.dispatch(KeyPress(key: "Z", characters: "Z")) == .handled)
+}
+
 @Test func focusedTextFieldDoesNotInsertVerticalArrowCharacters() {
     let runtime = StateRuntime()
     let view = TextFieldEditingView()
@@ -12007,6 +12065,23 @@ private func renderUntilStable<Content: View>(
     return maximumPasses + 1
 }
 
+private func textFieldOverflowInput() -> String {
+    "https://example.com/" + String(repeating: "abcdefghijklmnopqrstuvwxyz0123456789", count: 8)
+}
+
+private func typeText(_ text: String, into runtime: StateRuntime) {
+    for character in text {
+        #expect(
+            runtime.dispatch(
+                KeyPress(
+                    key: KeyEquivalent(character),
+                    characters: String(character)
+                )
+            ) == .handled
+        )
+    }
+}
+
 private struct DeferredParentStateMutationView: View {
 
     @State private var isOpen = false
@@ -12269,6 +12344,91 @@ private struct OverlayPlaceholderTextFieldView: View {
                 Text("Placeholder")
                     .dim()
             }
+        }
+    }
+}
+
+private struct NestedOverlaidURLTextFieldEditingView: View {
+
+    @State var urlString = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 2) {
+                HStack(alignment: .top) {
+                    Text("App Title")
+                        .bold()
+                    Spacer()
+                }
+                HStack {
+                    Text("[")
+                        .dim()
+                    ZStack {
+                        TextField("Enter URL...", text: $urlString)
+                            .focused($isFocused)
+                        if urlString.isEmpty {
+                            Text("Enter URL...")
+                                .dim()
+                        }
+                    }
+                    Text("]")
+                        .dim()
+                }
+            }
+        }
+    }
+}
+
+private struct NestedZStackDelimitedTextFieldEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text("[")
+            ZStack {
+                TextField("URL", text: $text)
+                    .focused($isFocused)
+            }
+            Text("]")
+        }
+    }
+}
+
+private struct NestedHStackTextFieldEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            HStack {
+                TextField("URL", text: $text)
+                    .focused($isFocused)
+            }
+            Text("X")
+        }
+    }
+}
+
+private struct NestedSecureFieldEditingView: View {
+
+    @State var text = ""
+
+    @FocusState var isFocused = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            HStack {
+                SecureField("Password", text: $text)
+                    .focused($isFocused)
+            }
+            Text("X")
         }
     }
 }

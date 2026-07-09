@@ -29,15 +29,11 @@ struct AppRunner<Application: App> {
                 )
             }
 
-            switch TerminalControl.readInput(timeout: inputTimeout(using: runtime)) {
-            case .quit:
-                runtime.dispatchTerminate()
-            case .keyPress(let keyPress):
-                _ = runtime.dispatch(keyPress)
-            case .mouse(let mouseEvent):
-                _ = runtime.dispatch(mouseEvent)
-            case .none:
-                break
+            if dispatch(
+                TerminalControl.readInput(timeout: inputTimeout(using: runtime)),
+                using: runtime
+            ) {
+                dispatchPendingInput(using: runtime)
             }
 
             _ = runtime.dispatchExpiredTapActions()
@@ -60,6 +56,27 @@ struct AppRunner<Application: App> {
                 return
             }
         }
+    }
+
+    @discardableResult
+    private func dispatch(_ input: TerminalInput, using runtime: StateRuntime) -> Bool {
+        switch input {
+        case .quit:
+            runtime.dispatchTerminate()
+            return false
+        case .keyPress(let keyPress):
+            _ = runtime.dispatch(keyPress)
+            return true
+        case .mouse(let mouseEvent):
+            _ = runtime.dispatch(mouseEvent)
+            return true
+        case .none:
+            return false
+        }
+    }
+
+    private func dispatchPendingInput(using runtime: StateRuntime) {
+        while dispatch(TerminalControl.readInput(timeout: 0), using: runtime) {}
     }
 
     private func render(

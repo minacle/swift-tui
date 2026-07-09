@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   character while editing without widening visible placeholders.
 - Fixed nested stack layout so flexible content, including `TextField` and
   stack-local `Spacer` children, receives the parent stack's available width.
+- Fixed overflowing `TextField` and `SecureField` input inside nested stacks so
+  measurement renders no longer trigger a render loop that prevents further
+  input, and queued terminal input is coalesced before redraw.
 
 ## [0.5.1] - 2026-07-09
 
