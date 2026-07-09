@@ -492,37 +492,6 @@ public extension View {
         _backgroundStyle(style)
     }
 
-    @available(*, deprecated, renamed: "foregroundStyle(_:)")
-    func color(_ color: Color16) -> some View {
-        foregroundStyle(color)
-    }
-
-    @available(*, deprecated, renamed: "foregroundStyle(_:)")
-    func color(_ color: Color256) -> some View {
-        foregroundStyle(color)
-    }
-
-    @available(*, deprecated, renamed: "foregroundStyle(_:)")
-    func color(_ color: TrueColor) -> some View {
-        foregroundStyle(color)
-    }
-
-    @available(*, deprecated, renamed: "foregroundStyle(_:)")
-    func color(_ color: DefaultColor) -> some View {
-        foregroundStyle(color)
-    }
-
-    /// Sets the terminal foreground style for text within this view.
-    ///
-    /// - Parameter color: Any SGR color value accepted by the `Terminal` package.
-    /// - Returns: A view that renders descendant text with the given color.
-    @available(*, deprecated, renamed: "foregroundStyle(_:)")
-    func color<C: Color>(_ color: C) -> some View {
-        transformEnvironment(\.textStyle) {
-            $0.foregroundStyle = AnyColor(color)
-        }
-    }
-
     /// Sets the terminal foreground style for text within this view.
     ///
     /// - Parameter style: A type-erased terminal SGR color style.
