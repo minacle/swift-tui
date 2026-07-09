@@ -20,8 +20,35 @@ public nonisolated struct Rectangle: Shape {
     /// The body type for this primitive view.
     public typealias Body = Never
 
+    let halfCellEdgeStyle: RectangleHalfCellEdgeStyle
+
     /// Creates a rectangle shape.
-    public init() {}
+    public init() {
+        halfCellEdgeStyle = RectangleHalfCellEdgeStyle()
+    }
+
+    private init(halfCellEdgeStyle: RectangleHalfCellEdgeStyle) {
+        self.halfCellEdgeStyle = halfCellEdgeStyle
+    }
+
+    /// Returns this rectangle with selected edges inset by half a terminal cell.
+    public func edge(style: RectangleHalfCellEdgeStyle) -> Rectangle {
+        Rectangle(halfCellEdgeStyle: style)
+    }
+}
+
+/// A style that insets selected rectangle edges by half a terminal cell.
+public nonisolated struct RectangleHalfCellEdgeStyle: Equatable, Sendable {
+
+    /// The rectangle edges to inset by half a terminal cell.
+    public var edges: Edge.Set
+
+    /// Creates a half-cell rectangle edge style.
+    ///
+    /// - Parameter edges: The rectangle edges to inset by half a terminal cell.
+    public init(edges: Edge.Set = []) {
+        self.edges = edges
+    }
 }
 
 /// A shape with a translation offset transform applied to it.
@@ -223,7 +250,21 @@ public extension ShapeView {
 
 protocol ShapeRenderable {
 
-    func renderedShapeRects(in rect: RenderedRect) -> [RenderedRect]
+    func renderedShapeRegions(in rect: RenderedRect) -> [RenderedShapeRegion]
+}
+
+nonisolated struct RenderedShapeRegion: Equatable, Sendable {
+
+    var rect: RenderedRect
+
+    var halfCellEdges: Edge.Set
+
+    func offsetBy(x: Int, y: Int) -> RenderedShapeRegion {
+        RenderedShapeRegion(
+            rect: rect.offsetBy(x: x, y: y),
+            halfCellEdges: halfCellEdges
+        )
+    }
 }
 
 protocol FillShapeRenderable {
@@ -241,8 +282,10 @@ extension Rectangle: ShapeRenderable, LayoutTraitRenderable {
         LayoutTraits(flexibleAxes: [.horizontal, .vertical])
     }
 
-    func renderedShapeRects(in rect: RenderedRect) -> [RenderedRect] {
-        rect.isEmpty ? [] : [rect]
+    func renderedShapeRegions(in rect: RenderedRect) -> [RenderedShapeRegion] {
+        rect.isEmpty
+            ? []
+            : [RenderedShapeRegion(rect: rect, halfCellEdges: halfCellEdgeStyle.edges)]
     }
 }
 
@@ -252,12 +295,12 @@ extension OffsetShape: ShapeRenderable, LayoutTraitRenderable {
         LayoutTraits(flexibleAxes: [.horizontal, .vertical])
     }
 
-    func renderedShapeRects(in rect: RenderedRect) -> [RenderedRect] {
+    func renderedShapeRegions(in rect: RenderedRect) -> [RenderedShapeRegion] {
         guard let shape = shape as? any ShapeRenderable else {
             return []
         }
 
-        return shape.renderedShapeRects(in: rect).map {
+        return shape.renderedShapeRegions(in: rect).map {
             $0.offsetBy(x: offset.column, y: offset.row)
         }
     }
@@ -269,7 +312,7 @@ extension SizedShape: ShapeRenderable, LayoutTraitRenderable {
         LayoutTraits(flexibleAxes: [.horizontal, .vertical])
     }
 
-    func renderedShapeRects(in rect: RenderedRect) -> [RenderedRect] {
+    func renderedShapeRegions(in rect: RenderedRect) -> [RenderedShapeRegion] {
         guard let shape = shape as? any ShapeRenderable else {
             return []
         }
@@ -280,7 +323,7 @@ extension SizedShape: ShapeRenderable, LayoutTraitRenderable {
             width: size.columns,
             height: size.rows
         )
-        return shape.renderedShapeRects(in: sizedRect)
+        return shape.renderedShapeRegions(in: sizedRect)
     }
 }
 
@@ -399,9 +442,8 @@ enum ShapeRenderer {
             )
         }
 
-        let runs = shape.renderedShapeRects(in: bounds)
-            .compactMap { $0.clipped(to: bounds) }
-            .flatMap { fillRuns(in: $0, style: style) }
+        let runs = shape.renderedShapeRegions(in: bounds)
+            .flatMap { fillRuns(in: $0, clippedTo: bounds, style: style) }
         return RenderedBlock(
             runs: runs,
             width: bounds.width,
@@ -410,19 +452,78 @@ enum ShapeRenderer {
         )
     }
 
-    private static func fillRuns(in rect: RenderedRect, style: AnyColor) -> [RenderedRun] {
-        guard !rect.isEmpty else {
+    private static func fillRuns(
+        in region: RenderedShapeRegion,
+        clippedTo bounds: RenderedRect,
+        style: AnyColor
+    ) -> [RenderedRun] {
+        let originalRect = region.rect
+        let originalEdges = region.halfCellEdges
+        guard
+            !(originalRect.width == 1 && originalEdges.isSuperset(of: .horizontal)),
+            !(originalRect.height == 1 && originalEdges.isSuperset(of: .vertical)),
+            let rect = originalRect.clipped(to: bounds)
+        else {
             return []
         }
 
-        let text = String(repeating: "█", count: rect.width)
-        return (rect.y..<(rect.y + rect.height)).map {
-            RenderedRun(
+        var visibleEdges = originalEdges
+        if rect.x != originalRect.x {
+            visibleEdges.remove(.leading)
+        }
+        if rect.y != originalRect.y {
+            visibleEdges.remove(.top)
+        }
+        if rect.x + rect.width != originalRect.x + originalRect.width {
+            visibleEdges.remove(.trailing)
+        }
+        if rect.y + rect.height != originalRect.y + originalRect.height {
+            visibleEdges.remove(.bottom)
+        }
+
+        return (rect.y..<(rect.y + rect.height)).map { row in
+            let text = (rect.x..<(rect.x + rect.width)).map { column in
+                fillGlyph(atColumn: column, row: row, in: rect, edges: visibleEdges)
+            }.joined()
+            return RenderedRun(
                 text: text,
-                row: $0,
+                row: row,
                 column: rect.x,
                 style: TextStyle(foregroundStyle: style)
             )
+        }
+    }
+
+    private static func fillGlyph(
+        atColumn column: Int,
+        row: Int,
+        in rect: RenderedRect,
+        edges: Edge.Set
+    ) -> String {
+        let isTop = row == rect.y && edges.contains(.top)
+        let isBottom = row == rect.y + rect.height - 1 && edges.contains(.bottom)
+        let isLeading = column == rect.x && edges.contains(.leading)
+        let isTrailing = column == rect.x + rect.width - 1 && edges.contains(.trailing)
+
+        return switch (isTop, isBottom, isLeading, isTrailing) {
+        case (true, false, true, false):
+            "▗"
+        case (true, false, false, true):
+            "▖"
+        case (false, true, true, false):
+            "▝"
+        case (false, true, false, true):
+            "▘"
+        case (true, false, false, false):
+            "▄"
+        case (false, true, false, false):
+            "▀"
+        case (false, false, true, false):
+            "▐"
+        case (false, false, false, true):
+            "▌"
+        default:
+            "█"
         }
     }
 }

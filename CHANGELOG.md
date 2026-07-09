@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `Rectangle.edge(style:)` and `RectangleHalfCellEdgeStyle` for drawing
+  selected rectangle edges with half-cell and quarter-cell block characters.
+
 ## [0.6.0] - 2026-07-10
 
 ### Added

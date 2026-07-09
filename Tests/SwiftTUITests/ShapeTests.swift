@@ -56,6 +56,145 @@ struct ShapeTests {
         ])
     }
 
+    @Test func emptyHalfCellEdgeStylePreservesFullBlockFill() {
+        let plain = ViewResolver.block(
+            from: Rectangle()
+                .fill(.red)
+                .frame(width: 3, height: 2)
+        )
+        let styled = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle())
+                .fill(.red)
+                .frame(width: 3, height: 2)
+        )
+
+        #expect(styled == plain)
+    }
+
+    @Test func rectangleHalfCellEdgesRenderSelectedSides() {
+        let top = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .top))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+        let bottom = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .bottom))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+        let leading = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .leading))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+        let trailing = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .trailing))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+
+        #expect(top?.lines == ["▄▄▄", "███", "███"])
+        #expect(bottom?.lines == ["███", "███", "▀▀▀"])
+        #expect(leading?.lines == ["▐██", "▐██", "▐██"])
+        #expect(trailing?.lines == ["██▌", "██▌", "██▌"])
+    }
+
+    @Test func rectangleHalfCellEdgesSelectQuarterBlockCorners() {
+        let all = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .all))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+        let topLeading = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: [.top, .leading]))
+                .fill(.red)
+                .frame(width: 3, height: 3)
+        )
+
+        #expect(all?.lines == ["▗▄▖", "▐█▌", "▝▀▘"])
+        #expect(topLeading?.lines == ["▗▄▄", "▐██", "▐██"])
+    }
+
+    @Test func rectangleEdgeReturnsRectangleAndReplacesPreviousStyle() {
+        let rectangle: Rectangle = Rectangle()
+            .edge(style: RectangleHalfCellEdgeStyle(edges: .top))
+            .edge(style: RectangleHalfCellEdgeStyle(edges: .bottom))
+        let block = ViewResolver.block(
+            from: rectangle
+                .fill(.red)
+                .frame(width: 3, height: 2)
+        )
+
+        #expect(block?.lines == ["███", "▀▀▀"])
+    }
+
+    @Test func rectangleHalfCellEdgesSurviveSizeOffsetAndFill() {
+        let block = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: [.top, .leading]))
+                .size(width: 3, height: 2)
+                .offset(x: 1, y: 1)
+                .fill(.blue)
+                .frame(width: 5, height: 4, alignment: .topLeading)
+        )
+
+        #expect(block?.lines == ["     ", " ▗▄▄ ", " ▐██ ", "     "])
+        #expect(block?.runs == [
+            RenderedRun(
+                text: "▗▄▄",
+                row: 1,
+                column: 1,
+                style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
+            ),
+            RenderedRun(
+                text: "▐██",
+                row: 2,
+                column: 1,
+                style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
+            ),
+        ])
+    }
+
+    @Test func clippedOriginalHalfCellEdgesBecomeFullBlockFill() {
+        let block = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: [.top, .leading]))
+                .size(width: 3, height: 3)
+                .offset(x: -1, y: -1)
+                .fill(.red)
+                .frame(width: 2, height: 2, alignment: .topLeading)
+        )
+
+        #expect(block?.lines == ["██", "██"])
+    }
+
+    @Test func opposingHalfCellEdgesInOneCellRenderEmptyArea() {
+        let horizontal = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .horizontal))
+                .fill(.red)
+                .frame(width: 1, height: 2)
+        )
+        let vertical = ViewResolver.block(
+            from: Rectangle()
+                .edge(style: RectangleHalfCellEdgeStyle(edges: .vertical))
+                .fill(.red)
+                .frame(width: 2, height: 1)
+        )
+
+        #expect(horizontal?.runs == [])
+        #expect(horizontal?.lines == [" ", " "])
+        #expect(vertical?.runs == [])
+        #expect(vertical?.lines == ["  "])
+    }
+
     @Test func shapeSizeChangesDrawnRectWithoutChangingLayoutSize() {
         let block = ViewResolver.block(
             from: Rectangle()
