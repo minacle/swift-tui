@@ -1051,10 +1051,42 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(ViewResolver.text(from: textField) == "Required")
 }
 
+@Test func emptyTextFieldPromptRendersDimmed() {
+    let textField = TextField(
+        "Name",
+        text: .constant(""),
+        prompt: Text("Required")
+    )
+    .foregroundStyle(.brightGreen)
+    .bold()
+
+    #expect(ViewResolver.block(from: textField)?.runs == [
+        RenderedRun(
+            text: "Required",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.brightGreen),
+                isBold: true,
+                isDim: true
+            )
+        ),
+    ])
+}
+
 @Test func emptyTextFieldDisplaysTitleWhenPromptIsAbsent() {
     let textField = TextField("Name", text: .constant(""))
 
     #expect(ViewResolver.text(from: textField) == "Name")
+}
+
+@Test func emptyTextFieldFallbackTitleRendersDimmed() {
+    let textField = TextField("Name", text: .constant(""))
+
+    #expect(ViewResolver.block(from: textField)?.runs == [
+        RenderedRun(
+            text: "Name",
+            style: TextStyle(isDim: true)
+        ),
+    ])
 }
 
 @Test func maskedSecureFieldDisplaysBoundText() {
@@ -1101,6 +1133,17 @@ private func lineBreakKinds(in text: String) -> [String] {
     let secureField = SecureField("Password", text: .constant(""))
 
     #expect(ViewResolver.text(from: secureField) == "Password")
+}
+
+@Test func emptySecureFieldPlaceholderRendersDimmed() {
+    let secureField = SecureField("Password", text: .constant(""))
+
+    #expect(ViewResolver.block(from: secureField)?.runs == [
+        RenderedRun(
+            text: "Password",
+            style: TextStyle(isDim: true)
+        ),
+    ])
 }
 
 @Test func focusedSecureFieldEditsBoundTextWhileMaskingOutput() {

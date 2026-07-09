@@ -342,7 +342,7 @@ private enum TextInputRenderer {
             isFocused: isFocused,
             layoutText: layoutText
         )
-        let displayTextWidth = TerminalText.columnWidth(displayText)
+        let displayTextWidth = TerminalText.columnWidth(displayText.content)
         let reservesTrailingCaretCell = !currentText.isEmpty
         let contentWidth = max(
             reservesTrailingCaretCell ? displayTextWidth + 1 : displayTextWidth,
@@ -351,8 +351,8 @@ private enum TextInputRenderer {
         let content = RenderedBlock(
             runs: [
                 RenderedRun(
-                    text: displayText,
-                    style: EnvironmentRenderContext.current.textStyle
+                    text: displayText.content,
+                    style: textStyle(isPlaceholder: displayText.isPlaceholder)
                 ),
             ],
             width: contentWidth,
@@ -375,15 +375,26 @@ private enum TextInputRenderer {
         layoutText: String,
         prompt: Text?,
         label: Label
-    ) -> String {
+    ) -> DisplayText {
         if !text.isEmpty {
-            return layoutText
+            return DisplayText(content: layoutText, isPlaceholder: false)
         }
         if let prompt {
-            return prompt.content
+            return DisplayText(content: prompt.content, isPlaceholder: true)
         }
 
-        return ViewResolver.text(from: label) ?? ""
+        return DisplayText(
+            content: ViewResolver.text(from: label) ?? "",
+            isPlaceholder: true
+        )
+    }
+
+    private static func textStyle(isPlaceholder: Bool) -> TextStyle {
+        var style = EnvironmentRenderContext.current.textStyle
+        if isPlaceholder {
+            style.isDim = true
+        }
+        return style
     }
 
     private static func renderedCursor(
@@ -444,6 +455,13 @@ private enum TextInputRenderer {
             return .handled
         }
     }
+}
+
+private struct DisplayText {
+
+    let content: String
+
+    let isPlaceholder: Bool
 }
 
 private enum TextFieldDisplayMode {

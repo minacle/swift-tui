@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed empty `TextField` and `SecureField` placeholder rendering so
+  placeholder text is dimmed while preserving inherited text styling.
 - Fixed `TextField` rendering so text that exactly fits the field width
   reserves a trailing caret cell with or without focus.
 - Fixed nested stack layout so flexible content, including `TextField` and
