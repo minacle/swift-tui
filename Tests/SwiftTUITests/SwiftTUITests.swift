@@ -55,7 +55,9 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let string = "Hello"
     let substring = string[string.startIndex..<string.index(string.startIndex, offsetBy: 4)]
     var attributed = AttributedString("Styled")
+#if canImport(Darwin)
     attributed.inlinePresentationIntent = .stronglyEmphasized
+#endif
 
     #expect(Text(string).content == "Hello")
     #expect(Text(substring).content == "Hell")
@@ -64,6 +66,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     #expect(Text(attributed).content == "Styled")
 }
 
+#if canImport(Darwin)
 @Test func attributedTextMapsInlinePresentationIntentToRuns() {
     var attributed = AttributedString("Bold Italic Strike")
     attributed[attributed.range(of: "Bold")!].inlinePresentationIntent = .stronglyEmphasized
@@ -106,6 +109,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
         ),
     ])
 }
+#endif
 
 @Test func attributedTextMapsForegroundAndBackgroundAttributesToRuns() {
     var attributed = AttributedString("Red Blue")
@@ -156,6 +160,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     ])
 }
 
+#if canImport(Darwin)
 @Test func attributedTextPreservesRunStylesAcrossWrapping() {
     var attributed = AttributedString("Alpha Beta")
     attributed[attributed.range(of: "Beta")!].inlinePresentationIntent = .stronglyEmphasized
@@ -168,6 +173,7 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     ])
     #expect(block?.lines == ["Alpha", "Beta "])
 }
+#endif
 
 @Test func attributedTextAlignsLinesWithinProposal() {
     var left = AttributedString("A")

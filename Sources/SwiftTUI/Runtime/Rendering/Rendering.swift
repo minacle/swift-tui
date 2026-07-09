@@ -2410,7 +2410,7 @@ private struct RenderedScreenProjection {
 
     private mutating func clearCells(row: Int, columns: Range<Int>) {
         let affectedColumns = Set(columns.flatMap { column in
-            affectedColumns(containing: column, row: row)
+            self.affectedColumns(containing: column, row: row)
         })
 
         for column in affectedColumns where cells[row].indices.contains(column) {

@@ -240,7 +240,10 @@ nonisolated struct TextRun: Equatable, Sendable {
                 return nil
             }
 
-            var style = TextStyle(inlinePresentationIntent: run.inlinePresentationIntent)
+            var style = TextStyle()
+#if canImport(Darwin)
+            style = TextStyle(inlinePresentationIntent: run.inlinePresentationIntent)
+#endif
             style.foregroundStyle = run.foregroundColor
             style.backgroundStyle = run.backgroundColor
 
@@ -285,6 +288,7 @@ nonisolated struct TextStyle: Equatable, Sendable {
     init() {
     }
 
+#if canImport(Darwin)
     init(inlinePresentationIntent: InlinePresentationIntent?) {
         guard let inlinePresentationIntent else {
             return
@@ -294,6 +298,7 @@ nonisolated struct TextStyle: Equatable, Sendable {
         isItalic = inlinePresentationIntent.contains(.emphasized)
         isStrikethrough = inlinePresentationIntent.contains(.strikethrough)
     }
+#endif
 
     func merged(with override: TextStyle) -> TextStyle {
         TextStyle(
