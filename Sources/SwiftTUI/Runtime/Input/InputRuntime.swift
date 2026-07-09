@@ -180,6 +180,48 @@ struct TapGestureView<Content: View>: View, InputModifierRenderable, LayoutTrait
     }
 }
 
+nonisolated struct PointerPressView<Content: View>: View, InputModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let handler: PointerPressHandler
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        runtime?.registerPointerPressHandler(handler, at: path)
+        guard var block = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+}
+
 struct LongPressGestureView<Content: View>: View, InputModifierRenderable,
     LayoutTraitRenderable
 {
@@ -331,6 +373,17 @@ struct TapGestureHandler {
     let action: TapGestureAction
 }
 
+nonisolated struct PointerPressHandler {
+
+    let actionPath: [Int]?
+
+    let coordinateSpace: CoordinateSpace
+
+    let matches: (PointerPress) -> Bool
+
+    let action: (PointerPress) -> PointerPress.Result
+}
+
 struct LongPressGestureHandler {
 
     let actionPath: [Int]?
@@ -445,6 +498,8 @@ final class InputRuntime {
 
     private var tapHandlersByPath: [[Int]: [TapGestureHandler]] = [:]
 
+    private var pointerPressHandlersByPath: [[Int]: [PointerPressHandler]] = [:]
+
     private var longPressHandlersByPath: [[Int]: [LongPressGestureHandler]] = [:]
 
     private var hoverHandlersByPath: [[Int]: [HoverGestureHandler]] = [:]
@@ -489,6 +544,7 @@ final class InputRuntime {
         handlersByPath = [:]
         globalHandlers = []
         tapHandlersByPath = [:]
+        pointerPressHandlersByPath = [:]
         longPressHandlersByPath = [:]
         hoverHandlersByPath = [:]
         linkHandlersByPath = [:]
@@ -511,6 +567,10 @@ final class InputRuntime {
 
     func register(_ handler: TapGestureHandler, at path: [Int]) {
         tapHandlersByPath[path, default: []].append(handler)
+    }
+
+    func register(_ handler: PointerPressHandler, at path: [Int]) {
+        pointerPressHandlersByPath[path, default: []].append(handler)
     }
 
     func register(_ handler: LongPressGestureHandler, at path: [Int]) {
@@ -657,7 +717,8 @@ final class InputRuntime {
             activeMouseDownPositionTarget = nil
             pressedTapTarget = nil
             pressedLinkTarget = nil
-            return cancelled ? .handled : .ignored
+            let pointerPressResult = dispatchPointerPress(mouseEvent, perform: perform)
+            return pointerPressResult == .handled || cancelled ? .handled : .ignored
         }
 
         switch mouseEvent.phase {
@@ -683,16 +744,28 @@ final class InputRuntime {
                 at: date,
                 perform: perform
             ) == .handled
+            let pointerPressResult = dispatchPointerPress(mouseEvent, perform: perform)
             return focusedPath != nil
                 || positioned
                 || pressedLinkTarget != nil
                 || pressedTapTarget != nil
                 || longPressStarted
                 || longPressRecognized
+                || pointerPressResult == .handled
                 ? .handled : .ignored
         case .motion:
             return .ignored
         case .up:
+            let pointerPressResult = dispatchPointerPress(mouseEvent, perform: perform)
+            if pointerPressResult == .handled {
+                activeMouseDownPositionTarget = nil
+                _ = cancelLongPress(perform: perform)
+                pressedLinkTarget = nil
+                pressedTapTarget = nil
+                resetTapSequence()
+                return .handled
+            }
+
             let longPressWasActive = longPressSequence != nil
             let mouseDownPositionWasActive = activeMouseDownPositionTarget != nil
             activeMouseDownPositionTarget = nil
@@ -887,6 +960,47 @@ final class InputRuntime {
         return handled ? .handled : .ignored
     }
 
+    private func dispatchPointerPress(
+        _ mouseEvent: MouseEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> KeyPress.Result {
+        guard let button = mouseEvent.button.pointerButton,
+              let phase = mouseEvent.phase.pointerPressPhase else {
+            return .ignored
+        }
+
+        let rootPoint = rootPoint(for: mouseEvent)
+        for target in pointerPressTargets(at: mouseEvent) {
+            for handler in pointerPressHandlersByPath[target.path] ?? [] {
+                let location = location(
+                    in: handler.coordinateSpace,
+                    path: target.path,
+                    rootPoint: rootPoint
+                )
+                let pointerPress = PointerPress(
+                    button: button,
+                    location: location,
+                    modifiers: mouseEvent.modifiers,
+                    phase: phase
+                )
+                guard handler.matches(pointerPress) else {
+                    continue
+                }
+
+                let actionPath = handler.actionPath ?? target.path
+                var result = PointerPress.Result.ignored
+                perform(actionPath) {
+                    result = handler.action(pointerPress)
+                }
+                if result == .handled {
+                    return .handled
+                }
+            }
+        }
+
+        return .ignored
+    }
+
     private func cancelLongPress(perform: ([Int], () -> Void) -> Void) -> Bool {
         guard let sequence = longPressSequence else {
             return false
@@ -972,6 +1086,21 @@ final class InputRuntime {
             .path
     }
 
+    private func pointerPressTargets(at mouseEvent: MouseEvent) -> [RenderedHitRegion] {
+        let column = mouseEvent.column - rootFrame.column
+        let row = mouseEvent.row - rootFrame.row
+        var paths: Set<[Int]> = []
+        return hitRegions
+            .filter {
+                pointerPressHandlersByPath[$0.path] != nil
+                    && $0.frame.contains(column: column, row: row)
+            }
+            .sorted(by: pointerPressHitRegionPrecedes)
+            .filter {
+                paths.insert($0.path).inserted
+            }
+    }
+
     private func hoverTargets(at mouseEvent: MouseEvent) -> [RenderedHitRegion] {
         let column = mouseEvent.column - rootFrame.column
         let row = mouseEvent.row - rootFrame.row
@@ -985,6 +1114,17 @@ final class InputRuntime {
             .filter {
                 paths.insert($0.path).inserted
             }
+    }
+
+    private func pointerPressHitRegionPrecedes(
+        _ lhs: RenderedHitRegion,
+        _ rhs: RenderedHitRegion
+    ) -> Bool {
+        if lhs.path.count != rhs.path.count {
+            return lhs.path.count > rhs.path.count
+        }
+
+        return lhs.frame.area < rhs.frame.area
     }
 
     private func hitRegionPrecedes(
@@ -1366,12 +1506,41 @@ final class InputRuntime {
 
 private extension MouseButton {
 
+    var pointerButton: PointerButton? {
+        switch self {
+        case .left:
+            return .left
+        case .middle:
+            return .middle
+        case .right:
+            return .right
+        case .other(let button):
+            return .other(button)
+        case .wheelUp, .wheelDown, .wheelLeft, .wheelRight:
+            return nil
+        }
+    }
+
     var isScrollWheel: Bool {
         switch self {
         case .wheelUp, .wheelDown, .wheelLeft, .wheelRight:
             return true
         default:
             return false
+        }
+    }
+}
+
+private extension MouseEvent.Phase {
+
+    var pointerPressPhase: PointerPress.Phases? {
+        switch self {
+        case .down:
+            return .down
+        case .up:
+            return .up
+        case .motion:
+            return nil
         }
     }
 }

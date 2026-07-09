@@ -236,6 +236,88 @@ public nonisolated struct KeyPress: Equatable, Sendable {
     }
 }
 
+/// A terminal pointer button that can participate in pointer-press events.
+public nonisolated enum PointerButton: Equatable, Hashable, Sendable {
+
+    /// The primary pointer button.
+    case left
+
+    /// The middle pointer button.
+    case middle
+
+    /// The secondary pointer button.
+    case right
+
+    /// Another terminal pointer button.
+    case other(Int)
+}
+
+/// A pointer button press delivered to a view's rendered terminal frame.
+public nonisolated struct PointerPress: Equatable, Sendable {
+
+    /// Options for matching different phases of a pointer-press event.
+    public nonisolated struct Phases: OptionSet, Sendable {
+
+        /// The raw option-set storage value.
+        public let rawValue: Int
+
+        /// Creates pointer-press phases from a raw option-set value.
+        public init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+
+        /// The pointer button-down phase.
+        public static let down = Phases(rawValue: 1 << 0)
+
+        /// The pointer button-up phase.
+        public static let up = Phases(rawValue: 1 << 1)
+
+        /// All pointer-press phases.
+        public static let all: Phases = [.down, .up]
+    }
+
+    /// A result value that indicates whether an action consumed the event.
+    public nonisolated enum Result: Equatable, Hashable, Sendable {
+
+        /// The handler consumed the event and propagation should stop.
+        case handled
+
+        /// The handler did not consume the event.
+        case ignored
+    }
+
+    /// The pointer button associated with this press.
+    public let button: PointerButton
+
+    /// The terminal-cell pointer location in the requested coordinate space.
+    public let location: Point
+
+    /// The modifier keys active for this event.
+    public let modifiers: EventModifiers
+
+    /// The pointer-press phase.
+    public let phase: Phases
+
+    /// Creates a pointer-press event.
+    ///
+    /// - Parameters:
+    ///   - button: The pointer button associated with this press.
+    ///   - location: The terminal-cell pointer location.
+    ///   - modifiers: The active modifier keys.
+    ///   - phase: The pointer-press phase.
+    public init(
+        button: PointerButton,
+        location: Point,
+        modifiers: EventModifiers = [],
+        phase: Phases
+    ) {
+        self.button = button
+        self.location = location
+        self.modifiers = modifiers
+        self.phase = phase
+    }
+}
+
 /// The current terminal-cell hover state and pointer location.
 public enum HoverPhase: Equatable, Sendable {
 
@@ -297,6 +379,117 @@ public extension View {
                 count: count,
                 action: .location(coordinateSpace, action)
             )
+        )
+    }
+
+    /// Performs an action when the primary pointer button is pressed down
+    /// inside this view's frame.
+    ///
+    /// - Parameter action: The action to perform for a matching pointer press.
+    /// - Returns: A view with a pointer-press handler attached.
+    nonisolated func onPointerPress(
+        action: @escaping () -> PointerPress.Result
+    ) -> some View {
+        onPointerPress(.left, phases: .down, coordinateSpace: .local) {
+            _ in
+
+            action()
+        }
+    }
+
+    /// Performs an action when matching pointer button presses occur inside
+    /// this view's frame.
+    ///
+    /// The view registers its rendered terminal frame as a hit region. Pointer
+    /// motion and scroll-wheel input do not produce pointer-press events.
+    ///
+    /// - Parameters:
+    ///   - phases: The pointer-press phases to match.
+    ///   - buttons: The pointer buttons to match.
+    ///   - coordinateSpace: The coordinate space for reported locations.
+    ///   - action: The action to perform for matching pointer presses.
+    /// - Returns: A view with a pointer-press handler attached.
+    @_disfavoredOverload
+    nonisolated func onPointerPress(
+        phases: PointerPress.Phases = .down,
+        buttons: Set<PointerButton> = [.left],
+        coordinateSpace: CoordinateSpace = .local,
+        action: @escaping (PointerPress) -> PointerPress.Result
+    ) -> some View {
+        PointerPressView(
+            content: self,
+            handler: PointerPressHandler(
+                actionPath: StateContext.currentPath,
+                coordinateSpace: coordinateSpace,
+                matches: {
+                    buttons.contains($0.button) && phases.contains($0.phase)
+                },
+                action: action
+            )
+        )
+    }
+
+    /// Performs an action when the specified pointer button is pressed down
+    /// inside this view's frame.
+    ///
+    /// - Parameters:
+    ///   - button: The pointer button to match.
+    ///   - action: The action to perform for a matching pointer press.
+    /// - Returns: A view with a pointer-press handler attached.
+    nonisolated func onPointerPress(
+        _ button: PointerButton,
+        action: @escaping () -> PointerPress.Result
+    ) -> some View {
+        onPointerPress(button, phases: .down, coordinateSpace: .local) {
+            _ in
+
+            action()
+        }
+    }
+
+    /// Performs an action when the specified pointer button and phases occur
+    /// inside this view's frame.
+    ///
+    /// - Parameters:
+    ///   - button: The pointer button to match.
+    ///   - phases: The pointer-press phases to match.
+    ///   - coordinateSpace: The coordinate space for reported locations.
+    ///   - action: The action to perform for matching pointer presses.
+    /// - Returns: A view with a pointer-press handler attached.
+    nonisolated func onPointerPress(
+        _ button: PointerButton,
+        phases: PointerPress.Phases,
+        coordinateSpace: CoordinateSpace = .local,
+        action: @escaping (PointerPress) -> PointerPress.Result
+    ) -> some View {
+        onPointerPress(
+            buttons: [button],
+            phases: phases,
+            coordinateSpace: coordinateSpace,
+            action: action
+        )
+    }
+
+    /// Performs an action when any of the specified pointer buttons and phases
+    /// occur inside this view's frame.
+    ///
+    /// - Parameters:
+    ///   - buttons: The pointer buttons to match.
+    ///   - phases: The pointer-press phases to match.
+    ///   - coordinateSpace: The coordinate space for reported locations.
+    ///   - action: The action to perform for matching pointer presses.
+    /// - Returns: A view with a pointer-press handler attached.
+    nonisolated func onPointerPress(
+        buttons: Set<PointerButton>,
+        phases: PointerPress.Phases = .down,
+        coordinateSpace: CoordinateSpace = .local,
+        action: @escaping (PointerPress) -> PointerPress.Result
+    ) -> some View {
+        onPointerPress(
+            phases: phases,
+            buttons: buttons,
+            coordinateSpace: coordinateSpace,
+            action: action
         )
     }
 

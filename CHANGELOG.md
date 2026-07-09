@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `onPointerPress` handlers with terminal-cell pointer locations,
+  pointer-button filtering, and down/up phase matching.
+
 ### Fixed
 
 - Fixed focused `TextField` rendering so text that exactly fits the field width

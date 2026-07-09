@@ -336,6 +336,18 @@ final class StateRuntime {
         )
     }
 
+    func registerPointerPressHandler(_ handler: PointerPressHandler, at path: [Int]) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringPointerPressHandler(handler),
+            at: path
+        )
+    }
+
     func registerLongPressGestureHandler(
         _ handler: LongPressGestureHandler,
         at path: [Int]
@@ -827,6 +839,22 @@ final class StateRuntime {
             actionPath: handler.actionPath,
             count: handler.count,
             action: handler.action.restoringEnvironment(environment)
+        )
+    }
+
+    private func environmentRestoringPointerPressHandler(
+        _ handler: PointerPressHandler
+    ) -> PointerPressHandler {
+        let environment = EnvironmentRenderContext.current
+        return PointerPressHandler(
+            actionPath: handler.actionPath,
+            coordinateSpace: handler.coordinateSpace,
+            matches: handler.matches,
+            action: { pointerPress in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action(pointerPress)
+                }
+            }
         )
     }
 

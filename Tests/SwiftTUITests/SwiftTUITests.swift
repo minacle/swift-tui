@@ -5069,6 +5069,17 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(phases.contains(.down))
     #expect(phases.contains(.repeat))
     #expect(KeyPress.Result.handled != .ignored)
+    #expect(PointerPress.Phases.all.contains(.down))
+    #expect(PointerPress.Phases.all.contains(.up))
+    #expect(PointerPress.Result.handled != .ignored)
+    #expect(
+        PointerPress(
+            button: .left,
+            location: Point(column: 1, row: 2),
+            modifiers: .shift,
+            phase: .down
+        ).location == Point(column: 1, row: 2)
+    )
     #expect(mouse.button == .left)
     #expect(mouse.column == 2)
     #expect(mouse.row == 3)
@@ -8110,6 +8121,10 @@ private struct ParentCallbackStateMutationTests {
             .onLongPressGesture {
                 tapProbe.record("long")
             }
+            .onPointerPress {
+                tapProbe.record("pointer")
+                return .handled
+            }
             .onHover { _ in
                 tapProbe.record("hover")
             }
@@ -8157,6 +8172,287 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.dispatchExpiredLongPressActions() == .ignored)
     #expect(keyProbe.events.isEmpty)
     #expect(tapProbe.events.isEmpty)
+}
+
+@Test func pointerPressDefaultMatchesOnlyLeftDown() {
+    let runtime = StateRuntime()
+    let pointerProbe = PointerPressProbe()
+    let view = Text("A")
+        .onPointerPress {
+            pointerProbe.record("default")
+            return .handled
+        }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+        ) == .ignored
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .right, column: 1, row: 1, phase: .down)
+        ) == .ignored
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+        ) == .ignored
+    )
+    #expect(pointerProbe.names == ["default"])
+}
+
+@Test func pointerPressCanMatchDownAndUpPhases() {
+    let runtime = StateRuntime()
+    let pointerProbe = PointerPressProbe()
+    let view = Text("A")
+        .onPointerPress(phases: [.down, .up]) { pointerPress in
+            pointerProbe.record("press", pointerPress)
+            return .handled
+        }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(
+        pointerProbe.events.map(\.phase) == [
+            .down,
+            .up,
+        ]
+    )
+}
+
+@Test func pointerPressButtonFilterMatchesRightAndMiddleWithoutFocusing() {
+    let runtime = StateRuntime()
+    let focusProbe = FocusBindingProbe<Bool>()
+    let keyProbe = KeyPressProbe()
+    let pointerProbe = PointerPressProbe()
+    let view = PointerPressFocusableView(
+        focusProbe: focusProbe,
+        keyProbe: keyProbe,
+        pointerProbe: pointerProbe
+    )
+
+    _ = runtime.block(from: view)
+
+    #expect(focusProbe.binding?.wrappedValue == false)
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .right, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .middle, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+    #expect(keyProbe.events.isEmpty)
+    #expect(pointerProbe.events.map(\.button) == [.right, .middle])
+    #expect(focusProbe.binding?.wrappedValue == false)
+}
+
+@Test func pointerPressReportsLocalGlobalNamedLocationsAndModifiers() {
+    let runtime = StateRuntime()
+    let pointerProbe = PointerPressProbe()
+    let view = HStack(spacing: 0) {
+        Text("..")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("x")
+            Text("ABCD")
+                .frame(width: 2)
+                .onPointerPress(coordinateSpace: .local) { pointerPress in
+                    pointerProbe.record("local", pointerPress)
+                    return .ignored
+                }
+                .onPointerPress(coordinateSpace: .global) { pointerPress in
+                    pointerProbe.record("global", pointerPress)
+                    return .ignored
+                }
+                .onPointerPress(coordinateSpace: .named("stack")) { pointerPress in
+                    pointerProbe.record("named", pointerPress)
+                    return .ignored
+                }
+        }
+        .coordinateSpace(.named("stack"))
+    }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(
+                button: .left,
+                column: 4,
+                row: 2,
+                modifiers: [.shift, .control],
+                phase: .down
+            )
+        ) == .ignored
+    )
+    #expect(
+        pointerProbe.events == [
+            PointerPressEvent(
+                name: "named",
+                button: .left,
+                location: Point(column: 1, row: 1),
+                modifiers: [.shift, .control],
+                phase: .down
+            ),
+            PointerPressEvent(
+                name: "global",
+                button: .left,
+                location: Point(column: 3, row: 1),
+                modifiers: [.shift, .control],
+                phase: .down
+            ),
+            PointerPressEvent(
+                name: "local",
+                button: .left,
+                location: Point(column: 1, row: 0),
+                modifiers: [.shift, .control],
+                phase: .down
+            ),
+        ]
+    )
+}
+
+@Test func pointerPressPropagatesFromChildToParentUntilHandled() {
+    let runtime = StateRuntime()
+    let pointerProbe = PointerPressProbe()
+    let view = VStack {
+        Text("A")
+            .onPointerPress {
+                pointerProbe.record("child")
+                return .ignored
+            }
+    }
+    .onPointerPress {
+        pointerProbe.record("parent")
+        return .handled
+    }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(pointerProbe.names == ["child", "parent"])
+}
+
+@Test func pointerPressStopsPropagationWhenChildHandlesEvent() {
+    let runtime = StateRuntime()
+    let pointerProbe = PointerPressProbe()
+    let view = VStack {
+        Text("A")
+            .onPointerPress {
+                pointerProbe.record("child")
+                return .handled
+            }
+    }
+    .onPointerPress {
+        pointerProbe.record("parent")
+        return .handled
+    }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(pointerProbe.names == ["child"])
+}
+
+@Test func handledPointerPressUpSuppressesTapCompletion() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let pointerProbe = PointerPressProbe()
+    let view = Text("A")
+        .onTapGesture {
+            tapProbe.record("tap")
+        }
+        .onPointerPress(phases: .up) { pointerPress in
+            pointerProbe.record("up", pointerPress)
+            return .handled
+        }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(pointerProbe.names == ["up"])
+    #expect(tapProbe.events.isEmpty)
+}
+
+@Test func ignoredPointerPressUpPreservesTapCompletion() {
+    let runtime = StateRuntime()
+    let tapProbe = TapGestureProbe()
+    let pointerProbe = PointerPressProbe()
+    let view = Text("A")
+        .onTapGesture {
+            tapProbe.record("tap")
+        }
+        .onPointerPress(phases: .up) { pointerPress in
+            pointerProbe.record("up", pointerPress)
+            return .ignored
+        }
+
+    _ = runtime.block(from: view)
+
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(pointerProbe.names == ["up"])
+    #expect(tapProbe.events == ["tap"])
+}
+
+@Test func pointerPressActionMutatesStateAndInvalidatesView() {
+    let runtime = StateRuntime()
+    let view = PointerPressStateMutationView()
+
+    #expect(runtime.block(from: view)?.text == "0")
+    #expect(
+        runtime.dispatch(
+            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "1")
 }
 
 @Test func tapGestureActionMutatesStateAndInvalidatesView() {
@@ -10072,6 +10368,43 @@ private final class TapGestureProbe {
 
     func record(_ event: String) {
         events.append(event)
+    }
+}
+
+private struct PointerPressEvent: Equatable {
+
+    var name: String
+
+    var button: PointerButton
+
+    var location: Point
+
+    var modifiers: EventModifiers
+
+    var phase: PointerPress.Phases
+}
+
+private final class PointerPressProbe {
+
+    var names: [String] = []
+
+    var events: [PointerPressEvent] = []
+
+    func record(_ name: String) {
+        names.append(name)
+    }
+
+    func record(_ name: String, _ pointerPress: PointerPress) {
+        names.append(name)
+        events.append(
+            PointerPressEvent(
+                name: name,
+                button: pointerPress.button,
+                location: pointerPress.location,
+                modifiers: pointerPress.modifiers,
+                phase: pointerPress.phase
+            )
+        )
     }
 }
 
@@ -12140,6 +12473,19 @@ private struct TapGestureStateMutationView: View {
     }
 }
 
+private struct PointerPressStateMutationView: View {
+
+    @State var count = 0
+
+    var body: some View {
+        Text(String(count))
+            .onPointerPress {
+                count += 1
+                return .handled
+            }
+    }
+}
+
 private struct LongPressGestureStateMutationView: View {
 
     @State private var count = 0
@@ -13282,11 +13628,70 @@ private struct CapturedDisabledInputModifiersText: View {
             .onTapGesture {
                 tapProbe.record("tap")
             }
+            .onPointerPress {
+                tapProbe.record("pointer")
+                return .handled
+            }
             .onHover { _ in
                 tapProbe.record("hover")
             }
             .onContinuousHover { _ in
                 tapProbe.record("continuous-hover")
+            }
+    }
+}
+
+private struct PointerPressFocusableView: View {
+
+    @FocusState private var isFocused = false
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    let keyProbe: KeyPressProbe
+
+    let pointerProbe: PointerPressProbe
+
+    var body: some View {
+        CapturedPointerPressFocusableText(
+            focusBinding: $isFocused,
+            focusProbe: focusProbe,
+            keyProbe: keyProbe,
+            pointerProbe: pointerProbe
+        )
+    }
+}
+
+private struct CapturedPointerPressFocusableText: View {
+
+    let focusBinding: FocusState<Bool>.Binding
+
+    let keyProbe: KeyPressProbe
+
+    let pointerProbe: PointerPressProbe
+
+    init(
+        focusBinding: FocusState<Bool>.Binding,
+        focusProbe: FocusBindingProbe<Bool>,
+        keyProbe: KeyPressProbe,
+        pointerProbe: PointerPressProbe
+    ) {
+        self.focusBinding = focusBinding
+        self.keyProbe = keyProbe
+        self.pointerProbe = pointerProbe
+        focusProbe.capture(focusBinding)
+    }
+
+    var body: some View {
+        Text("A")
+            .focusable()
+            .focused(focusBinding)
+            .onKeyPress(.return) {
+                keyProbe.record("return")
+                return .handled
+            }
+            .onPointerPress(buttons: [.right, .middle]) { pointerPress in
+                pointerProbe.record("pointer", pointerPress)
+                return .handled
             }
     }
 }
