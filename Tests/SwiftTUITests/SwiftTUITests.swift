@@ -1005,7 +1005,16 @@ private func lineBreakKinds(in text: String) -> [String] {
         )
     )
 
-    #expect(ViewResolver.text(from: textField) == "mayu")
+    #expect(ViewResolver.text(from: textField) == "mayu ")
+}
+
+@Test func nonFocusedTextFieldWithTextReservesTrailingCaretCell() {
+    let textField = TextField("Name", text: .constant("mayu"))
+    let block = ViewResolver.block(from: textField)
+
+    #expect(block?.text == "mayu ")
+    #expect(block?.width == 5)
+    #expect(block?.cursor == nil)
 }
 
 @Test func textFieldDisplayTextInheritsTextStyle() {
@@ -1051,7 +1060,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 @Test func maskedSecureFieldDisplaysBoundText() {
     let secureField = SecureField("Password", text: .constant("secret"))
 
-    #expect(ViewResolver.text(from: secureField) == "••••••")
+    #expect(ViewResolver.text(from: secureField) == "•••••• ")
 }
 
 @Test func styledSecureFieldMasksText() {

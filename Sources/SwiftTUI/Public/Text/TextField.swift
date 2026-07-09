@@ -343,7 +343,7 @@ private enum TextInputRenderer {
             layoutText: layoutText
         )
         let displayTextWidth = TerminalText.columnWidth(displayText)
-        let reservesTrailingCaretCell = cursor != nil && !currentText.isEmpty
+        let reservesTrailingCaretCell = !currentText.isEmpty
         let contentWidth = max(
             reservesTrailingCaretCell ? displayTextWidth + 1 : displayTextWidth,
             1

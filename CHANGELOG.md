@@ -32,9 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed focused `TextField` rendering so text that exactly fits the field width
-  preserves both its leading character and the caret position after the final
-  character while editing without widening visible placeholders.
+- Fixed `TextField` rendering so text that exactly fits the field width
+  reserves a trailing caret cell with or without focus.
 - Fixed nested stack layout so flexible content, including `TextField` and
   stack-local `Spacer` children, receives the parent stack's available width.
 - Fixed overflowing `TextField` and `SecureField` input inside nested stacks so
