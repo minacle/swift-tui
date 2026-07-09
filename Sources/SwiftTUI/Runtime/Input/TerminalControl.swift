@@ -22,7 +22,7 @@ enum TerminalInput: Equatable, Sendable {
 
     case keyPress(KeyPress)
 
-    case mouse(MouseEvent)
+    case pointer(PointerEvent)
 
     case none
 }
@@ -43,9 +43,9 @@ enum TerminalControl {
 
     static let exitAlternateScreenSequence = "\u{001B}[?1049l"
 
-    static let enableMouseTrackingSequence = "\u{001B}[?1003h\u{001B}[?1006h"
+    static let enablePointerTrackingSequence = "\u{001B}[?1003h\u{001B}[?1006h"
 
-    static let disableMouseTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
+    static let disablePointerTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
 
     static func cursorPositionSequence(row: Int, column: Int) -> String {
         "\u{001B}[\(max(row, 1));\(max(column, 1))H"
@@ -181,8 +181,8 @@ enum TerminalControl {
             return .quit
         }
 
-        if let mouseEvent = mouseEventInput(for: bytes) {
-            return .mouse(mouseEvent)
+        if let pointerEvent = pointerEventInput(for: bytes) {
+            return .pointer(pointerEvent)
         }
 
         if let keyPress = escapeSequenceInput(for: bytes) {
@@ -351,7 +351,7 @@ enum TerminalControl {
         }
     }
 
-    private static func mouseEventInput(for bytes: [UInt8]) -> MouseEvent? {
+    private static func pointerEventInput(for bytes: [UInt8]) -> PointerEvent? {
         guard let string = String(bytes: bytes, encoding: .ascii),
               string.hasPrefix("\u{001B}[<"),
               let final = string.last,
@@ -372,16 +372,16 @@ enum TerminalControl {
         let isMotion = encodedButton & 32 != 0
         let encodedButtonWithoutMotion = encodedButton & ~32
 
-        return MouseEvent(
-            button: mouseButton(for: encodedButtonWithoutMotion),
+        return PointerEvent(
+            button: pointerButton(for: encodedButtonWithoutMotion),
             column: column,
             row: row,
-            modifiers: mouseModifiers(for: encodedButtonWithoutMotion),
+            modifiers: pointerModifiers(for: encodedButtonWithoutMotion),
             phase: isMotion ? .motion : final == "M" ? .down : .up
         )
     }
 
-    private static func mouseButton(for encodedButton: Int) -> MouseButton {
+    private static func pointerButton(for encodedButton: Int) -> PointerEvent.Button {
         let button = encodedButton & ~0b1_1100
         switch button {
         case 0:
@@ -403,7 +403,7 @@ enum TerminalControl {
         }
     }
 
-    private static func mouseModifiers(for encodedButton: Int) -> EventModifiers {
+    private static func pointerModifiers(for encodedButton: Int) -> EventModifiers {
         var modifiers: EventModifiers = []
         if encodedButton & 4 != 0 {
             modifiers.insert(.shift)
@@ -483,7 +483,7 @@ final class TerminalSession {
         try raw.apply(to: .standardInput, when: .now)
         previousWindowChangeHandler = signal(SIGWINCH, handleTerminalWindowChangeSignal)
         TerminalControl.write(TerminalControl.enterAlternateScreenSequence)
-        TerminalControl.write(TerminalControl.enableMouseTrackingSequence)
+        TerminalControl.write(TerminalControl.enablePointerTrackingSequence)
         TerminalControl.write(TerminalControl.hideCursorSequence)
         isActive = true
     }
@@ -499,7 +499,7 @@ final class TerminalSession {
             self.previousWindowChangeHandler = nil
         }
         TerminalControl.write(TerminalControl.showCursorSequence)
-        TerminalControl.write(TerminalControl.disableMouseTrackingSequence)
+        TerminalControl.write(TerminalControl.disablePointerTrackingSequence)
         TerminalControl.write(TerminalControl.exitAlternateScreenSequence)
         isActive = false
     }

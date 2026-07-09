@@ -333,8 +333,8 @@ public extension View {
 
     /// Performs an action when this view recognizes a tap gesture.
     ///
-    /// The view registers its rendered terminal frame as a hit region. Mouse
-    /// input that completes the requested tap count inside that frame runs the
+    /// The view registers its rendered terminal frame as a hit region. Pointer
+    /// events that complete the requested tap count inside that frame run the
     /// action.
     ///
     /// - Parameters:
@@ -495,7 +495,7 @@ public extension View {
 
     /// Performs an action when the pointer enters or exits this view's frame.
     ///
-    /// The view registers its rendered terminal frame as a hover region. Mouse
+    /// The view registers its rendered terminal frame as a hover region. Pointer
     /// motion inside that frame passes `true`; motion outside after entry
     /// passes `false`.
     ///
@@ -536,9 +536,9 @@ public extension View {
 
     /// Adds an action to perform when this view recognizes a long press gesture.
     ///
-    /// The view registers its rendered terminal frame as a hit region. Mouse
-    /// input that remains pressed inside the allowed movement distance for at
-    /// least `minimumDuration` runs the action.
+    /// The view registers its rendered terminal frame as a hit region. Pointer
+    /// events that keep the primary button pressed inside the allowed movement
+    /// distance for at least `minimumDuration` run the action.
     ///
     /// - Parameters:
     ///   - minimumDuration: The minimum duration of the long press.

@@ -298,8 +298,8 @@ private enum TextInputRenderer {
             ),
             at: path
         )
-        runtime?.registerMouseDownPositionHandler(
-            MouseDownPositionHandler(
+        runtime?.registerPointerDownPositionHandler(
+            PointerDownPositionHandler(
                 actionPath: path,
                 action: { point in
                     guard let fieldState else {

@@ -268,13 +268,13 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let date = Date(timeIntervalSinceReferenceDate: 1_000)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date
         ) == .ignored
     )
@@ -1142,7 +1142,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 3, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 3, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1174,12 +1174,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1578,7 +1578,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 3, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 3, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1607,7 +1607,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 5, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 5, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1628,12 +1628,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1655,12 +1655,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 4, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 4, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
         ) == .handled
     )
     #expect(renderUntilStable(runtime, view: view) <= 3)
@@ -1670,7 +1670,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.cursor == RenderedCursor(column: 1))
 }
 
-@Test func textFieldMouseMotionWithoutPressDoesNotMoveCaret() {
+@Test func textFieldPointerMotionWithoutPressDoesNotMoveCaret() {
     let runtime = StateRuntime()
     let view = TextFieldInitialTextView(text: "abcd")
 
@@ -1680,7 +1680,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
         ) == .ignored
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1691,7 +1691,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.cursor == RenderedCursor(column: 5))
 }
 
-@Test func textFieldMouseUpEndsCaretDrag() {
+@Test func textFieldPointerUpEndsCaretDrag() {
     let runtime = StateRuntime()
     let view = TextFieldInitialTextView(text: "abcd")
 
@@ -1701,17 +1701,17 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 4, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .ignored
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1735,7 +1735,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1759,7 +1759,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 2, phase: .down)
         ) == .handled
     )
     #expect(focusProbe.binding?.wrappedValue == .second)
@@ -1781,7 +1781,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 5, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 5, row: 1, phase: .down)
         ) == .handled
     )
     #expect(focusProbe.binding?.wrappedValue == true)
@@ -1846,7 +1846,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 2, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1868,12 +1868,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 3, row: 2, phase: .motion)
+            PointerEvent(button: .left, column: 3, row: 2, phase: .motion)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -1896,12 +1896,12 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 3, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 3, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
         ) == .handled
     )
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -1923,7 +1923,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -2198,7 +2198,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.consumeInvalidation())
@@ -2220,7 +2220,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 5, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 5, phase: .down)
         ) == .handled
     )
 
@@ -2240,7 +2240,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 23, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 23, phase: .down)
         ) == .handled
     )
 
@@ -2263,7 +2263,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 3, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 3, phase: .down)
         ) == .handled
     )
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -2409,7 +2409,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.lines == ["     ", "     ", "     "])
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 3, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 3, row: 2, phase: .down)
         ) == .handled
     )
     #expect(focusProbe.binding?.wrappedValue == true)
@@ -3174,7 +3174,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 2, phase: .down)
         ) == .handled
     )
     #expect(runtime.consumeInvalidation())
@@ -3223,7 +3223,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 2, phase: .down)
         ) == .handled
     )
     _ = runtime.consumeInvalidation()
@@ -3524,7 +3524,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.consumeInvalidation())
@@ -3543,7 +3543,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 11, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 11, row: 2, phase: .down)
         ) == .handled
     )
     #expect(runtime.consumeInvalidation())
@@ -3873,7 +3873,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.lines == ["HIJ", "MNO"])
 }
 
-@Test func scrollViewScrollsWithMouseWheelWithoutFocus() {
+@Test func scrollViewScrollsWithPointerWheelWithoutFocus() {
     let runtime = StateRuntime()
     let view = FocusedScrollWheelView()
 
@@ -4923,8 +4923,8 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.hideCursorSequence == "\u{001B}[?25l")
     #expect(TerminalControl.showCursorSequence == "\u{001B}[?25h")
     #expect(TerminalControl.exitAlternateScreenSequence == "\u{001B}[?1049l")
-    #expect(TerminalControl.enableMouseTrackingSequence == "\u{001B}[?1003h\u{001B}[?1006h")
-    #expect(TerminalControl.disableMouseTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")
+    #expect(TerminalControl.enablePointerTrackingSequence == "\u{001B}[?1003h\u{001B}[?1006h")
+    #expect(TerminalControl.disablePointerTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")
 }
 
 @Test func terminalViewportTrackerIgnoresSameViewport() {
@@ -5051,7 +5051,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let key: KeyEquivalent = "a"
     let modifiers: EventModifiers = [.shift, .control]
     let phases: KeyPress.Phases = [.down, .repeat]
-    let mouse = MouseEvent(
+    let pointer = PointerEvent(
         button: .left,
         column: 2,
         row: 3,
@@ -5080,11 +5080,11 @@ private func lineBreakKinds(in text: String) -> [String] {
             phase: .down
         ).location == Point(column: 1, row: 2)
     )
-    #expect(mouse.button == .left)
-    #expect(mouse.column == 2)
-    #expect(mouse.row == 3)
-    #expect(mouse.modifiers == .shift)
-    #expect(mouse.phase == .down)
+    #expect(pointer.button == .left)
+    #expect(pointer.column == 2)
+    #expect(pointer.row == 3)
+    #expect(pointer.modifiers == .shift)
+    #expect(pointer.phase == .down)
 }
 
 @Test func environmentReadsDefaultValue() {
@@ -6010,19 +6010,19 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.escapeSequenceIsComplete([27, 91, 51, 126]))
 }
 
-@Test func terminalParsesSGRMouseInput() {
+@Test func terminalParsesSGRPointerInput() {
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<0;12;3M".utf8))
-            == .mouse(MouseEvent(button: .left, column: 12, row: 3, phase: .down))
+            == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<0;12;3m".utf8))
-            == .mouse(MouseEvent(button: .left, column: 12, row: 3, phase: .up))
+            == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .up))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<20;1;2M".utf8))
-            == .mouse(
-                MouseEvent(
+            == .pointer(
+                PointerEvent(
                     button: .left,
                     column: 1,
                     row: 2,
@@ -6033,12 +6033,12 @@ private func lineBreakKinds(in text: String) -> [String] {
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<32;12;3M".utf8))
-            == .mouse(MouseEvent(button: .left, column: 12, row: 3, phase: .motion))
+            == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .motion))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<52;1;2M".utf8))
-            == .mouse(
-                MouseEvent(
+            == .pointer(
+                PointerEvent(
                     button: .left,
                     column: 1,
                     row: 2,
@@ -6049,32 +6049,32 @@ private func lineBreakKinds(in text: String) -> [String] {
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<35;8;9M".utf8))
-            == .mouse(MouseEvent(button: .other(3), column: 8, row: 9, phase: .motion))
+            == .pointer(PointerEvent(button: .other(3), column: 8, row: 9, phase: .motion))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<2;4;5M".utf8))
-            == .mouse(MouseEvent(button: .right, column: 4, row: 5, phase: .down))
+            == .pointer(PointerEvent(button: .right, column: 4, row: 5, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<64;6;7M".utf8))
-            == .mouse(MouseEvent(button: .wheelUp, column: 6, row: 7, phase: .down))
+            == .pointer(PointerEvent(button: .wheelUp, column: 6, row: 7, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<65;6;7M".utf8))
-            == .mouse(MouseEvent(button: .wheelDown, column: 6, row: 7, phase: .down))
+            == .pointer(PointerEvent(button: .wheelDown, column: 6, row: 7, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<66;6;7M".utf8))
-            == .mouse(MouseEvent(button: .wheelRight, column: 6, row: 7, phase: .down))
+            == .pointer(PointerEvent(button: .wheelRight, column: 6, row: 7, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<67;6;7M".utf8))
-            == .mouse(MouseEvent(button: .wheelLeft, column: 6, row: 7, phase: .down))
+            == .pointer(PointerEvent(button: .wheelLeft, column: 6, row: 7, phase: .down))
     )
     #expect(
         TerminalControl.input(for: Array("\u{001B}[<68;6;7M".utf8))
-            == .mouse(
-                MouseEvent(
+            == .pointer(
+                PointerEvent(
                     button: .wheelUp,
                     column: 6,
                     row: 7,
@@ -6622,7 +6622,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(probe.binding?.wrappedValue == false)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(probe.binding?.wrappedValue == true)
@@ -6638,7 +6638,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(probe.binding?.wrappedValue == false)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(probe.binding?.wrappedValue == true)
@@ -6653,14 +6653,14 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 2, phase: .down)
         ) == .ignored
     )
     #expect(probe.binding?.wrappedValue == false)
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 2, phase: .down)
+            PointerEvent(button: .left, column: 2, row: 2, phase: .down)
         ) == .handled
     )
     #expect(probe.binding?.wrappedValue == true)
@@ -6675,7 +6675,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(probe.binding?.wrappedValue == true)
@@ -6690,7 +6690,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .ignored
     )
     #expect(probe.binding?.wrappedValue == false)
@@ -6710,7 +6710,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
@@ -6719,7 +6719,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date
         ) == .handled
     )
@@ -6916,13 +6916,13 @@ func NavigationLinkNilValueIsInactive() {
     let date = Date(timeIntervalSinceReferenceDate: 1_000)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date
         ) == .ignored
     )
@@ -8187,22 +8187,22 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up)
         ) == .ignored
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .right, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .right, column: 1, row: 1, phase: .down)
         ) == .ignored
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .motion)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
         ) == .ignored
     )
     #expect(pointerProbe.names == ["default"])
@@ -8221,12 +8221,12 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up)
         ) == .handled
     )
     #expect(
@@ -8253,12 +8253,12 @@ private struct ParentCallbackStateMutationTests {
     #expect(focusProbe.binding?.wrappedValue == false)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .right, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .right, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .middle, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .middle, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
@@ -8296,7 +8296,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(
+            PointerEvent(
                 button: .left,
                 column: 4,
                 row: 2,
@@ -8351,7 +8351,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(pointerProbe.names == ["child", "parent"])
@@ -8376,7 +8376,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(pointerProbe.names == ["child"])
@@ -8399,12 +8399,12 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up)
         ) == .handled
     )
     #expect(pointerProbe.names == ["up"])
@@ -8428,12 +8428,12 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up)
         ) == .handled
     )
     #expect(pointerProbe.names == ["up"])
@@ -8447,7 +8447,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(runtime.block(from: view)?.text == "0")
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
 
@@ -8501,7 +8501,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
@@ -8512,7 +8512,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(tapProbe.events == ["pressing", "long"])
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date.addingTimeInterval(0.6)
         ) == .handled
     )
@@ -8538,13 +8538,13 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date.addingTimeInterval(0.1)
         ) == .handled
     )
@@ -8572,13 +8572,13 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 4, row: 1, phase: .motion),
+            PointerEvent(button: .left, column: 4, row: 1, phase: .motion),
             at: date.addingTimeInterval(0.1)
         ) == .handled
     )
@@ -8605,21 +8605,21 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down),
             at: date
         ) == .handled
     )
     #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 2, row: 1, phase: .up),
             at: date.addingTimeInterval(0.2)
         ) == .handled
     )
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 3, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 3, row: 1, phase: .down),
             at: date.addingTimeInterval(1)
         ) == .ignored
     )
@@ -8645,14 +8645,14 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date.addingTimeInterval(1)
         ) == .handled
     )
     #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(1.1)) == .handled)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date.addingTimeInterval(1.2)
         ) == .handled
     )
@@ -8668,7 +8668,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
@@ -8681,7 +8681,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date.addingTimeInterval(0.2)
         ) == .handled
     )
@@ -8698,7 +8698,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
@@ -9096,17 +9096,17 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .right, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .right, column: 1, row: 1, phase: .down)
         ) == .ignored
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down)
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 2, row: 1, phase: .up)
+            PointerEvent(button: .left, column: 2, row: 1, phase: .up)
         ) == .ignored
     )
 
@@ -9144,7 +9144,7 @@ private struct ParentCallbackStateMutationTests {
     #expect(!didRun)
 }
 
-@Test func buttonClickPerformsActionOnMouseUpInsideSameRegion() {
+@Test func buttonClickPerformsActionOnPointerUpInsideSameRegion() {
     let runtime = StateRuntime()
     let tapProbe = TapGestureProbe()
     let date = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -9156,7 +9156,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down),
             at: date
         ) == .handled
     )
@@ -9164,7 +9164,7 @@ private struct ParentCallbackStateMutationTests {
 
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 1, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 1, phase: .up),
             at: date
         ) == .handled
     )
@@ -11557,13 +11557,13 @@ private func dispatchClick(
 ) {
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: column, row: row, phase: .down),
+            PointerEvent(button: .left, column: column, row: row, phase: .down),
             at: date
         ) == result
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: column, row: row, phase: .up),
+            PointerEvent(button: .left, column: column, row: row, phase: .up),
             at: date
         ) == result
     )
@@ -11571,7 +11571,7 @@ private func dispatchClick(
 
 private func dispatchWheel(
     to runtime: StateRuntime,
-    button: MouseButton,
+    button: PointerEvent.Button,
     column: Int,
     row: Int,
     modifiers: EventModifiers = [],
@@ -11579,7 +11579,7 @@ private func dispatchWheel(
 ) {
     #expect(
         runtime.dispatch(
-            MouseEvent(
+            PointerEvent(
                 button: button,
                 column: column,
                 row: row,
@@ -11594,12 +11594,12 @@ private func dispatchHover(
     to runtime: StateRuntime,
     column: Int,
     row: Int,
-    button: MouseButton = .other(3),
+    button: PointerEvent.Button = .other(3),
     expecting result: KeyPress.Result = .handled
 ) {
     #expect(
         runtime.dispatch(
-            MouseEvent(button: button, column: column, row: row, phase: .motion)
+            PointerEvent(button: button, column: column, row: row, phase: .motion)
         ) == result
     )
 }
@@ -12370,13 +12370,13 @@ private func focusParentCallbackKeyPressChild(in runtime: StateRuntime) {
     let date = Date(timeIntervalSinceReferenceDate: 1_000)
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 0, phase: .down),
+            PointerEvent(button: .left, column: 1, row: 0, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: 1, row: 0, phase: .up),
+            PointerEvent(button: .left, column: 1, row: 0, phase: .up),
             at: date
         ) == .ignored
     )

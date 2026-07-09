@@ -378,8 +378,8 @@ final class StateRuntime {
         )
     }
 
-    func registerMouseDownPositionHandler(
-        _ handler: MouseDownPositionHandler,
+    func registerPointerDownPositionHandler(
+        _ handler: PointerDownPositionHandler,
         at path: [Int]
     ) {
         guard !isSuppressingInteractiveRenderRegistrations,
@@ -388,7 +388,7 @@ final class StateRuntime {
         }
 
         input.register(
-            environmentRestoringMouseDownPositionHandler(handler),
+            environmentRestoringPointerDownPositionHandler(handler),
             at: path
         )
     }
@@ -671,9 +671,9 @@ final class StateRuntime {
         return input.dispatchGlobal(keyPress, perform: performKeyPress)
     }
 
-    func dispatch(_ mouseEvent: MouseEvent, at date: Date = Date()) -> KeyPress.Result {
+    func dispatch(_ pointerEvent: PointerEvent, at date: Date = Date()) -> KeyPress.Result {
         input.dispatch(
-            mouseEvent,
+            pointerEvent,
             at: date,
             perform: { path, operation in
                 withView(at: path, perform: operation)
@@ -688,8 +688,8 @@ final class StateRuntime {
                 }
                 return result.handled
             },
-            scroll: { path, mouseEvent in
-                dispatchScroll(mouseEvent, at: path)
+            scroll: { path, pointerEvent in
+                dispatchScroll(pointerEvent, at: path)
             }
         )
     }
@@ -893,11 +893,11 @@ final class StateRuntime {
         )
     }
 
-    private func environmentRestoringMouseDownPositionHandler(
-        _ handler: MouseDownPositionHandler
-    ) -> MouseDownPositionHandler {
+    private func environmentRestoringPointerDownPositionHandler(
+        _ handler: PointerDownPositionHandler
+    ) -> PointerDownPositionHandler {
         let environment = EnvironmentRenderContext.current
-        return MouseDownPositionHandler(
+        return PointerDownPositionHandler(
             actionPath: handler.actionPath,
             action: { point in
                 EnvironmentRenderContext.withValues(environment) {
@@ -1103,11 +1103,11 @@ final class StateRuntime {
     }
 
     private func dispatchScroll(
-        _ mouseEvent: MouseEvent,
+        _ pointerEvent: PointerEvent,
         at path: [Int]
     ) -> KeyPress.Result {
         guard var state = scrollViewStates[path],
-              let delta = scrollDelta(for: mouseEvent, axes: state.axes) else {
+              let delta = scrollDelta(for: pointerEvent, axes: state.axes) else {
             return .ignored
         }
 
@@ -1134,13 +1134,13 @@ final class StateRuntime {
     }
 
     private func scrollDelta(
-        for mouseEvent: MouseEvent,
+        for pointerEvent: PointerEvent,
         axes: Axis.Set
     ) -> (x: Int, y: Int)? {
-        switch mouseEvent.button {
+        switch pointerEvent.button {
         case .wheelUp:
             if axes.contains(.horizontal)
-                && (mouseEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                && (pointerEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
                 return (x: -1, y: 0)
             }
             guard axes.contains(.vertical) else {
@@ -1149,7 +1149,7 @@ final class StateRuntime {
             return (x: 0, y: -1)
         case .wheelDown:
             if axes.contains(.horizontal)
-                && (mouseEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                && (pointerEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
                 return (x: 1, y: 0)
             }
             guard axes.contains(.vertical) else {

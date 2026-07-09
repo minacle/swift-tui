@@ -67,8 +67,8 @@ struct AppRunner<Application: App> {
         case .keyPress(let keyPress):
             _ = runtime.dispatch(keyPress)
             return true
-        case .mouse(let mouseEvent):
-            _ = runtime.dispatch(mouseEvent)
+        case .pointer(let pointerEvent):
+            _ = runtime.dispatch(pointerEvent)
             return true
         case .none:
             return false

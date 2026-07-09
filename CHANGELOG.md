@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `onPointerPress` handlers with terminal-cell pointer locations,
   pointer-button filtering, and down/up phase matching.
 
+### Changed
+
+- Renamed terminal input event handling around `PointerEvent` and
+  `TerminalInput.pointer`; code that dispatches raw terminal input should now
+  construct `PointerEvent` values and handle `.pointer(...)` terminal input.
+- Renamed caret-position drag registration to
+  `registerPointerDownPositionHandler` with `PointerDownPositionHandler` for
+  editable text controls.
+- Renamed terminal tracking controls to `enablePointerTrackingSequence` and
+  `disablePointerTrackingSequence`.
+
+### Removed
+
+- Removed the old `MouseEvent`, `MouseButton`,
+  `MouseDownPositionHandler`, `TerminalInput.mouse`,
+  `enableMouseTrackingSequence`, and `disableMouseTrackingSequence`
+  declarations instead of keeping compatibility aliases.
+
 ### Fixed
 
 - Fixed focused `TextField` rendering so text that exactly fits the field width

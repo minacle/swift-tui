@@ -63,8 +63,8 @@ extension TextEditor {
             ),
             at: path
         )
-        runtime?.registerMouseDownPositionHandler(
-            MouseDownPositionHandler(
+        runtime?.registerPointerDownPositionHandler(
+            PointerDownPositionHandler(
                 actionPath: path,
                 action: { point in
                     guard let editorState else {

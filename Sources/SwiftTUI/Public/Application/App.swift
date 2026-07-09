@@ -26,7 +26,7 @@ public extension App {
     ///
     /// This method is normally invoked by Swift's `@main` entry point. It
     /// configures the terminal session, repeatedly renders the root scene into
-    /// the current viewport, dispatches keyboard and mouse input, and prints a
+    /// the current viewport, dispatches keyboard and pointer input, and prints a
     /// startup error if the terminal session cannot be created.
     static func main() {
         do {

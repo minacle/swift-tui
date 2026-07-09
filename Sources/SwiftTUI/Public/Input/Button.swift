@@ -42,7 +42,7 @@ public nonisolated struct ButtonSizing: Equatable, Hashable, Sendable {
 /// A control that initiates an action.
 ///
 /// Buttons are focusable, handle Return while focused, and also register a
-/// single-click/tap hit region for terminal mouse input.
+/// single-click/tap hit region for terminal pointer events.
 public nonisolated struct Button<Label: View>: View, ButtonRenderable,
     LayoutTraitRenderable
 {

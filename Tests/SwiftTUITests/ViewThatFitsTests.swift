@@ -168,12 +168,12 @@ private func dispatchClick(
 ) {
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: column, row: row, phase: .down)
+            PointerEvent(button: .left, column: column, row: row, phase: .down)
         ) == result
     )
     #expect(
         runtime.dispatch(
-            MouseEvent(button: .left, column: column, row: row, phase: .up)
+            PointerEvent(button: .left, column: column, row: row, phase: .up)
         ) == result
     )
 }

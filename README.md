@@ -6,7 +6,7 @@
 
 SwiftTUI is a Swift package for building terminal user interfaces with a
 SwiftUI-shaped API. It renders views into terminal character cells, handles
-keyboard and mouse input, and provides state, focus, layout, navigation, and
+keyboard and pointer input, and provides state, focus, layout, navigation, and
 lifecycle primitives for interactive command-line apps.
 
 ## Requirements
@@ -90,7 +90,7 @@ or background process.
 
 SwiftTUI provides a SwiftUI-shaped API for terminal apps. Views are measured in
 character cells, rendered as terminal text with SGR styling, and updated from
-keyboard and mouse events in an interactive terminal session.
+keyboard and pointer events in an interactive terminal session.
 
 SwiftTUI is not a SwiftUI renderer or native-control bridge. Its layout, focus,
 scrolling, navigation, state, and lifecycle behavior are defined by this
