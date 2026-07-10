@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `View.edgeInset(_:spacing:content:)` for placing terminal content at an
+  available edge while proposing the remaining space to the modified view.
 - Added SwiftUI-compatible `EnvironmentValues.lineLimit` and read-only
   `EnvironmentValues.isFocused`, with existing line-limit and focus modifiers
   propagating their values through descendant environment snapshots.
