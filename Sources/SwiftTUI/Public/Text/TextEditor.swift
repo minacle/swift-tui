@@ -94,6 +94,17 @@ extension TextEditor {
             PointerDownPositionHandler(
                 actionPath: path,
                 requiresFocus: true,
+                shouldDeferBegin: { point in
+                    guard let editorState else {
+                        return false
+                    }
+
+                    let layout = TextEditorLayout(
+                        text: editorState.text,
+                        maxWidth: editorState.layoutWidth
+                    )
+                    return editorState.selectionContains(point, layout: layout)
+                },
                 began: { point in
                     guard let editorState else {
                         return
@@ -446,6 +457,10 @@ final class TextEditorState {
             upperBound: text.count
         )
         preferredColumn = nil
+    }
+
+    func selectionContains(_ point: Point, layout: TextEditorLayout) -> Bool {
+        selectedRange?.contains(offset(to: point, layout: layout)) == true
     }
 
     func extendSelection(to point: Point, layout: TextEditorLayout) {

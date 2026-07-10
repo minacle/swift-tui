@@ -926,6 +926,11 @@ final class StateRuntime {
         return PointerDownPositionHandler(
             actionPath: handler.actionPath,
             requiresFocus: handler.requiresFocus,
+            shouldDeferBegin: { point in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.shouldDeferBegin(point)
+                }
+            },
             began: { point in
                 EnvironmentRenderContext.withValues(environment) {
                     handler.began(point)

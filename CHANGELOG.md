@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the drag endpoint.
 - Changed attributed links so pointer dragging selects text and cancels link or
   tap activation, while a pointer click without movement still opens the link.
+- Changed taps inside an existing text selection to preserve the range through
+  `onTapGesture` and `onLongPressGesture` handling. An ordinary tap now
+  collapses the selection on pointer release and moves an editable caret there,
+  while a successful long press keeps the range.
 
 ### Removed
 

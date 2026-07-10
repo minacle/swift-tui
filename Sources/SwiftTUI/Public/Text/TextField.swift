@@ -334,6 +334,16 @@ private enum TextInputRenderer {
             PointerDownPositionHandler(
                 actionPath: path,
                 requiresFocus: true,
+                shouldDeferBegin: { point in
+                    guard let fieldState else {
+                        return false
+                    }
+
+                    return fieldState.selectionContains(
+                        column: point.column,
+                        layoutText: displayMode.layoutText(for: fieldState.text)
+                    )
+                },
                 began: { point in
                     guard let fieldState else {
                         return
@@ -692,6 +702,12 @@ final class TextFieldState {
             at: offset(toColumn: column, layoutText: layoutText),
             upperBound: text.count
         )
+    }
+
+    func selectionContains(column: Int, layoutText: String) -> Bool {
+        selectedRange?.contains(
+            offset(toColumn: column, layoutText: layoutText)
+        ) == true
     }
 
     func extendSelection(toColumn column: Int, layoutText: String) {

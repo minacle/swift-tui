@@ -458,6 +458,8 @@ struct PointerDownPositionHandler {
 
     let requiresFocus: Bool
 
+    var shouldDeferBegin: (Point) -> Bool = { _ in false }
+
     let began: (Point) -> Void
 
     let changed: (Point) -> Void
@@ -494,6 +496,10 @@ final class InputRuntime {
         var path: [Int]
 
         var frame: RenderedRect
+
+        var startLocation: Point
+
+        var hasBegun: Bool
     }
 
     private var handlersByPath: [[Int]: [KeyPressHandler]] = [:]
@@ -776,9 +782,9 @@ final class InputRuntime {
 
             let longPressWasActive = longPressSequence != nil
             let pointerDownPositionWasActive = activePointerDownPositionTarget != nil
-            activePointerDownPositionTarget = nil
             let longPressSucceeded = endLongPress(perform: perform)
             if longPressSucceeded {
+                activePointerDownPositionTarget = nil
                 pressedLinkTarget = nil
                 pressedTapTarget = nil
                 return .handled
@@ -791,14 +797,25 @@ final class InputRuntime {
                 }
 
                 guard linkTarget(at: pointerEvent) == pressedLinkTarget else {
+                    activePointerDownPositionTarget = nil
                     return .ignored
                 }
 
-                return dispatchLink(at: pressedLinkTarget, perform: performLink)
+                let linkResult = dispatchLink(at: pressedLinkTarget, perform: performLink)
+                let positioned = finishActivePointerDownPosition(
+                    at: pointerEvent,
+                    perform: perform
+                )
+                return linkResult == .handled || positioned ? .handled : .ignored
             }
 
             guard let pressedTapTarget else {
-                return longPressWasActive || pointerDownPositionWasActive ? .handled : .ignored
+                let positioned = finishActivePointerDownPosition(
+                    at: pointerEvent,
+                    perform: perform
+                )
+                return longPressWasActive || pointerDownPositionWasActive || positioned
+                    ? .handled : .ignored
             }
 
             defer {
@@ -806,16 +823,22 @@ final class InputRuntime {
             }
 
             guard tapTarget(at: pointerEvent) == pressedTapTarget else {
+                activePointerDownPositionTarget = nil
                 resetTapSequence()
                 return .ignored
             }
 
-            return dispatchTap(
+            let tapResult = dispatchTap(
                 at: pressedTapTarget,
                 location: rootPoint(for: pointerEvent),
                 date: date,
                 perform: perform
             )
+            let positioned = finishActivePointerDownPosition(
+                at: pointerEvent,
+                perform: perform
+            )
+            return tapResult == .handled || positioned ? .handled : .ignored
         }
     }
 
@@ -1184,12 +1207,17 @@ final class InputRuntime {
             return false
         }
 
+        let shouldDeferBegin = handler.shouldDeferBegin(target.location)
         activePointerDownPositionTarget = ActivePointerDownPositionTarget(
             path: target.path,
-            frame: target.frame
+            frame: target.frame,
+            startLocation: target.location,
+            hasBegun: !shouldDeferBegin
         )
-        perform(handler.actionPath ?? target.path) {
-            handler.began(target.location)
+        if !shouldDeferBegin {
+            perform(handler.actionPath ?? target.path) {
+                handler.began(target.location)
+            }
         }
         return true
     }
@@ -1198,22 +1226,56 @@ final class InputRuntime {
         at pointerEvent: PointerEvent,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
-        guard let target = activePointerDownPositionTarget,
+        guard var target = activePointerDownPositionTarget,
               let handler = pointerDownPositionHandlersByPath[target.path] else {
             activePointerDownPositionTarget = nil
             return false
         }
 
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
-        let location = Point(
-            column: column - target.frame.x,
-            row: row - target.frame.y
-        )
+        if !target.hasBegun {
+            target.hasBegun = true
+            activePointerDownPositionTarget = target
+            perform(handler.actionPath ?? target.path) {
+                handler.began(target.startLocation)
+            }
+        }
+        let location = location(of: pointerEvent, in: target.frame)
         perform(handler.actionPath ?? target.path) {
             handler.changed(location)
         }
         return true
+    }
+
+    private func finishActivePointerDownPosition(
+        at pointerEvent: PointerEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> Bool {
+        guard let target = activePointerDownPositionTarget else {
+            return false
+        }
+        activePointerDownPositionTarget = nil
+        guard !target.hasBegun,
+              let handler = pointerDownPositionHandlersByPath[target.path] else {
+            return false
+        }
+
+        let location = location(of: pointerEvent, in: target.frame)
+        perform(handler.actionPath ?? target.path) {
+            handler.began(location)
+        }
+        return true
+    }
+
+    private func location(
+        of pointerEvent: PointerEvent,
+        in frame: RenderedRect
+    ) -> Point {
+        let column = pointerEvent.column - rootFrame.column
+        let row = pointerEvent.row - rootFrame.row
+        return Point(
+            column: column - frame.x,
+            row: row - frame.y
+        )
     }
 
     private func pointerDownPositionTarget(

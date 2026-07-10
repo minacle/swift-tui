@@ -1424,6 +1424,9 @@ enum TextLayoutRenderer {
                 PointerDownPositionHandler(
                     actionPath: path,
                     requiresFocus: false,
+                    shouldDeferBegin: { point in
+                        selectionState?.range?.contains(layout.offset(at: point)) == true
+                    },
                     began: { point in
                         runtime?.beginTextSelection(
                             at: path,

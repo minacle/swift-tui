@@ -364,6 +364,34 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     #expect(opened == [url])
 }
 
+@Test func selectedStaticTextStaysSelectedUntilPointerRelease() {
+    let runtime = StateRuntime()
+    let view = Text("abcd").textSelection(.enabled)
+
+    _ = runtime.block(from: view)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 1,
+        fromRow: 1,
+        toColumn: 4,
+        toRow: 1
+    )
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 2, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == nil)
+}
+
 @Test func buttonLabelsDoNotRegisterStaticTextSelection() {
     let runtime = StateRuntime()
     let view = Button("Run") {}.textSelection(.enabled)
@@ -2241,6 +2269,90 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.caret == RenderedCaret(column: 3))
 }
 
+@Test func selectedTextFieldDefersCollapseForTapAndLongPressGestures() {
+    var text = "abcd"
+    var selection: TextSelection?
+    var tapSelection: TextSelection?
+    var longPressSelection: TextSelection?
+    let runtime = StateRuntime()
+    let date = Date(timeIntervalSinceReferenceDate: 1_000)
+    let view = TextField(
+        "Label",
+        text: Binding(
+            get: { text },
+            set: { text = $0 }
+        ),
+        selection: Binding(
+            get: { selection },
+            set: { selection = $0 }
+        )
+    )
+    .onTapGesture {
+        tapSelection = selection
+    }
+    .onLongPressGesture(minimumDuration: 0.5) {
+        longPressSelection = selection
+    }
+
+    _ = runtime.block(from: view)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 2,
+        fromRow: 1,
+        toColumn: 4,
+        toRow: 1
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 3, row: 1, phase: .down),
+            at: date
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
+    #expect(runtime.block(from: view)?.caret == nil)
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 3, row: 1, phase: .up),
+            at: date.addingTimeInterval(0.1)
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(tapSelection, in: text) == 1..<3)
+    #expect(selectionCharacterOffsets(selection, in: text) == 2..<2)
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
+
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 2,
+        fromRow: 1,
+        toColumn: 4,
+        toRow: 1
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 3, row: 1, phase: .down),
+            at: date.addingTimeInterval(1)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatchExpiredLongPressActions(
+            at: date.addingTimeInterval(1.5)
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(longPressSelection, in: text) == 1..<3)
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 3, row: 1, phase: .up),
+            at: date.addingTimeInterval(1.6)
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
+    #expect(runtime.block(from: view)?.caret == nil)
+}
+
 @Test func clickingTextFieldTrailingCaretCellMovesCaretToEnd() {
     let runtime = StateRuntime()
     let view = ExactFitDelimitedFixedSizeTextFieldView()
@@ -2824,6 +2936,52 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["ab  ", "cXd "])
     #expect(block?.caret == RenderedCaret(row: 1, column: 2))
+}
+
+@Test func selectedTextEditorDefersCollapseUntilPointerRelease() {
+    var text = "ab\ncd"
+    var selection: TextSelection?
+    let runtime = StateRuntime()
+    let proposal = RenderProposal(columns: 4)
+    let view = TextEditor(
+        text: Binding(
+            get: { text },
+            set: { text = $0 }
+        ),
+        selection: Binding(
+            get: { selection },
+            set: { selection = $0 }
+        )
+    )
+
+    _ = runtime.block(from: view, in: proposal)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 1,
+        fromRow: 1,
+        toColumn: 2,
+        toRow: 2
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 0..<4)
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 0..<4)
+    #expect(runtime.block(from: view, in: proposal)?.caret == nil)
+
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 2, row: 1, phase: .up)
+        ) == .handled
+    )
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<1)
+    #expect(
+        runtime.block(from: view, in: proposal)?.caret
+            == RenderedCaret(row: 0, column: 1)
+    )
 }
 
 @Test func draggingTextEditorMovesCaretToPointerLineAndColumn() {
