@@ -97,6 +97,7 @@ struct TextLayoutTests {
         #expect(middle?.lines == ["Alp...ma"])
     }
 
+#if canImport(Darwin)
     @Test
     func `head truncation preserves styling on the retained attributed suffix`() {
         var attributed = AttributedString("Alpha beta gamma")
@@ -112,6 +113,7 @@ struct TextLayoutTests {
             RenderedRun(text: "gamma", column: 3, style: TextStyle(isBold: true)),
         ])
     }
+#endif
 
     @Test
     func `truncationMode defaults to tail and propagates through the environment`() {

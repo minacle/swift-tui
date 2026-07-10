@@ -18,9 +18,9 @@ struct TextContentAndLinkTests {
         let string = "Hello"
         let substring = string[string.startIndex..<string.index(string.startIndex, offsetBy: 4)]
         var attributed = AttributedString("Styled")
-    #if canImport(Darwin)
+#if canImport(Darwin)
         attributed.inlinePresentationIntent = .stronglyEmphasized
-    #endif
+#endif
 
         #expect(Text(string).content == "Hello")
         #expect(Text(substring).content == "Hell")
@@ -29,6 +29,7 @@ struct TextContentAndLinkTests {
         #expect(Text(attributed).content == "Styled")
     }
 
+#if canImport(Darwin)
     @Test
     func `attributed bold, italic, and strikethrough intents become matching rendered styles`() {
         var attributed = AttributedString("Bold Italic Strike")
@@ -73,6 +74,7 @@ struct TextContentAndLinkTests {
             ),
         ])
     }
+#endif
 
     @Test
     func `attributed foreground and background colors produce separate styled runs`() {
@@ -125,6 +127,7 @@ struct TextContentAndLinkTests {
         ])
     }
 
+#if canImport(Darwin)
     @Test
     func `wrapping preserves styles attached to attributed runs`() {
         var attributed = AttributedString("Alpha Beta")
@@ -138,6 +141,7 @@ struct TextContentAndLinkTests {
         ])
         #expect(block?.lines == ["Alpha", "Beta "])
     }
+#endif
 
     @Test
     func `attributed alignment positions text within the proposed width`() {
