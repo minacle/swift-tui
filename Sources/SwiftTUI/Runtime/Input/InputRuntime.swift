@@ -456,7 +456,11 @@ struct PointerDownPositionHandler {
 
     let actionPath: [Int]?
 
-    let action: (Point) -> Void
+    let requiresFocus: Bool
+
+    let began: (Point) -> Void
+
+    let changed: (Point) -> Void
 }
 
 protocol InputModifierRenderable {
@@ -696,6 +700,10 @@ final class InputRuntime {
                 at: pointerEvent,
                 perform: perform
             )
+            if positioned {
+                pressedLinkTarget = nil
+                pressedTapTarget = nil
+            }
             let longPressResult = dispatchLongPressMotion(pointerEvent, perform: perform)
             return hoverResult == .handled
                 || positioned
@@ -1181,7 +1189,7 @@ final class InputRuntime {
             frame: target.frame
         )
         perform(handler.actionPath ?? target.path) {
-            handler.action(target.location)
+            handler.began(target.location)
         }
         return true
     }
@@ -1203,7 +1211,7 @@ final class InputRuntime {
             row: row - target.frame.y
         )
         perform(handler.actionPath ?? target.path) {
-            handler.action(location)
+            handler.changed(location)
         }
         return true
     }
@@ -1214,13 +1222,27 @@ final class InputRuntime {
     ) -> (path: [Int], frame: RenderedRect, location: Point)? {
         let column = pointerEvent.column - rootFrame.column
         let row = pointerEvent.row - rootFrame.row
-        guard let region = focusRegions
+        if let region = focusRegions
             .filter({
                 eligiblePaths.contains($0.path)
-                    && pointerDownPositionHandlersByPath[$0.path] != nil
+                    && pointerDownPositionHandlersByPath[$0.path]?.requiresFocus == true
                     && $0.frame.contains(column: column, row: row)
             })
             .sorted(by: focusRegionPrecedes)
+            .first {
+            return (
+                region.path,
+                region.frame,
+                Point(column: column - region.frame.x, row: row - region.frame.y)
+            )
+        }
+
+        guard let region = hitRegions
+            .filter({
+                pointerDownPositionHandlersByPath[$0.path]?.requiresFocus == false
+                    && $0.frame.contains(column: column, row: row)
+            })
+            .sorted(by: hitRegionPrecedes)
             .first else {
             return nil
         }

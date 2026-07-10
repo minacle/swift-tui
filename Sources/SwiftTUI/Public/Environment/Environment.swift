@@ -122,10 +122,15 @@ public nonisolated struct EnvironmentValues {
     /// - Parameter key: The key type that identifies the value.
     public nonisolated subscript<Key: EnvironmentKey>(_ key: Key.Type) -> Key.Value {
         get {
-            storage[ObjectIdentifier(key)] as? Key.Value ?? Key.defaultValue
+            guard let storedValue = storage[ObjectIdentifier(key)],
+                  let value = storedValue as? Key.Value else {
+                return Key.defaultValue
+            }
+
+            return value
         }
         set {
-            storage[ObjectIdentifier(key)] = newValue
+            storage[ObjectIdentifier(key)] = newValue as Any
         }
     }
 

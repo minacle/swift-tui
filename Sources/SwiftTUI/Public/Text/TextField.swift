@@ -301,12 +301,23 @@ private enum TextInputRenderer {
         runtime?.registerPointerDownPositionHandler(
             PointerDownPositionHandler(
                 actionPath: path,
-                action: { point in
+                requiresFocus: true,
+                began: { point in
                     guard let fieldState else {
                         return
                     }
 
-                    fieldState.move(
+                    fieldState.beginSelection(
+                        toColumn: point.column,
+                        layoutText: displayMode.layoutText(for: fieldState.text)
+                    )
+                },
+                changed: { point in
+                    guard let fieldState else {
+                        return
+                    }
+
+                    fieldState.extendSelection(
                         toColumn: point.column,
                         layoutText: displayMode.layoutText(for: fieldState.text)
                     )
@@ -348,13 +359,15 @@ private enum TextInputRenderer {
             reservesTrailingCaretCell ? displayTextWidth + 1 : displayTextWidth,
             1
         )
+        let environment = EnvironmentRenderContext.current
         let content = RenderedBlock(
-            runs: [
-                RenderedRun(
-                    text: displayText.content,
-                    style: textStyle(isPlaceholder: displayText.isPlaceholder)
-                ),
-            ],
+            runs: TextSelectionRenderer.runs(
+                text: displayText.content,
+                style: textStyle(isPlaceholder: displayText.isPlaceholder),
+                selection: displayText.isPlaceholder ? nil : fieldState?.selectedRange,
+                tint: environment.tint,
+                foregroundStyle: environment.textSelectionForegroundStyle
+            ),
             width: contentWidth,
             height: 1,
             cursor: cursor
@@ -426,16 +439,16 @@ private enum TextInputRenderer {
 
         switch keyPress.key {
         case .leftArrow:
-            state.moveLeft()
+            state.moveLeft(selecting: keyPress.modifiers.contains(.shift))
             return .handled
         case .rightArrow:
-            state.moveRight()
+            state.moveRight(selecting: keyPress.modifiers.contains(.shift))
             return .handled
         case .home:
-            state.move(to: 0)
+            state.move(to: 0, selecting: keyPress.modifiers.contains(.shift))
             return .handled
         case .end:
-            state.move(to: state.text.count)
+            state.move(to: state.text.count, selecting: keyPress.modifiers.contains(.shift))
             return .handled
         case .delete:
             state.deleteBackward(update: text)
@@ -494,12 +507,14 @@ final class TextFieldState {
 
     private var lastObservedBindingText: String
 
-    private(set) var offset = 0 {
-        didSet {
-            if offset != oldValue {
-                invalidate()
-            }
-        }
+    private let selection: TextSelectionState
+
+    var offset: Int {
+        selection.offset
+    }
+
+    var selectedRange: Range<Int>? {
+        selection.range
     }
 
     private(set) var horizontalScrollOffset = 0
@@ -507,8 +522,8 @@ final class TextFieldState {
     init(initialText: String, invalidate: @escaping () -> Void) {
         self.text = initialText
         self.lastObservedBindingText = initialText
-        self.offset = initialText.count
         self.invalidate = invalidate
+        self.selection = TextSelectionState(offset: initialText.count, invalidate: invalidate)
     }
 
     func synchronize(with bindingText: String) {
@@ -518,31 +533,57 @@ final class TextFieldState {
 
         text = bindingText
         lastObservedBindingText = bindingText
+        selection.clamp(upperBound: text.count, clearsSelection: true)
     }
 
     func clamp() {
-        move(to: offset)
+        selection.clamp(upperBound: text.count)
         horizontalScrollOffset = min(horizontalScrollOffset, offset)
     }
 
-    func moveLeft() {
-        offset = max(offset - 1, 0)
+    func moveLeft(selecting: Bool = false) {
+        if !selecting, let selectedRange {
+            selection.collapse(to: selectedRange.lowerBound, upperBound: text.count)
+            return
+        }
+
+        selection.move(to: offset - 1, upperBound: text.count, selecting: selecting)
     }
 
-    func moveRight() {
-        move(to: offset + 1)
+    func moveRight(selecting: Bool = false) {
+        if !selecting, let selectedRange {
+            selection.collapse(to: selectedRange.upperBound, upperBound: text.count)
+            return
+        }
+
+        selection.move(to: offset + 1, upperBound: text.count, selecting: selecting)
     }
 
-    func move(to offset: Int) {
-        self.offset = min(max(offset, 0), text.count)
+    func move(to offset: Int, selecting: Bool = false) {
+        selection.move(to: offset, upperBound: text.count, selecting: selecting)
     }
 
-    func move(toColumn column: Int, layoutText: String) {
+    func beginSelection(toColumn column: Int, layoutText: String) {
+        selection.begin(
+            at: offset(toColumn: column, layoutText: layoutText),
+            upperBound: text.count
+        )
+    }
+
+    func extendSelection(toColumn column: Int, layoutText: String) {
+        selection.move(
+            to: offset(toColumn: column, layoutText: layoutText),
+            upperBound: text.count,
+            selecting: true
+        )
+    }
+
+    private func offset(toColumn column: Int, layoutText: String) -> Int {
         let scrollColumn = TerminalText.columnWidth(
             layoutText,
             upToCharacterOffset: horizontalScrollOffset
         )
-        move(to: Self.offset(in: layoutText, nearestColumn: scrollColumn + column))
+        return Self.offset(in: layoutText, nearestColumn: scrollColumn + column)
     }
 
     func updateHorizontalScrollOffset(maxWidth: Int, layoutText: String) {
@@ -593,29 +634,46 @@ final class TextFieldState {
     }
 
     func insert(_ newText: String, update binding: Binding<String>) {
-        text.insert(newText, atCharacterOffset: offset)
-        binding.wrappedValue = text
-        lastObservedBindingText = binding.wrappedValue
-        offset += newText.count
+        let replacementRange = selectedRange ?? offset..<offset
+        text.replaceCharacters(in: replacementRange, with: newText)
+        commit(update: binding)
+        selection.collapse(
+            to: replacementRange.lowerBound + newText.count,
+            upperBound: text.count
+        )
     }
 
     func deleteBackward(update binding: Binding<String>) {
+        if let selectedRange {
+            delete(selectedRange, update: binding)
+            return
+        }
         guard offset > 0 else {
             return
         }
 
-        text.removeCharacter(atOffset: offset - 1)
-        binding.wrappedValue = text
-        lastObservedBindingText = binding.wrappedValue
-        offset -= 1
+        delete((offset - 1)..<offset, update: binding)
     }
 
     func deleteForward(update binding: Binding<String>) {
+        if let selectedRange {
+            delete(selectedRange, update: binding)
+            return
+        }
         guard offset < text.count else {
             return
         }
 
-        text.removeCharacter(atOffset: offset)
+        delete(offset..<(offset + 1), update: binding)
+    }
+
+    private func delete(_ range: Range<Int>, update binding: Binding<String>) {
+        text.replaceCharacters(in: range, with: "")
+        commit(update: binding)
+        selection.collapse(to: range.lowerBound, upperBound: text.count)
+    }
+
+    private func commit(update binding: Binding<String>) {
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
     }

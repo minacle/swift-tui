@@ -336,6 +336,18 @@ enum TerminalControl {
             return keyPress(for: .rightArrow)
         case [27, 91, 68]:
             return keyPress(for: .leftArrow)
+        case [27, 91, 49, 59, 50, 65]:
+            return keyPress(for: .upArrow, modifiers: .shift)
+        case [27, 91, 49, 59, 50, 66]:
+            return keyPress(for: .downArrow, modifiers: .shift)
+        case [27, 91, 49, 59, 50, 67]:
+            return keyPress(for: .rightArrow, modifiers: .shift)
+        case [27, 91, 49, 59, 50, 68]:
+            return keyPress(for: .leftArrow, modifiers: .shift)
+        case [27, 91, 49, 59, 50, 72]:
+            return keyPress(for: .home, modifiers: .shift)
+        case [27, 91, 49, 59, 50, 70]:
+            return keyPress(for: .end, modifiers: .shift)
         case [27, 91, 72], [27, 79, 72], [27, 91, 49, 126], [27, 91, 55, 126]:
             return keyPress(for: .home)
         case [27, 91, 70], [27, 79, 70], [27, 91, 52, 126], [27, 91, 56, 126]:
@@ -449,10 +461,14 @@ enum TerminalControl {
         }
     }
 
-    private static func keyPress(for key: KeyEquivalent) -> KeyPress {
+    private static func keyPress(
+        for key: KeyEquivalent,
+        modifiers: EventModifiers = []
+    ) -> KeyPress {
         KeyPress(
             key: key,
-            characters: String(key.character)
+            characters: String(key.character),
+            modifiers: modifiers
         )
     }
 }

@@ -66,7 +66,8 @@ extension TextEditor {
         runtime?.registerPointerDownPositionHandler(
             PointerDownPositionHandler(
                 actionPath: path,
-                action: { point in
+                requiresFocus: true,
+                began: { point in
                     guard let editorState else {
                         return
                     }
@@ -75,7 +76,18 @@ extension TextEditor {
                         text: editorState.text,
                         maxWidth: editorState.layoutWidth
                     )
-                    editorState.move(to: point, layout: layout)
+                    editorState.beginSelection(to: point, layout: layout)
+                },
+                changed: { point in
+                    guard let editorState else {
+                        return
+                    }
+
+                    let layout = TextEditorLayout(
+                        text: editorState.text,
+                        maxWidth: editorState.layoutWidth
+                    )
+                    editorState.extendSelection(to: point, layout: layout)
                 }
             ),
             at: path
@@ -94,12 +106,17 @@ extension TextEditor {
             )
         }
 
+        let environment = EnvironmentRenderContext.current
         let content = RenderedBlock(
-            runs: layout.lines.enumerated().map {
-                RenderedRun(
-                    text: $0.element.text,
-                    row: $0.offset,
-                    style: EnvironmentRenderContext.current.textStyle
+            runs: layout.lines.enumerated().flatMap { row, line in
+                TextSelectionRenderer.runs(
+                    text: line.text,
+                    row: row,
+                    baseOffset: line.lowerOffset,
+                    style: environment.textStyle,
+                    selection: editorState?.selectedRange,
+                    tint: environment.tint,
+                    foregroundStyle: environment.textSelectionForegroundStyle
                 )
             },
             width: layout.width,
@@ -141,24 +158,25 @@ extension TextEditor {
         }
 
         let layout = TextEditorLayout(text: state.text, maxWidth: state.layoutWidth)
+        let selecting = keyPress.modifiers.contains(.shift)
         switch keyPress.key {
         case .leftArrow:
-            state.moveLeft()
+            state.moveLeft(selecting: selecting)
             return .handled
         case .rightArrow:
-            state.moveRight()
+            state.moveRight(selecting: selecting)
             return .handled
         case .upArrow:
-            state.moveVertically(by: -1, layout: layout)
+            state.moveVertically(by: -1, layout: layout, selecting: selecting)
             return .handled
         case .downArrow:
-            state.moveVertically(by: 1, layout: layout)
+            state.moveVertically(by: 1, layout: layout, selecting: selecting)
             return .handled
         case .home:
-            state.moveToLineStart(layout: layout)
+            state.moveToLineStart(layout: layout, selecting: selecting)
             return .handled
         case .end:
-            state.moveToLineEnd(layout: layout)
+            state.moveToLineEnd(layout: layout, selecting: selecting)
             return .handled
         case .delete:
             state.deleteBackward(update: text)
@@ -194,12 +212,14 @@ final class TextEditorState {
 
     private var lastObservedBindingText: String
 
-    private(set) var offset = 0 {
-        didSet {
-            if offset != oldValue {
-                invalidate()
-            }
-        }
+    private let selection: TextSelectionState
+
+    var offset: Int {
+        selection.offset
+    }
+
+    var selectedRange: Range<Int>? {
+        selection.range
     }
 
     private var preferredColumn: Int?
@@ -217,8 +237,8 @@ final class TextEditorState {
     init(initialText: String, invalidate: @escaping () -> Void) {
         self.text = initialText
         self.lastObservedBindingText = initialText
-        self.offset = initialText.count
         self.invalidate = invalidate
+        self.selection = TextSelectionState(offset: initialText.count, invalidate: invalidate)
     }
 
     func synchronize(with bindingText: String) {
@@ -228,81 +248,132 @@ final class TextEditorState {
 
         text = bindingText
         lastObservedBindingText = bindingText
-        clamp()
+        selection.clamp(upperBound: text.count, clearsSelection: true)
     }
 
     func clamp() {
-        move(to: offset, preservesPreferredColumn: false)
+        selection.clamp(upperBound: text.count)
     }
 
     func updateLayoutWidth(_ width: Int?) {
         layoutWidth = width
     }
 
-    func moveLeft() {
-        move(to: offset - 1, preservesPreferredColumn: false)
+    func moveLeft(selecting: Bool = false) {
+        if !selecting, let selectedRange {
+            move(to: selectedRange.lowerBound, preservesPreferredColumn: false, selecting: false)
+            return
+        }
+
+        move(to: offset - 1, preservesPreferredColumn: false, selecting: selecting)
     }
 
-    func moveRight() {
-        move(to: offset + 1, preservesPreferredColumn: false)
+    func moveRight(selecting: Bool = false) {
+        if !selecting, let selectedRange {
+            move(to: selectedRange.upperBound, preservesPreferredColumn: false, selecting: false)
+            return
+        }
+
+        move(to: offset + 1, preservesPreferredColumn: false, selecting: selecting)
     }
 
-    func moveVertically(by delta: Int, layout: TextEditorLayout) {
+    func moveVertically(by delta: Int, layout: TextEditorLayout, selecting: Bool = false) {
         let current = layout.lineAndColumn(at: offset)
         let column = preferredColumn ?? current.column
         preferredColumn = column
         let lineIndex = min(max(current.lineIndex + delta, 0), layout.lines.count - 1)
-        offset = layout.offset(onLine: lineIndex, nearestColumn: column)
-    }
-
-    func moveToLineStart(layout: TextEditorLayout) {
-        let current = layout.lineAndColumn(at: offset)
-        move(to: layout.lines[current.lineIndex].lowerOffset, preservesPreferredColumn: false)
-    }
-
-    func moveToLineEnd(layout: TextEditorLayout) {
-        let current = layout.lineAndColumn(at: offset)
-        move(to: layout.lines[current.lineIndex].upperOffset, preservesPreferredColumn: false)
-    }
-
-    func move(to point: Point, layout: TextEditorLayout) {
-        let lineIndex = min(max(scrollPoint.y + point.row, 0), layout.lines.count - 1)
-        let column = max(scrollPoint.x + point.column, 0)
         move(
             to: layout.offset(onLine: lineIndex, nearestColumn: column),
-            preservesPreferredColumn: false
+            preservesPreferredColumn: true,
+            selecting: selecting
         )
     }
 
+    func moveToLineStart(layout: TextEditorLayout, selecting: Bool = false) {
+        let current = layout.lineAndColumn(at: offset)
+        move(
+            to: layout.lines[current.lineIndex].lowerOffset,
+            preservesPreferredColumn: false,
+            selecting: selecting
+        )
+    }
+
+    func moveToLineEnd(layout: TextEditorLayout, selecting: Bool = false) {
+        let current = layout.lineAndColumn(at: offset)
+        move(
+            to: layout.lines[current.lineIndex].upperOffset,
+            preservesPreferredColumn: false,
+            selecting: selecting
+        )
+    }
+
+    func beginSelection(to point: Point, layout: TextEditorLayout) {
+        selection.begin(
+            at: offset(to: point, layout: layout),
+            upperBound: text.count
+        )
+        preferredColumn = nil
+    }
+
+    func extendSelection(to point: Point, layout: TextEditorLayout) {
+        move(
+            to: offset(to: point, layout: layout),
+            preservesPreferredColumn: false,
+            selecting: true
+        )
+    }
+
+    private func offset(to point: Point, layout: TextEditorLayout) -> Int {
+        let lineIndex = min(max(scrollPoint.y + point.row, 0), layout.lines.count - 1)
+        let column = max(scrollPoint.x + point.column, 0)
+        return layout.offset(onLine: lineIndex, nearestColumn: column)
+    }
+
     func insert(_ newText: String, update binding: Binding<String>) {
-        text.insert(newText, atCharacterOffset: offset)
-        binding.wrappedValue = text
-        lastObservedBindingText = binding.wrappedValue
-        offset += newText.count
+        let replacementRange = selectedRange ?? offset..<offset
+        text.replaceCharacters(in: replacementRange, with: newText)
+        commit(update: binding)
+        selection.collapse(
+            to: replacementRange.lowerBound + newText.count,
+            upperBound: text.count
+        )
         preferredColumn = nil
     }
 
     func deleteBackward(update binding: Binding<String>) {
+        if let selectedRange {
+            delete(selectedRange, update: binding)
+            return
+        }
         guard offset > 0 else {
             return
         }
 
-        text.removeCharacter(atOffset: offset - 1)
-        binding.wrappedValue = text
-        lastObservedBindingText = binding.wrappedValue
-        offset -= 1
-        preferredColumn = nil
+        delete((offset - 1)..<offset, update: binding)
     }
 
     func deleteForward(update binding: Binding<String>) {
+        if let selectedRange {
+            delete(selectedRange, update: binding)
+            return
+        }
         guard offset < text.count else {
             return
         }
 
-        text.removeCharacter(atOffset: offset)
+        delete(offset..<(offset + 1), update: binding)
+    }
+
+    private func delete(_ range: Range<Int>, update binding: Binding<String>) {
+        text.replaceCharacters(in: range, with: "")
+        commit(update: binding)
+        selection.collapse(to: range.lowerBound, upperBound: text.count)
+        preferredColumn = nil
+    }
+
+    private func commit(update binding: Binding<String>) {
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
-        preferredColumn = nil
     }
 
     func updateScrollPoint(
@@ -347,8 +418,12 @@ final class TextEditorState {
         scrollPoint = ScrollPoint(x: x, y: y)
     }
 
-    private func move(to newOffset: Int, preservesPreferredColumn: Bool) {
-        offset = min(max(newOffset, 0), text.count)
+    private func move(
+        to newOffset: Int,
+        preservesPreferredColumn: Bool,
+        selecting: Bool
+    ) {
+        selection.move(to: newOffset, upperBound: text.count, selecting: selecting)
         if !preservesPreferredColumn {
             preferredColumn = nil
         }

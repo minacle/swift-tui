@@ -96,6 +96,41 @@ SwiftTUI is not a SwiftUI renderer or native-control bridge. Its layout, focus,
 scrolling, navigation, state, and lifecycle behavior are defined by this
 package's terminal runtime.
 
+## Text Selection
+
+Enable drag selection for static text with `textSelection(_:)`. The current
+`tint` supplies the selection background and defaults to `Color16.blue`:
+
+```swift
+Text("Drag to select this text")
+    .textSelection(.enabled)
+    .tint(.blue)
+```
+
+Use `textSelectionForegroundStyle(_:)` to replace the foreground of selected
+characters. It accepts any supported `ShapeStyle`, which SwiftTUI stores as an
+`AnyShapeStyle` in the environment:
+
+```swift
+Text("Selected text uses white on blue")
+    .foregroundStyle(.yellow)
+    .textSelection(.enabled)
+    .tint(.blue)
+    .textSelectionForegroundStyle(Optional(Color16.white))
+```
+
+The environment value is optional. Its default value is `nil`, which preserves
+the original foreground of each selected run, including attributed text and
+links. A nested view can clear an outer override explicitly:
+
+```swift
+Text("Keep my original foreground")
+    .environment(\.textSelectionForegroundStyle, nil)
+```
+
+Passing `nil` to `tint(_:)` independently clears selection backgrounds and link
+tint without changing the selected-text foreground setting.
+
 ## Validation
 
 Use these commands from the package root:

@@ -154,6 +154,12 @@ extension String {
         remove(at: indexAtCharacterOffset(offset))
     }
 
+    mutating func replaceCharacters(in range: Range<Int>, with replacement: String) {
+        let lowerBound = indexAtCharacterOffset(range.lowerBound)
+        let upperBound = indexAtCharacterOffset(range.upperBound)
+        replaceSubrange(lowerBound..<upperBound, with: replacement)
+    }
+
     private func indexAtCharacterOffset(_ offset: Int) -> Index {
         index(startIndex, offsetBy: min(max(offset, 0), count))
     }

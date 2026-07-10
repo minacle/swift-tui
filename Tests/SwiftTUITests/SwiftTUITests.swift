@@ -10,6 +10,11 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let foreground = "38;5;42"
 }
 
+nonisolated struct CustomErasedShapeStyle: ShapeStyle {
+
+    let _swiftTUIAnyColor = AnyColor(Color16.brightMagenta)
+}
+
 @Test func anyColorConvenienceFactoriesCreateTypeErasedColors() {
     let defaultColor: AnyColor = .default
 
@@ -25,6 +30,259 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
         AnyColor.trueColor(TrueColor(red: 4, green: 5, blue: 6))
             == AnyColor(TrueColor(red: 4, green: 5, blue: 6))
     )
+}
+
+@Test func anyShapeStyleErasesBuiltInAndCustomShapeStyles() {
+    let builtIn = AnyShapeStyle(Color16.red)
+    let custom = AnyShapeStyle(CustomErasedShapeStyle())
+
+    func acceptsShapeStyle<S: ShapeStyle>(_: S) {}
+    func acceptsSendable<S: Sendable>(_: S) {}
+
+    #expect(builtIn._swiftTUIAnyColor == AnyColor(Color16.red))
+    #expect(custom._swiftTUIAnyColor == AnyColor(Color16.brightMagenta))
+    acceptsShapeStyle(builtIn)
+    acceptsSendable(builtIn)
+    #expect(EnvironmentValues().textSelectionForegroundStyle == nil)
+    #expect(EnvironmentValues().tint == AnyColor(Color16.blue))
+}
+
+@Test func selectionForegroundEnvironmentSupportsDirectAndNestedNilOverrides() {
+    var environment = EnvironmentValues()
+    environment.textSelectionForegroundStyle = AnyShapeStyle(Color16.green)
+    #expect(
+        environment.textSelectionForegroundStyle?._swiftTUIAnyColor
+            == AnyColor(Color16.green)
+    )
+    environment.textSelectionForegroundStyle = nil
+    #expect(environment.textSelectionForegroundStyle == nil)
+
+    let runtime = StateRuntime()
+    let view = VStack {
+        Text("ab")
+            .foregroundStyle(.yellow)
+            .textSelection(.enabled)
+            .textSelectionForegroundStyle(Optional<Color16>.none)
+    }
+    .textSelectionForegroundStyle(Optional(Color16.white))
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+
+    #expect(runtime.block(from: view)?.runs == [
+        RenderedRun(
+            text: "ab",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.yellow),
+                backgroundStyle: AnyColor(Color16.blue)
+            )
+        ),
+    ])
+}
+
+@Test func textSelectabilityValuesExposeExpectedConstants() {
+    let enabled: EnabledTextSelectability = .enabled
+    let disabled: DisabledTextSelectability = .disabled
+
+    #expect(type(of: enabled).allowsSelection)
+    #expect(!type(of: disabled).allowsSelection)
+}
+
+@Test func selectableTextUsesTintAndOptionalSelectionForegroundStyle() {
+    let runtime = StateRuntime()
+    let view = Text("abcd")
+        .foregroundStyle(.yellow)
+        .textSelection(.enabled)
+        .textSelectionForegroundStyle(Optional(Color16.white))
+
+    _ = runtime.block(from: view)
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
+        ) == .handled
+    )
+
+    let block = runtime.block(from: view)
+    #expect(block?.runs == [
+        RenderedRun(
+            text: "abc",
+            style: TextStyle(
+                foregroundStyle: AnyColor(Color16.white),
+                backgroundStyle: AnyColor(Color16.blue)
+            )
+        ),
+        RenderedRun(
+            text: "d",
+            column: 3,
+            style: TextStyle(foregroundStyle: AnyColor(Color16.yellow))
+        ),
+    ])
+}
+
+@Test func selectedTextStylesReachTerminalSGROutput() {
+    let runtime = StateRuntime()
+    let view = Text("A")
+        .textSelection(.enabled)
+        .textSelectionForegroundStyle(Optional(Color16.white))
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 2, row: 1, phase: .motion))
+    let output = TextRenderer.screen(
+        for: runtime.block(from: view)!,
+        in: TerminalViewportSize(columns: 1, rows: 1)
+    )
+
+    #expect(
+        output
+            == "\u{001B}[2J\u{001B}[1;1H"
+            + "\u{001B}[37m\u{001B}[44mA\u{001B}[39m\u{001B}[49m"
+            + "\u{001B}[?25l"
+    )
+}
+
+@Test func nilSelectionForegroundStylePreservesOriginalForeground() {
+    let runtime = StateRuntime()
+    let view = Text("ab")
+        .foregroundStyle(.yellow)
+        .textSelection(.enabled)
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 2, row: 1, phase: .motion))
+
+    #expect(runtime.block(from: view)?.runs.first?.style == TextStyle(
+        foregroundStyle: AnyColor(Color16.yellow),
+        backgroundStyle: AnyColor(Color16.blue)
+    ))
+}
+
+@Test func selectionTintAndForegroundOverridesRemainIndependent() {
+    let runtime = StateRuntime()
+    let view = Text("ab")
+        .foregroundStyle(.yellow)
+        .textSelection(.enabled)
+        .tint(Optional<Color16>.none)
+        .textSelectionForegroundStyle(Optional(Color16.white))
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+
+    #expect(runtime.block(from: view)?.runs == [
+        RenderedRun(
+            text: "ab",
+            style: TextStyle(foregroundStyle: AnyColor(Color16.white))
+        ),
+    ])
+}
+
+@Test func staticTextSupportsReverseMultilineWideCharacterSelection() {
+    let runtime = StateRuntime()
+    let view = Text("한a\nbc").textSelection(.enabled)
+
+    _ = runtime.block(from: view, in: RenderProposal(columns: 4))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 2, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .motion))
+
+    #expect(runtime.block(from: view, in: RenderProposal(columns: 4))?.runs == [
+        RenderedRun(
+            text: "한a",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+        ),
+        RenderedRun(
+            text: "bc",
+            row: 1,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+        ),
+    ])
+}
+
+@Test func containerTextSelectionKeepsIndependentTargetsAndReplacesTheActiveRange() {
+    let runtime = StateRuntime()
+    let view = HStack(spacing: 1) {
+        Text("ab")
+        Text("cd")
+    }
+    .textSelection(.enabled)
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+    #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
+
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 6, row: 1, phase: .motion))
+
+    #expect(runtime.block(from: view)?.runs == [
+        RenderedRun(text: "ab"),
+        RenderedRun(
+            text: "cd",
+            column: 3,
+            style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+        ),
+    ])
+}
+
+@Test func disabledAndHiddenStaticTextDoNotStartSelection() {
+    let disabledRuntime = StateRuntime()
+    let disabled = Text("ab").textSelection(.enabled).disabled(true)
+    _ = disabledRuntime.block(from: disabled)
+    #expect(
+        disabledRuntime.dispatch(
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .ignored
+    )
+
+    let hiddenRuntime = StateRuntime()
+    let hidden = Text("ab").textSelection(.enabled).hidden()
+    _ = hiddenRuntime.block(from: hidden)
+    #expect(
+        hiddenRuntime.dispatch(
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .ignored
+    )
+}
+
+@Test func selectableLinkOpensOnClickButNotAfterSelectionDrag() {
+    var attributed = AttributedString("Visit")
+    let url = URL(string: "https://example.com")!
+    attributed.link = url
+    var opened: [URL] = []
+    let runtime = StateRuntime()
+    let view = Text(attributed)
+        .textSelection(.enabled)
+        .environment(\.openURL, OpenURLAction { opened.append($0); return .handled })
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .motion))
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .up))
+    #expect(opened.isEmpty)
+    #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
+
+    dispatchClick(to: runtime, column: 5, row: 1)
+    #expect(opened == [url])
+}
+
+@Test func buttonLabelsDoNotRegisterStaticTextSelection() {
+    let runtime = StateRuntime()
+    let view = Button("Run") {}.textSelection(.enabled)
+
+    _ = runtime.block(from: view)
+    _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 3, row: 1, phase: .motion)
+        ) == .ignored
+    )
+    #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == nil)
 }
 
 @Test func styleModifiersAcceptAnyColorConvenienceFactories() {
@@ -220,7 +478,11 @@ nonisolated struct CustomShapeStyle: Color, ShapeStyle {
     let block = runtime.block(from: view)
 
     #expect(block?.runs == [
-        RenderedRun(text: "Visit", link: url),
+        RenderedRun(
+            text: "Visit",
+            style: TextStyle(foregroundStyle: AnyColor(Color16.blue)),
+            link: url
+        ),
     ])
     dispatchClick(to: runtime, column: 1, row: 1)
     #expect(opened == [url])
@@ -1234,12 +1496,19 @@ private func lineBreakKinds(in text: String) -> [String] {
             PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .handled
     )
+    #expect(runtime.block(from: view)?.runs == [
+        RenderedRun(
+            text: "•••",
+            style: TextStyle(backgroundStyle: AnyColor(Color16.blue))
+        ),
+        RenderedRun(text: "•••", column: 3),
+    ])
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
-    #expect(probe.binding?.wrappedValue == "secXret")
-    #expect(runtime.block(from: view)?.text == "••••••• ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 4))
+    #expect(probe.binding?.wrappedValue == "Xret")
+    #expect(runtime.block(from: view)?.text == "•••• ")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
 }
 
 @Test func focusedSecureFieldUsesMaskedColumnWidthForCursorAndScroll() {
@@ -1369,6 +1638,73 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "acb ")
     #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+}
+
+@Test func shiftArrowsSelectAndReplaceTextFieldRange() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+
+    let block = runtime.block(from: view)
+    #expect(block?.text == "abX ")
+    #expect(block?.cursor == RenderedCursor(column: 3))
+}
+
+@Test func unmodifiedArrowCollapsesTextFieldSelection() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    for _ in 0..<2 {
+        _ = runtime.dispatch(KeyPress(
+            key: .leftArrow,
+            characters: "\u{F702}",
+            modifiers: .shift
+        ))
+    }
+    _ = runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}"))
+    _ = runtime.dispatch(KeyPress(key: "X", characters: "X"))
+
+    #expect(runtime.block(from: view)?.text == "abXcd ")
+}
+
+@Test func backspaceDeletesTheEntireTextFieldSelection() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcd")
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+
+    for _ in 0..<2 {
+        _ = runtime.dispatch(KeyPress(
+            key: .leftArrow,
+            characters: "\u{F702}",
+            modifiers: .shift
+        ))
+    }
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
+
+    #expect(runtime.block(from: view)?.text == "ab ")
+    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
 }
 
 @Test func focusedTextFieldCursorComposesThroughStacks() {
@@ -1692,8 +2028,8 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
-    #expect(block?.text == "abcXd ")
-    #expect(block?.cursor == RenderedCursor(column: 4))
+    #expect(block?.text == "Xd ")
+    #expect(block?.cursor == RenderedCursor(column: 1))
 }
 
 @Test func draggingTextFieldOutsideFrameScrollsToCaret() {
@@ -1887,6 +2223,54 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
 }
 
+@Test func shiftHomeSelectsAndReplacesTextEditorLineSuffix() {
+    let runtime = StateRuntime()
+    let view = TextEditorInitialTextView(text: "ab\ncd")
+    let proposal = RenderProposal(columns: 4)
+
+    _ = runtime.block(from: view, in: proposal)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view, in: proposal)
+
+    #expect(runtime.dispatch(KeyPress(
+        key: .home,
+        characters: "\u{F729}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+
+    let block = runtime.block(from: view, in: proposal)
+    #expect(block?.lines == ["ab  ", "X   "])
+    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+}
+
+@Test func textEditorReturnReplacesSelectionAndExternalChangesClearIt() {
+    var boundText = "ab\ncd"
+    let binding = Binding(
+        get: { boundText },
+        set: { boundText = $0 }
+    )
+    let state = TextEditorState(initialText: boundText) {}
+    var layout = TextEditorLayout(text: state.text, maxWidth: 4)
+
+    state.moveToLineStart(layout: layout, selecting: true)
+    state.insert("\n", update: binding)
+    #expect(boundText == "ab\n\n")
+    #expect(state.offset == 4)
+    #expect(state.selectedRange == nil)
+
+    state.moveLeft(selecting: true)
+    state.synchronize(with: "x")
+    #expect(state.selectedRange == nil)
+    #expect(state.offset == 1)
+
+    boundText = "x"
+    layout = TextEditorLayout(text: state.text, maxWidth: 4)
+    state.moveToLineEnd(layout: layout)
+    state.insert("y", update: binding)
+    #expect(boundText == "xy")
+}
+
 @Test func clickingTextEditorMovesCaretToClickedLineAndColumn() {
     let runtime = StateRuntime()
     let view = TextEditorInitialTextView(text: "ab\ncd")
@@ -1932,8 +2316,8 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view, in: proposal)
-    #expect(block?.lines == ["ab  ", "cdX "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 3))
+    #expect(block?.lines == ["X   "])
+    #expect(block?.cursor == RenderedCursor(row: 0, column: 1))
 }
 
 @Test func draggingTextEditorOutsideFrameScrollsToCaret() {
@@ -6051,6 +6435,12 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.input(for: [27, 91, 53, 126]) == .keyPress(KeyPress(key: .pageUp, characters: "\u{F72C}")))
     #expect(TerminalControl.input(for: [27, 91, 54, 126]) == .keyPress(KeyPress(key: .pageDown, characters: "\u{F72D}")))
     #expect(TerminalControl.input(for: [27, 91, 51, 126]) == .keyPress(KeyPress(key: .deleteForward, characters: "\u{F728}")))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 65]) == .keyPress(KeyPress(key: .upArrow, characters: "\u{F700}", modifiers: .shift)))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 66]) == .keyPress(KeyPress(key: .downArrow, characters: "\u{F701}", modifiers: .shift)))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 67]) == .keyPress(KeyPress(key: .rightArrow, characters: "\u{F703}", modifiers: .shift)))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 68]) == .keyPress(KeyPress(key: .leftArrow, characters: "\u{F702}", modifiers: .shift)))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 72]) == .keyPress(KeyPress(key: .home, characters: "\u{F729}", modifiers: .shift)))
+    #expect(TerminalControl.input(for: [27, 91, 49, 59, 50, 70]) == .keyPress(KeyPress(key: .end, characters: "\u{F72B}", modifiers: .shift)))
     #expect(TerminalControl.input(for: [27, 91, 90]) == .none)
 }
 

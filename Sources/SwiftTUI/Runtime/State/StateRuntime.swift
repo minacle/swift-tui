@@ -26,6 +26,10 @@ final class StateRuntime {
 
     private var textEditorStates: [[Int]: TextEditorState] = [:]
 
+    private var textSelectionStates: [[Int]: TextSelectionState] = [:]
+
+    private var activeTextSelectionPath: [Int]?
+
     private var forEachIdentityStates: [ForEachIdentityKey: ForEachIdentityState] = [:]
 
     private var explicitIDStates: [ExplicitIDIdentityKey: ExplicitIDIdentityState] = [:]
@@ -597,6 +601,28 @@ final class StateRuntime {
         return state
     }
 
+    func textSelectionState(at path: [Int], initialOffset: Int = 0) -> TextSelectionState {
+        if let state = textSelectionStates[path] {
+            return state
+        }
+
+        let state = TextSelectionState(offset: initialOffset) {
+            [weak self] in
+
+            self?.invalidated = true
+        }
+        textSelectionStates[path] = state
+        return state
+    }
+
+    func beginTextSelection(at path: [Int], offset: Int, upperBound: Int) {
+        if let activeTextSelectionPath, activeTextSelectionPath != path {
+            textSelectionStates[activeTextSelectionPath]?.clearSelection(upperBound: .max)
+        }
+        activeTextSelectionPath = path
+        textSelectionState(at: path).begin(at: offset, upperBound: upperBound)
+    }
+
     func forEachChildIndex(at path: [Int], id: AnyHashable) -> Int {
         let key = ForEachIdentityKey(path: path)
         var state = forEachIdentityStates[key] ?? ForEachIdentityState()
@@ -899,9 +925,15 @@ final class StateRuntime {
         let environment = EnvironmentRenderContext.current
         return PointerDownPositionHandler(
             actionPath: handler.actionPath,
-            action: { point in
+            requiresFocus: handler.requiresFocus,
+            began: { point in
                 EnvironmentRenderContext.withValues(environment) {
-                    handler.action(point)
+                    handler.began(point)
+                }
+            },
+            changed: { point in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.changed(point)
                 }
             }
         )
@@ -983,6 +1015,12 @@ final class StateRuntime {
         }
         textEditorStates = textEditorStates.filter {
             !$0.key.starts(with: path)
+        }
+        textSelectionStates = textSelectionStates.filter {
+            !$0.key.starts(with: path)
+        }
+        if activeTextSelectionPath?.starts(with: path) == true {
+            activeTextSelectionPath = nil
         }
         forEachIdentityStates = forEachIdentityStates.filter {
             !$0.key.path.starts(with: path)

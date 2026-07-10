@@ -10,14 +10,14 @@ public typealias Color = Terminal.SGR.Color
 /// A style that can be applied to terminal foreground or background content.
 ///
 /// SwiftTUI currently implements shape styles for terminal color values only.
-public protocol ShapeStyle: Sendable {
+public nonisolated protocol ShapeStyle: Sendable {
 
-    var _swiftTUIAnyColor: AnyColor { get }
+    nonisolated var _swiftTUIAnyColor: AnyColor { get }
 }
 
 public extension ShapeStyle where Self: Color {
 
-    var _swiftTUIAnyColor: AnyColor {
+    nonisolated var _swiftTUIAnyColor: AnyColor {
         AnyColor(self)
     }
 }
@@ -687,7 +687,7 @@ private struct TextStyleKey: EnvironmentKey {
 
 private struct TintKey: EnvironmentKey {
 
-    nonisolated static let defaultValue: AnyColor? = nil
+    nonisolated static let defaultValue: AnyColor? = AnyColor(Color16.blue)
 }
 
 enum TextLineLimitContext {

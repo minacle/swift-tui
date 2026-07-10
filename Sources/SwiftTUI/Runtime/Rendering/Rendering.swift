@@ -1278,6 +1278,82 @@ extension ForEach: FlattenableViewContent where Content: View {
     }
 }
 
+private struct TextSourceLine {
+
+    var text: String
+
+    var sourceOffsets: [Int?]
+
+    var lowerOffset: Int
+
+    var upperOffset: Int
+
+    static func mappedLines(for text: String, maxWidth: Int?) -> [TextSourceLine] {
+        let displayLines = TextLineWrapper.wrappedLines(for: text, maxWidth: maxWidth)
+        var lines: [TextSourceLine] = []
+        var searchStart = text.startIndex
+        for displayLine in displayLines {
+            let range: Range<String.Index>
+            if displayLine.isEmpty {
+                range = searchStart..<searchStart
+            }
+            else if let found = text.range(of: displayLine, range: searchStart..<text.endIndex) {
+                range = found
+            }
+            else {
+                range = searchStart..<searchStart
+            }
+
+            let lowerOffset = text.distance(from: text.startIndex, to: range.lowerBound)
+            let upperOffset = text.distance(from: text.startIndex, to: range.upperBound)
+            lines.append(
+                TextSourceLine(
+                    text: displayLine,
+                    sourceOffsets: Array(lowerOffset..<upperOffset).map(Optional.some),
+                    lowerOffset: lowerOffset,
+                    upperOffset: upperOffset
+                )
+            )
+            searchStart = range.upperBound
+            if searchStart < text.endIndex, text[searchStart] == "\n" {
+                searchStart = text.index(after: searchStart)
+            }
+        }
+        return lines
+    }
+
+    func truncated(maxWidth: Int?) -> TextSourceLine {
+        guard let maxWidth else {
+            return TextSourceLine(
+                text: text + "...",
+                sourceOffsets: sourceOffsets + [nil, nil, nil],
+                lowerOffset: lowerOffset,
+                upperOffset: upperOffset
+            )
+        }
+        guard maxWidth > 0 else {
+            return TextSourceLine(text: "", sourceOffsets: [], lowerOffset: lowerOffset, upperOffset: lowerOffset)
+        }
+        guard maxWidth >= 3 else {
+            return TextSourceLine(
+                text: String(repeating: ".", count: maxWidth),
+                sourceOffsets: Array(repeating: nil, count: maxWidth),
+                lowerOffset: lowerOffset,
+                upperOffset: lowerOffset
+            )
+        }
+
+        let prefix = TerminalText.prefix(text, maxWidth: maxWidth - 3)
+        let prefixCount = prefix.count
+        return TextSourceLine(
+            text: prefix + "...",
+            sourceOffsets: Array(sourceOffsets.prefix(prefixCount)) + [nil, nil, nil],
+            lowerOffset: lowerOffset,
+            upperOffset: lowerOffset + prefixCount
+        )
+    }
+}
+
 enum TextLayoutRenderer {
 
     static func block(
@@ -1287,46 +1363,86 @@ enum TextLayoutRenderer {
         runtime: StateRuntime?
     ) -> RenderedBlock {
         let lineLimit = TextLineLimitContext.current
-        var lines = TextLineWrapper.wrappedLines(for: text.content, maxWidth: proposal?.columns)
+        var lines = TextSourceLine.mappedLines(for: text.content, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
 
         if let number = lineLimit.number {
             lines = Array(lines.prefix(number))
             if isTruncated, !lines.isEmpty {
-                lines[lines.count - 1] = TextLineWrapper.truncatedLine(
-                    lines[lines.count - 1],
-                    maxWidth: proposal?.columns
-                )
+                lines[lines.count - 1] = lines[lines.count - 1].truncated(maxWidth: proposal?.columns)
             }
             if lineLimit.reservesSpace, lines.count < number {
-                lines.append(contentsOf: Array(repeating: "", count: number - lines.count))
+                let offset = lines.last?.upperOffset ?? text.content.count
+                lines.append(
+                    contentsOf: Array(
+                        repeating: TextSourceLine(
+                            text: "",
+                            sourceOffsets: [],
+                            lowerOffset: offset,
+                            upperOffset: offset
+                        ),
+                        count: number - lines.count
+                    )
+                )
             }
         }
 
-        let runs = TextRunLayoutMapper.renderedRuns(
+        let environment = EnvironmentRenderContext.current
+        let allowsSelection = environment.isTextSelectionEnabled && environment.isEnabled
+        let selectionState = allowsSelection
+            ? runtime?.textSelectionState(at: path)
+            : nil
+        selectionState?.clamp(upperBound: text.content.count)
+        let layout = TextRunLayoutMapper.renderedRuns(
             for: lines,
             text: text,
-            baseStyle: EnvironmentRenderContext.current.textStyle,
-            tint: EnvironmentRenderContext.current.tint,
+            baseStyle: environment.textStyle,
+            tint: environment.tint,
+            selection: selectionState?.range,
+            selectionForegroundStyle: environment.textSelectionForegroundStyle,
             alignmentWidth: text.hasAttributedAlignment ? proposal?.columns : nil
         )
         let width = if text.hasAttributedAlignment, let columns = proposal?.columns {
             columns
         }
         else {
-            lines.map(TerminalText.columnWidth).max() ?? 0
+            lines.map { TerminalText.columnWidth($0.text) }.max() ?? 0
         }
         var block = RenderedBlock(
-            runs: runs,
+            runs: layout.runs,
             width: width,
             height: lines.count,
             paddedRows: Set(
                 lines.enumerated().compactMap { row, line in
-                    line.isEmpty && !runs.isEmpty ? row : nil
+                    line.text.isEmpty && !layout.runs.isEmpty ? row : nil
                 }
             )
         )
-        registerLinks(in: runtime, path: path, runs: runs, block: &block)
+        if allowsSelection, !block.bounds.isEmpty {
+            block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+            runtime?.registerPointerDownPositionHandler(
+                PointerDownPositionHandler(
+                    actionPath: path,
+                    requiresFocus: false,
+                    began: { point in
+                        runtime?.beginTextSelection(
+                            at: path,
+                            offset: layout.offset(at: point),
+                            upperBound: text.content.count
+                        )
+                    },
+                    changed: { point in
+                        selectionState?.move(
+                            to: layout.offset(at: point),
+                            upperBound: text.content.count,
+                            selecting: true
+                        )
+                    }
+                ),
+                at: path
+            )
+        }
+        registerLinks(in: runtime, path: path, runs: layout.runs, block: &block)
         return block
     }
 
@@ -1368,6 +1484,45 @@ enum TextLayoutRenderer {
     }
 }
 
+private struct TextRunLayoutResult {
+
+    struct Line {
+
+        var source: TextSourceLine
+
+        var column: Int
+    }
+
+    var runs: [RenderedRun]
+
+    var lines: [Line]
+
+    func offset(at point: Point) -> Int {
+        guard !lines.isEmpty else {
+            return 0
+        }
+
+        let line = lines[min(max(point.row, 0), lines.count - 1)]
+        let targetColumn = max(point.column - line.column, 0)
+        var column = 0
+        var offset = line.source.lowerOffset
+        for (character, sourceOffset) in zip(line.source.text, line.source.sourceOffsets) {
+            guard let sourceOffset else {
+                break
+            }
+
+            let width = TerminalText.columnWidth(String(character))
+            guard column + width <= targetColumn else {
+                return sourceOffset
+            }
+
+            column += width
+            offset = sourceOffset + 1
+        }
+        return min(offset, line.source.upperOffset)
+    }
+}
+
 private enum TextRunLayoutMapper {
 
     private struct StyledCharacter {
@@ -1382,15 +1537,17 @@ private enum TextRunLayoutMapper {
     }
 
     static func renderedRuns(
-        for lines: [String],
+        for lines: [TextSourceLine],
         text: Text,
         baseStyle: TextStyle,
         tint: AnyColor?,
+        selection: Range<Int>?,
+        selectionForegroundStyle: AnyShapeStyle?,
         alignmentWidth: Int? = nil
-    ) -> [RenderedRun] {
+    ) -> TextRunLayoutResult {
         let characters = styledCharacters(for: text, baseStyle: baseStyle, tint: tint)
-        var sourceIndex = characters.startIndex
         var renderedRuns: [RenderedRun] = []
+        var renderedLines: [TextRunLayoutResult.Line] = []
 
         for (row, line) in lines.enumerated() {
             var column = 0
@@ -1420,14 +1577,20 @@ private enum TextRunLayoutMapper {
                 pendingLink = nil
             }
 
-            for character in line {
-                let styledCharacter = nextStyledCharacter(
-                    matching: character,
-                    in: characters,
-                    from: &sourceIndex
-                )
-                let style = styledCharacter?.style ?? baseStyle
+            for (character, sourceOffset) in zip(line.text, line.sourceOffsets) {
+                let styledCharacter = sourceOffset.flatMap {
+                    characters.indices.contains($0) ? characters[$0] : nil
+                }
+                var style = styledCharacter?.style ?? baseStyle
                 let link = styledCharacter?.link
+                if let sourceOffset, selection?.contains(sourceOffset) == true {
+                    if let tint {
+                        style.backgroundStyle = tint
+                    }
+                    if let selectionForegroundStyle {
+                        style.foregroundStyle = selectionForegroundStyle._swiftTUIAnyColor
+                    }
+                }
                 if rowAlignment == nil {
                     rowAlignment = styledCharacter?.alignment
                 }
@@ -1445,14 +1608,15 @@ private enum TextRunLayoutMapper {
 
             flush()
             let offset = horizontalOffset(
-                for: line,
+                for: line.text,
                 alignment: rowAlignment,
                 width: alignmentWidth
             )
             renderedRuns.append(contentsOf: rowRuns.map { $0.offsetBy(x: offset, y: 0) })
+            renderedLines.append(TextRunLayoutResult.Line(source: line, column: offset))
         }
 
-        return renderedRuns
+        return TextRunLayoutResult(runs: renderedRuns, lines: renderedLines)
     }
 
     private static func styledCharacters(
@@ -1497,20 +1661,6 @@ private enum TextRunLayoutMapper {
         }
     }
 
-    private static func nextStyledCharacter(
-        matching character: Character,
-        in characters: [StyledCharacter],
-        from index: inout [StyledCharacter].Index
-    ) -> StyledCharacter? {
-        while index < characters.endIndex {
-            let styledCharacter = characters[index]
-            index = characters.index(after: index)
-            if styledCharacter.character == character {
-                return styledCharacter
-            }
-        }
-        return nil
-    }
 }
 
 enum TextLineWrapper {

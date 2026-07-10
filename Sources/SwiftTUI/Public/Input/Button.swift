@@ -143,12 +143,16 @@ extension Button {
         runtime: StateRuntime?
     ) -> RenderedBlock? {
         let environment = EnvironmentRenderContext.current
-        guard var block = ViewResolver.block(
-            from: label,
-            in: proposal,
-            path: path + [0],
-            runtime: runtime
-        ) else {
+        var labelEnvironment = environment
+        labelEnvironment.isTextSelectionEnabled = false
+        guard var block = EnvironmentRenderContext.withValues(labelEnvironment, perform: {
+            ViewResolver.block(
+                from: label,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            )
+        }) else {
             return nil
         }
 
