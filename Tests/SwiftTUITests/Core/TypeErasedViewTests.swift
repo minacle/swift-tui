@@ -1,10 +1,13 @@
+import Foundation
+import Observation
 import Testing
 @testable import SwiftTUI
 
-@Suite("AnyView")
-struct AnyViewTests {
+@Suite("Type-Erased Views")
+struct TypeErasedViewTests {
 
-    @Test func preservesTextOutputAndStyle() {
+    @Test
+    func `AnyView preserves text content and foreground style`() {
         let original = Text("●").foregroundStyle(.green)
         let erased = AnyView(original)
 
@@ -12,11 +15,13 @@ struct AnyViewTests {
         #expect(ViewResolver.block(from: erased)?.lines == ViewResolver.block(from: original)?.lines)
     }
 
-    @Test func canWrapEmptyView() {
+    @Test
+    func `AnyView renders an empty view as no content`() {
         #expect(ViewResolver.block(from: AnyView(EmptyView())) == nil)
     }
 
-    @Test func preservesBoldTextStyle() {
+    @Test
+    func `AnyView preserves bold text style`() {
         let block = ViewResolver.block(from: AnyView(Text("x").bold()))
 
         #expect(block?.runs == [
@@ -28,7 +33,8 @@ struct AnyViewTests {
         #expect(block?.lines == ["x"])
     }
 
-    @Test func preservesDimTextStyle() {
+    @Test
+    func `AnyView preserves dim text style`() {
         let block = ViewResolver.block(from: AnyView(Text("x").dim()))
 
         #expect(block?.runs == [
@@ -40,7 +46,8 @@ struct AnyViewTests {
         #expect(block?.lines == ["x"])
     }
 
-    @Test func preservesAdditionalTextStyles() {
+    @Test
+    func `AnyView preserves italic, underline, and strikethrough styles`() {
         let block = ViewResolver.block(
             from: AnyView(
                 Text("x")
@@ -63,7 +70,8 @@ struct AnyViewTests {
         #expect(block?.lines == ["x"])
     }
 
-    @Test func canWrapStacks() {
+    @Test
+    func `AnyView preserves horizontal stack layout`() {
         let view = AnyView(HStack {
             Text("a")
             Text("b")
@@ -72,7 +80,8 @@ struct AnyViewTests {
         #expect(ViewResolver.block(from: view)?.lines == ["ab"])
     }
 
-    @Test func optionalStorageRendersFromParentView() {
+    @Test
+    func `an optional AnyView renders when present and contributes no content when absent`() {
         struct Row: View {
 
             let marker: AnyView?
@@ -101,7 +110,8 @@ struct AnyViewTests {
         #expect(ViewResolver.block(from: unmarked)?.lines == ["title"])
     }
 
-    @Test func preservesLineLimitContext() {
+    @Test
+    func `a line limit applied to AnyView constrains wrapped output`() {
         let view = AnyView(Text("Alpha beta gamma"))
             .lineLimit(2)
 

@@ -1,183 +1,201 @@
+import Foundation
+import Observation
 import Testing
 @testable import SwiftTUI
 
-@Test func customLayoutBasicVStackMeasuresAndPlacesSubviews() {
-    let view = BasicVStackLayout() {
-        Text("A")
-        Text("BB")
-    }
+@Suite("Custom Layouts")
+struct CustomLayoutTests {
 
-    let block = ViewResolver.block(from: view)
-
-    #expect(block?.width == 2)
-    #expect(block?.height == 2)
-    #expect(block?.lines == ["A ", "BB"])
-}
-
-@Test func customLayoutPassesProposalsToSubviewMeasurementAndPlacement() {
-    let view = ProposedWrappingLayout() {
-        Text("Alpha Beta")
-    }
-
-    let block = ViewResolver.block(from: view, in: RenderProposal(columns: 5))
-
-    #expect(block?.lines == ["Alpha", "Beta "])
-}
-
-@Test func customLayoutMeasuresSpacerWithProposedSize() {
-    let view = SpacerMeasurementLayout() {
-        Spacer()
-    }
-
-    let block = ViewResolver.block(from: view)
-
-    #expect(block?.width == 4)
-    #expect(block?.height == 2)
-    #expect(block?.lines == ["    ", "    "])
-}
-
-@Test func customLayoutNegativeSizeRendersAsZeroSizeBlock() {
-    let view = NegativeSizeLayout() {
-        Text("A")
-    }
-
-    let block = ViewResolver.block(from: view)
-
-    #expect(block?.width == 0)
-    #expect(block?.height == 0)
-    #expect(block?.lines == [])
-}
-
-@Test func customLayoutPlacesSubviewsWithAnchorsAndClipsToBounds() {
-    let view = AnchoredLayout() {
-        Text("AB")
-        Text("CDE")
-        Text("XYZ")
-    }
-
-    let block = ViewResolver.block(from: view)
-
-    #expect(block?.lines == [
-        "     ",
-        "ABCDE",
-        "   XY",
-    ])
-}
-
-@Test func customLayoutOffsetsCaretAndInteractionRegions() {
-    let runtime = StateRuntime()
-    let tapProbe = LayoutTapGestureProbe()
-    let view = RegionOffsetLayout() {
-        ScrollView(.horizontal) {
-            Text("ABCDE")
-        }
-        .scrollPosition(.constant(ScrollPosition(x: 1)))
-        .padding(.horizontal, 1)
-        .onTapGesture {
-            tapProbe.record("tap")
-        }
-        .focusable()
-    }
-
-    let block = runtime.block(from: view)
-
-    #expect(block?.lines == [
-        "       ",
-        "  BCD  ",
-        "       ",
-    ])
-    #expect(block?.scrollRegions.map { $0.frame } == [
-        RenderedRect(x: 2, y: 1, width: 3, height: 1),
-    ])
-    #expect(block?.hitRegions.map { $0.frame } == [
-        RenderedRect(x: 1, y: 1, width: 5, height: 1),
-    ])
-    #expect(block?.focusRegions.map { $0.frame } == [
-        RenderedRect(x: 1, y: 1, width: 5, height: 1),
-    ])
-}
-
-@Test func customLayoutOffsetsTextFieldCaret() {
-    let runtime = StateRuntime()
-    let view = CaretOffsetTextFieldView()
-
-    _ = runtime.block(from: view)
-    _ = runtime.consumeInvalidation()
-    let block = runtime.block(from: view)
-
-    #expect(block?.lines == [
-        "       ",
-        " Name  ",
-        "       ",
-    ])
-    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
-}
-
-@Test func layoutPriorityIsVisibleThroughTypeErasureAndLayoutModifiers() {
-    let view = PriorityWidthLayout() {
-        AnyView(
+    @Test
+    func `a custom vertical layout measures and places its subviews`() {
+        let view = BasicVStackLayout() {
             Text("A")
-                .layoutPriority(2.5)
-                .padding()
-                .frame(width: 5, alignment: .leading)
-        )
+            Text("BB")
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 2)
+        #expect(block?.height == 2)
+        #expect(block?.lines == ["A ", "BB"])
     }
 
-    let block = ViewResolver.block(from: view)
+    @Test
+    func `a custom layout forwards its proposal during subview measurement and placement`() {
+        let view = ProposedWrappingLayout() {
+            Text("Alpha Beta")
+        }
 
-    #expect(block?.width == 5)
-    #expect(block?.lines == ["     ", " A   ", "     "])
-}
+        let block = ViewResolver.block(from: view, in: RenderProposal(columns: 5))
 
-@Test func layoutValueIsVisibleAndFallsBackToDefaultValue() {
-    let view = LayoutValueRowLayout() {
-        Text("A")
-            .layoutValue(key: ColumnSpanKey.self, value: 3)
-        Text("B")
+        #expect(block?.lines == ["Alpha", "Beta "])
     }
 
-    let block = ViewResolver.block(from: view)
+    @Test
+    func `a custom layout measures a Spacer with an explicit proposal`() {
+        let view = SpacerMeasurementLayout() {
+            Spacer()
+        }
 
-    #expect(block?.width == 4)
-    #expect(block?.lines == ["A  B"])
-}
+        let block = ViewResolver.block(from: view)
 
-@Test func layoutValueIsVisibleThroughTypeErasureAndLayoutModifiers() {
-    let view = LayoutValueWidthLayout() {
-        AnyView(
+        #expect(block?.width == 4)
+        #expect(block?.height == 2)
+        #expect(block?.lines == ["    ", "    "])
+    }
+
+    @Test
+    func `a negative custom layout size clamps to an empty rendered block`() {
+        let view = NegativeSizeLayout() {
             Text("A")
-                .layoutValue(key: ColumnSpanKey.self, value: 5)
-                .padding()
-                .frame(width: 7, alignment: .leading)
-        )
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 0)
+        #expect(block?.height == 0)
+        #expect(block?.lines == [])
     }
 
-    let block = ViewResolver.block(from: view)
+    @Test
+    func `a custom layout places subviews by anchor and clips them to its bounds`() {
+        let view = AnchoredLayout() {
+            Text("AB")
+            Text("CDE")
+            Text("XYZ")
+        }
 
-    #expect(block?.width == 5)
-}
+        let block = ViewResolver.block(from: view)
 
-@Test func multipleLayoutValueKeysAreIndependent() {
-    let view = LayoutValueRowLayout() {
-        Text("A")
-            .layoutValue(key: LeadingInsetKey.self, value: 2)
-            .layoutValue(key: ColumnSpanKey.self, value: 4)
+        #expect(block?.lines == [
+            "     ",
+            "ABCDE",
+            "   XY",
+        ])
     }
 
-    let block = ViewResolver.block(from: view)
+    @Test
+    func `a custom layout translates scroll, hit, and focus regions with the placed subview`() {
+        let runtime = StateRuntime()
+        let tapProbe = LayoutTapGestureProbe()
+        let view = RegionOffsetLayout() {
+            ScrollView(.horizontal) {
+                Text("ABCDE")
+            }
+            .scrollPosition(.constant(ScrollPosition(x: 1)))
+            .padding(.horizontal, 1)
+            .onTapGesture {
+                tapProbe.record("tap")
+            }
+            .focusable()
+        }
 
-    #expect(block?.width == 6)
-    #expect(block?.lines == ["  A   "])
-}
+        let block = runtime.block(from: view)
 
-@Test func customLayoutSharesCacheBetweenSizingAndPlacement() {
-    let view = CacheBackedLayout() {
-        Text("A")
+        #expect(block?.lines == [
+            "       ",
+            "  BCD  ",
+            "       ",
+        ])
+        #expect(block?.scrollRegions.map { $0.frame } == [
+            RenderedRect(x: 2, y: 1, width: 3, height: 1),
+        ])
+        #expect(block?.hitRegions.map { $0.frame } == [
+            RenderedRect(x: 1, y: 1, width: 5, height: 1),
+        ])
+        #expect(block?.focusRegions.map { $0.frame } == [
+            RenderedRect(x: 1, y: 1, width: 5, height: 1),
+        ])
     }
 
-    let block = ViewResolver.block(from: view)
+    @Test
+    func `a custom layout translates a TextField caret to the placed subview`() {
+        let runtime = StateRuntime()
+        let view = CaretOffsetTextFieldView()
 
-    #expect(block?.lines == ["  A"])
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        let block = runtime.block(from: view)
+
+        #expect(block?.lines == [
+            "       ",
+            " Name  ",
+            "       ",
+        ])
+        #expect(block?.caret == RenderedCaret(row: 1, column: 1))
+    }
+
+    @Test
+    func `a custom layout reads subview priority through AnyView and intervening modifiers`() {
+        let view = PriorityWidthLayout() {
+            AnyView(
+                Text("A")
+                    .layoutPriority(2.5)
+                    .padding()
+                    .frame(width: 5, alignment: .leading)
+            )
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 5)
+        #expect(block?.lines == ["     ", " A   ", "     "])
+    }
+
+    @Test
+    func `a custom layout reads explicit layout values and defaults from separate subviews`() {
+        let view = LayoutValueRowLayout() {
+            Text("A")
+                .layoutValue(key: ColumnSpanKey.self, value: 3)
+            Text("B")
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 4)
+        #expect(block?.lines == ["A  B"])
+    }
+
+    @Test
+    func `a custom layout reads layout values through AnyView and intervening modifiers`() {
+        let view = LayoutValueWidthLayout() {
+            AnyView(
+                Text("A")
+                    .layoutValue(key: ColumnSpanKey.self, value: 5)
+                    .padding()
+                    .frame(width: 7, alignment: .leading)
+            )
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 5)
+    }
+
+    @Test
+    func `a custom layout reads independent values for multiple layout keys`() {
+        let view = LayoutValueRowLayout() {
+            Text("A")
+                .layoutValue(key: LeadingInsetKey.self, value: 2)
+                .layoutValue(key: ColumnSpanKey.self, value: 4)
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.width == 6)
+        #expect(block?.lines == ["  A   "])
+    }
+
+    @Test
+    func `a custom layout reuses its cache between sizing and placement`() {
+        let view = CacheBackedLayout() {
+            Text("A")
+        }
+
+        let block = ViewResolver.block(from: view)
+
+        #expect(block?.lines == ["  A"])
+    }
 }
 
 private struct BasicVStackLayout: Layout {
@@ -364,12 +382,12 @@ private struct PriorityWidthLayout: Layout {
     }
 }
 
-private nonisolated enum ColumnSpanKey: LayoutValueKey {
+nonisolated enum ColumnSpanKey: LayoutValueKey {
 
     static let defaultValue = 1
 }
 
-private nonisolated enum LeadingInsetKey: LayoutValueKey {
+nonisolated enum LeadingInsetKey: LayoutValueKey {
 
     static let defaultValue = 0
 }

@@ -1,0 +1,225 @@
+import Foundation
+import Observation
+import Testing
+@testable import SwiftTUI
+
+@Suite("Stack Layout")
+struct StackLayoutTests {
+
+    @Test
+    func `an HStack places children side by side with no spacing by default`() {
+        let stack = HStack {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "AB")
+    }
+
+    @Test
+    func `an HStack inserts the requested number of spacing columns`() {
+        let stack = HStack(spacing: 1) {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "A B")
+    }
+
+    @Test
+    func `a rendered text run preserves spaces from its content`() {
+        let block = ViewResolver.block(from: Text("A B C"))
+
+        #expect(block?.runs == [RenderedRun(text: "A B C")])
+    }
+
+    @Test
+    func `HStack spacing uses run coordinates without materializing spacer runs`() {
+        let block = ViewResolver.block(
+            from: HStack(spacing: 3) {
+                Text("A")
+                Text("B")
+            }
+        )
+
+        #expect(block?.runs == [
+            RenderedRun(text: "A", row: 0, column: 0),
+            RenderedRun(text: "B", row: 0, column: 4),
+        ])
+        #expect(block?.lines == ["A   B"])
+    }
+
+    @Test
+    func `a VStack places children on adjacent rows with no spacing by default`() {
+        let stack = VStack {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "A\nB")
+    }
+
+    @Test
+    func `a VStack inserts the requested number of blank spacing rows`() {
+        let stack = VStack(spacing: 1) {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "A\n\nB")
+    }
+
+    @Test
+    func `padding, frame expansion, and Spacers add blank cells without creating text runs`() {
+        let padded = ViewResolver.block(from: Text("A").padding())
+        let framed = ViewResolver.block(from: Text("A").frame(width: 4, height: 3))
+        let spacer = ViewResolver.block(from: Spacer(minLength: 2))
+
+        #expect(padded?.runs == [RenderedRun(text: "A", row: 1, column: 1)])
+        #expect(framed?.runs == [RenderedRun(text: "A", row: 1, column: 1)])
+        #expect(spacer?.runs == [])
+        #expect(spacer?.width == 2)
+        #expect(spacer?.height == 2)
+    }
+
+    @Test
+    func `HStack aligns children vertically`() {
+        let top = HStack(alignment: .top, spacing: 1) {
+            VStack {
+                Text("A")
+                Text("B")
+                Text("C")
+            }
+            Text("X")
+        }
+        let center = HStack(alignment: .center, spacing: 1) {
+            VStack {
+                Text("A")
+                Text("B")
+                Text("C")
+            }
+            Text("X")
+        }
+        let bottom = HStack(alignment: .bottom, spacing: 1) {
+            VStack {
+                Text("A")
+                Text("B")
+                Text("C")
+            }
+            Text("X")
+        }
+
+        #expect(ViewResolver.block(from: top)?.lines == ["A X", "B  ", "C  "])
+        #expect(ViewResolver.block(from: center)?.lines == ["A  ", "B X", "C  "])
+        #expect(ViewResolver.block(from: bottom)?.lines == ["A  ", "B  ", "C X"])
+    }
+
+    @Test
+    func `rendered block width counts terminal cells for wide characters`() {
+        let block = ViewResolver.block(from: Text("한A"))
+
+        #expect(block?.width == 3)
+    }
+
+    @Test
+    func `VStack aligns children horizontally`() {
+        let leading = VStack(alignment: .leading) {
+            Text("A")
+            Text("BBB")
+        }
+        let center = VStack(alignment: .center) {
+            Text("A")
+            Text("BBB")
+        }
+        let trailing = VStack(alignment: .trailing) {
+            Text("A")
+            Text("BBB")
+        }
+
+        #expect(ViewResolver.block(from: leading)?.lines == ["A  ", "BBB"])
+        #expect(ViewResolver.block(from: center)?.lines == [" A ", "BBB"])
+        #expect(ViewResolver.block(from: trailing)?.lines == ["  A", "BBB"])
+    }
+
+    @Test
+    func `VStack aligns wide text by terminal columns`() {
+        let stack = VStack(alignment: .trailing) {
+            Text("한")
+            Text("ABC")
+        }
+
+        #expect(ViewResolver.block(from: stack)?.lines == [" 한", "ABC"])
+    }
+
+    @Test
+    func `a spacer stores normalized minimum length`() {
+        #expect(Spacer().minLength == nil)
+        #expect(Spacer(minLength: 2).minLength == 2)
+        #expect(Spacer(minLength: -1).minLength == 0)
+    }
+
+    @Test
+    func `an HStack Spacer collapses to zero width without a proposal`() {
+        let stack = HStack {
+            Text("A")
+            Spacer()
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "AB")
+    }
+
+    @Test
+    func `HStack spacer fills proposed columns`() {
+        let stack = HStack {
+            Text("A")
+            Spacer()
+            Text("B")
+        }
+
+        let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 5))
+
+        #expect(block?.lines == ["A   B"])
+    }
+
+    @Test
+    func `HStack spacers share remaining columns`() {
+        let stack = HStack {
+            Text("A")
+            Spacer()
+            Text("B")
+            Spacer()
+            Text("C")
+        }
+
+        let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 8))
+
+        #expect(block?.lines == ["A   B  C"])
+    }
+
+    @Test
+    func `VStack spacer fills proposed rows`() {
+        let stack = VStack {
+            Text("A")
+            Spacer()
+            Text("B")
+        }
+
+        let block = ViewResolver.block(from: stack, in: RenderProposal(rows: 5))
+
+        #expect(block?.lines == ["A", " ", " ", " ", "B"])
+    }
+
+    @Test
+    func `a VStack without flexible children keeps its natural height under a taller proposal`() {
+        let stack = VStack {
+            Text("A")
+            Text("B")
+        }
+
+        let block = ViewResolver.block(from: stack, in: RenderProposal(columns: 4, rows: 5))
+
+        #expect(block?.height == 2)
+        #expect(block?.lines == ["A", "B"])
+    }
+}

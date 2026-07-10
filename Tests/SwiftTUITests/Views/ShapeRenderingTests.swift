@@ -1,10 +1,13 @@
+import Foundation
+import Observation
 import Testing
 @testable import SwiftTUI
 
-@Suite("Shape")
-struct ShapeTests {
+@Suite("Shape Rendering")
+struct ShapeRenderingTests {
 
-    @Test func rectangleFillRendersForegroundBlockCells() {
+    @Test
+    func `a filled rectangle covers its frame with colored full-block cells`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .fill(.red)
@@ -28,7 +31,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func rectangleFillEmitsForegroundSGRBlocks() {
+    @Test
+    func `a filled rectangle emits a foreground-color SGR sequence around its full-block cells`() {
         let output = TextRenderer.screen(
             for: ViewResolver.block(
                 from: Rectangle()
@@ -41,7 +45,8 @@ struct ShapeTests {
         #expect(output == "\u{001B}[2J\u{001B}[1;1H\u{001B}[31m██\u{001B}[39m\u{001B}[?25l")
     }
 
-    @Test func plainRectangleUsesForegroundStyleAsDefaultFill() {
+    @Test
+    func `a plain rectangle uses foregroundStyle as its default fill`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .foregroundStyle(.red)
@@ -56,7 +61,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func emptyHalfCellEdgeStylePreservesFullBlockFill() {
+    @Test
+    func `an empty half-cell edge style leaves the full-block fill unchanged`() {
         let plain = ViewResolver.block(
             from: Rectangle()
                 .fill(.red)
@@ -72,7 +78,8 @@ struct ShapeTests {
         #expect(styled == plain)
     }
 
-    @Test func rectangleHalfCellEdgesRenderSelectedSides() {
+    @Test
+    func `individual half-cell edges render on their selected sides`() {
         let top = ViewResolver.block(
             from: Rectangle()
                 .edge(style: RectangleHalfCellEdgeStyle(edges: .top))
@@ -104,7 +111,8 @@ struct ShapeTests {
         #expect(trailing?.lines == ["██▌", "██▌", "██▌"])
     }
 
-    @Test func rectangleHalfCellEdgesSelectQuarterBlockCorners() {
+    @Test
+    func `combined half-cell edges use quarter-block glyphs at corners`() {
         let all = ViewResolver.block(
             from: Rectangle()
                 .edge(style: RectangleHalfCellEdgeStyle(edges: .all))
@@ -122,7 +130,8 @@ struct ShapeTests {
         #expect(topLeading?.lines == ["▗▄▄", "▐██", "▐██"])
     }
 
-    @Test func rectangleEdgeReturnsRectangleAndReplacesPreviousStyle() {
+    @Test
+    func `applying an edge style preserves the Rectangle type and replaces the previous edge style`() {
         let rectangle: Rectangle = Rectangle()
             .edge(style: RectangleHalfCellEdgeStyle(edges: .top))
             .edge(style: RectangleHalfCellEdgeStyle(edges: .bottom))
@@ -135,7 +144,8 @@ struct ShapeTests {
         #expect(block?.lines == ["███", "▀▀▀"])
     }
 
-    @Test func rectangleHalfCellEdgesSurviveSizeOffsetAndFill() {
+    @Test
+    func `half-cell edges respect the rectangle size, offset, and fill color`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .edge(style: RectangleHalfCellEdgeStyle(edges: [.top, .leading]))
@@ -162,7 +172,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func clippedOriginalHalfCellEdgesBecomeFullBlockFill() {
+    @Test
+    func `clipping away the original half-cell edges exposes full-block interior cells`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .edge(style: RectangleHalfCellEdgeStyle(edges: [.top, .leading]))
@@ -175,7 +186,8 @@ struct ShapeTests {
         #expect(block?.lines == ["██", "██"])
     }
 
-    @Test func opposingHalfCellEdgesInOneCellRenderEmptyArea() {
+    @Test
+    func `opposing half-cell edges on a single-cell axis leave no filled area`() {
         let horizontal = ViewResolver.block(
             from: Rectangle()
                 .edge(style: RectangleHalfCellEdgeStyle(edges: .horizontal))
@@ -195,7 +207,8 @@ struct ShapeTests {
         #expect(vertical?.lines == ["  "])
     }
 
-    @Test func shapeSizeChangesDrawnRectWithoutChangingLayoutSize() {
+    @Test
+    func `shape size changes the drawn rectangle without changing its layout bounds`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .size(Size(columns: 2, rows: 1))
@@ -214,7 +227,8 @@ struct ShapeTests {
         #expect(block?.lines == ["██  ", "    ", "    "])
     }
 
-    @Test func shapeSizeWidthHeightMatchesTerminalSize() {
+    @Test
+    func `the width-and-height size overload matches the Size overload`() {
         let explicitSize = ViewResolver.block(
             from: Rectangle()
                 .size(Size(columns: 2, rows: 1))
@@ -231,7 +245,8 @@ struct ShapeTests {
         #expect(labeledSize == explicitSize)
     }
 
-    @Test func shapeOffsetMovesDrawnRectWithinLayoutBounds() {
+    @Test
+    func `shape offset moves the drawn rectangle within its layout bounds`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .size(width: 2, height: 1)
@@ -250,7 +265,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func shapeOffsetXYMatchesTerminalPoint() {
+    @Test
+    func `the x-and-y offset overload matches the Point overload`() {
         let explicitPoint = ViewResolver.block(
             from: Rectangle()
                 .size(width: 2, height: 1)
@@ -269,7 +285,8 @@ struct ShapeTests {
         #expect(labeledOffset == explicitPoint)
     }
 
-    @Test func negativeShapeSizeDrawsNoFillButKeepsFrame() {
+    @Test
+    func `a negative shape size draws no fill while preserving its layout frame`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .size(Size(columns: -1, rows: 2))
@@ -283,7 +300,8 @@ struct ShapeTests {
         #expect(block?.lines == ["   ", "   "])
     }
 
-    @Test func negativeShapeOffsetClipsFillToBounds() {
+    @Test
+    func `a negative shape offset clips the fill to layout bounds`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .size(width: 3, height: 1)
@@ -300,7 +318,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func shapeViewFillChainsDrawLaterFillAboveEarlierFill() {
+    @Test
+    func `the last fill in a chain renders above earlier fills`() {
         let block = ViewResolver.block(
             from: Rectangle()
                 .fill(.red)
@@ -316,7 +335,8 @@ struct ShapeTests {
         ])
     }
 
-    @Test func framedRectangleFillWorksInBackgroundAndOverlay() {
+    @Test
+    func `a filled rectangle renders behind base content in a background and over it in an overlay`() {
         let background = ViewResolver.block(
             from: Text("A")
                 .frame(width: 3, height: 2, alignment: .topLeading)

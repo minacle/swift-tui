@@ -1,10 +1,13 @@
+import Foundation
+import Observation
 import Testing
 @testable import SwiftTUI
 
-@Suite("ViewThatFits")
-struct ViewThatFitsTests {
+@Suite("Adaptive View Selection")
+struct AdaptiveViewSelectionTests {
 
-    @Test func defaultAxesChooseFirstChildThatFitsBothDimensions() {
+    @Test
+    func `ViewThatFits chooses the first child that fits both proposed dimensions by default`() {
         let view = ViewThatFits {
             Text("OK")
             Text("Fallback")
@@ -15,7 +18,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["OK"])
     }
 
-    @Test func horizontalAxisIgnoresHeightOverflow() {
+    @Test
+    func `a horizontally constrained ViewThatFits ignores vertical overflow`() {
         let view = ViewThatFits(in: .horizontal) {
             VStack {
                 Text("A")
@@ -29,7 +33,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["A", "B"])
     }
 
-    @Test func verticalAxisChoosesByHeight() {
+    @Test
+    func `a vertically constrained ViewThatFits selects a child by height`() {
         let view = ViewThatFits(in: .vertical) {
             VStack {
                 Text("A")
@@ -43,7 +48,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["C"])
     }
 
-    @Test func emptyAxesChooseFirstRenderableChild() {
+    @Test
+    func `ViewThatFits with no constrained axes selects its first renderable child`() {
         let view = ViewThatFits(in: []) {
             Text("First")
             Text("Second")
@@ -54,7 +60,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["F", "i", "r", "s", "t"])
     }
 
-    @Test func noFitFallsBackToLastRenderableChild() {
+    @Test
+    func `ViewThatFits falls back to its final renderable child when no candidate fits`() {
         let view = ViewThatFits(in: .horizontal) {
             Text("AAA")
             Text("DD")
@@ -66,7 +73,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["DD"])
     }
 
-    @Test func constrainedAxesMeasureIdealSizeBeforeChoosing() {
+    @Test
+    func `ViewThatFits compares ideal widths before selecting a horizontally constrained candidate`() {
         let view = ViewThatFits(in: .horizontal) {
             Text("Alpha Beta")
             Text("Short")
@@ -77,7 +85,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["Short"])
     }
 
-    @Test func hStackProposesRemainingWidthToViewThatFits() {
+    @Test
+    func `an HStack proposes its remaining width to ViewThatFits`() {
         let view = HStack {
             Text("A")
             ViewThatFits(in: .horizontal) {
@@ -91,7 +100,8 @@ struct ViewThatFitsTests {
         #expect(block?.lines == ["AB"])
     }
 
-    @Test func registersOnlySelectedInteractiveCandidate() {
+    @Test
+    func `ViewThatFits registers hit and focus regions only for the selected interactive candidate`() {
         let runtime = StateRuntime()
         let probe = ViewThatFitsTapProbe()
         let view = ViewThatFits(in: .horizontal) {
@@ -122,7 +132,8 @@ struct ViewThatFitsTests {
         #expect(probe.events == ["keep"])
     }
 
-    @Test func supportsGroupAnyViewAndModifierWrappedCandidates() {
+    @Test
+    func `ViewThatFits accepts candidates wrapped in Group, AnyView, and modifiers`() {
         let view = ViewThatFits(in: .horizontal) {
             Group {
                 AnyView(
