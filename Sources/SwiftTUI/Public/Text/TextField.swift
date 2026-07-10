@@ -392,7 +392,7 @@ private enum TextInputRenderer {
         var labelEnvironment = EnvironmentRenderContext.current
         labelEnvironment.isFocused = isFocused
         let displayText = EnvironmentRenderContext.withValues(labelEnvironment) {
-            displayText(
+            Self.displayText(
                 using: currentText,
                 layoutText: layoutText,
                 prompt: prompt,

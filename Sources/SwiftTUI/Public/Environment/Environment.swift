@@ -432,6 +432,13 @@ final class EnvironmentStorage<Value> {
         self.readValue = readValue
     }
 
+    #if swift(<6.4)
+    // Work around an optimizer crash in the Swift 6.3 synthesized deinitializer.
+    @inline(never)
+    deinit {
+    }
+    #endif
+
     func materialize(environment: EnvironmentValues) {
         values = environment
     }
