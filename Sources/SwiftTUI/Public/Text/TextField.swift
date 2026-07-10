@@ -348,11 +348,13 @@ private enum TextInputRenderer {
             prompt: prompt,
             label: label
         )
-        let cursor = renderedCursor(
-            state: fieldState,
-            isFocused: isFocused,
-            layoutText: layoutText
-        )
+        let cursor: RenderedCursor? = fieldState?.selectedRange == nil
+            ? renderedCursor(
+                state: fieldState,
+                isFocused: isFocused,
+                layoutText: layoutText
+            )
+            : nil
         let displayTextWidth = TerminalText.columnWidth(displayText.content)
         let reservesTrailingCaretCell = !currentText.isEmpty
         let contentWidth = max(

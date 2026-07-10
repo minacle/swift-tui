@@ -1503,6 +1503,7 @@ private func lineBreakKinds(in text: String) -> [String] {
         ),
         RenderedRun(text: "•••", column: 3),
     ])
+    #expect(runtime.block(from: view)?.cursor == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
@@ -2024,6 +2025,7 @@ private func lineBreakKinds(in text: String) -> [String] {
             PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .handled
     )
+    #expect(runtime.block(from: view)?.cursor == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
@@ -2055,7 +2057,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view)
     #expect(block?.lines == ["|def"])
-    #expect(block?.cursor == RenderedCursor(column: 1))
+    #expect(block?.cursor == nil)
 }
 
 @Test func textFieldPointerMotionWithoutPressDoesNotMoveCaret() {
@@ -2312,6 +2314,7 @@ private func lineBreakKinds(in text: String) -> [String] {
             PointerEvent(button: .left, column: 3, row: 2, phase: .motion)
         ) == .handled
     )
+    #expect(runtime.block(from: view, in: proposal)?.cursor == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
@@ -2344,7 +2347,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["top ", "b   ", "c   "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(block?.cursor == nil)
 }
 
 @Test func clickingScrolledTextEditorMovesCaretThroughScrollPoint() {

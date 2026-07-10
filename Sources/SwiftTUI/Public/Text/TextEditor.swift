@@ -107,6 +107,7 @@ extension TextEditor {
         }
 
         let environment = EnvironmentRenderContext.current
+        let visibleCursor = editorState?.selectedRange == nil ? cursor : nil
         let content = RenderedBlock(
             runs: layout.lines.enumerated().flatMap { row, line in
                 TextSelectionRenderer.runs(
@@ -122,7 +123,7 @@ extension TextEditor {
             width: layout.width,
             height: layout.height,
             paddedRows: Set(0..<layout.height),
-            cursor: cursor
+            cursor: visibleCursor
         )
 
         var block = ScrollViewRenderer.render(
