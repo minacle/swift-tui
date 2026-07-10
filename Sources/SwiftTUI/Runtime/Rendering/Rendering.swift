@@ -1432,10 +1432,9 @@ enum TextLayoutRenderer {
                         )
                     },
                     changed: { point in
-                        selectionState?.move(
+                        selectionState?.extendFromPointer(
                             to: layout.offset(at: point),
-                            upperBound: text.content.count,
-                            selecting: true
+                            upperBound: text.content.count
                         )
                     }
                 ),

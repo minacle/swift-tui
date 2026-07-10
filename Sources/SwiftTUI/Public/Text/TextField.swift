@@ -439,18 +439,33 @@ private enum TextInputRenderer {
             return .ignored
         }
 
+        let navigationBehavior =
+            EnvironmentRenderContext.current.textSelectionNavigationBehavior
+        let selecting = keyPress.modifiers.contains(.shift)
         switch keyPress.key {
         case .leftArrow:
-            state.moveLeft(selecting: keyPress.modifiers.contains(.shift))
+            state.moveLeft(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .rightArrow:
-            state.moveRight(selecting: keyPress.modifiers.contains(.shift))
+            state.moveRight(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .home:
-            state.move(to: 0, selecting: keyPress.modifiers.contains(.shift))
+            state.moveToStart(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .end:
-            state.move(to: state.text.count, selecting: keyPress.modifiers.contains(.shift))
+            state.moveToEnd(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .delete:
             state.deleteBackward(update: text)
@@ -543,26 +558,70 @@ final class TextFieldState {
         horizontalScrollOffset = min(horizontalScrollOffset, offset)
     }
 
-    func moveLeft(selecting: Bool = false) {
+    func moveLeft(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
         if !selecting, let selectedRange {
             selection.collapse(to: selectedRange.lowerBound, upperBound: text.count)
             return
         }
 
+        if selecting {
+            selection.prepareForSelectionNavigation(
+                toward: .backward,
+                behavior: navigationBehavior,
+                upperBound: text.count
+            )
+        }
         selection.move(to: offset - 1, upperBound: text.count, selecting: selecting)
     }
 
-    func moveRight(selecting: Bool = false) {
+    func moveRight(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
         if !selecting, let selectedRange {
             selection.collapse(to: selectedRange.upperBound, upperBound: text.count)
             return
         }
 
+        if selecting {
+            selection.prepareForSelectionNavigation(
+                toward: .forward,
+                behavior: navigationBehavior,
+                upperBound: text.count
+            )
+        }
         selection.move(to: offset + 1, upperBound: text.count, selecting: selecting)
     }
 
-    func move(to offset: Int, selecting: Bool = false) {
-        selection.move(to: offset, upperBound: text.count, selecting: selecting)
+    func moveToStart(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
+        if selecting {
+            selection.prepareForSelectionNavigation(
+                toward: .backward,
+                behavior: navigationBehavior,
+                upperBound: text.count
+            )
+        }
+        selection.move(to: 0, upperBound: text.count, selecting: selecting)
+    }
+
+    func moveToEnd(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
+        if selecting {
+            selection.prepareForSelectionNavigation(
+                toward: .forward,
+                behavior: navigationBehavior,
+                upperBound: text.count
+            )
+        }
+        selection.move(to: text.count, upperBound: text.count, selecting: selecting)
     }
 
     func beginSelection(toColumn column: Int, layoutText: String) {
@@ -573,10 +632,9 @@ final class TextFieldState {
     }
 
     func extendSelection(toColumn column: Int, layoutText: String) {
-        selection.move(
+        selection.extendFromPointer(
             to: offset(toColumn: column, layoutText: layoutText),
-            upperBound: text.count,
-            selecting: true
+            upperBound: text.count
         )
     }
 

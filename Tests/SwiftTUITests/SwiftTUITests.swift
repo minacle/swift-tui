@@ -47,6 +47,83 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     #expect(EnvironmentValues().tint == AnyColor(Color16.blue))
 }
 
+@Test func textSelectionNavigationBehaviorHasPlatformDefault() {
+    let values: Set<TextSelectionNavigationBehavior> = [
+        .dragEndpoint,
+        .navigationDirection,
+    ]
+
+    #expect(values.count == 2)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || os(watchOS)
+    #expect(EnvironmentValues().textSelectionNavigationBehavior == .navigationDirection)
+    #else
+    #expect(EnvironmentValues().textSelectionNavigationBehavior == .dragEndpoint)
+    #endif
+}
+
+@Test func navigationDirectionResolvesPointerSelectionBeforeContinuing() {
+    let backward = TextSelectionState(offset: 2) {}
+    backward.begin(at: 2, upperBound: 6)
+    backward.extendFromPointer(to: 5, upperBound: 6)
+    backward.prepareForSelectionNavigation(
+        toward: .backward,
+        behavior: .navigationDirection,
+        upperBound: 6
+    )
+    backward.move(to: 1, upperBound: 6, selecting: true)
+    #expect(backward.anchor == 5)
+    #expect(backward.offset == 1)
+    #expect(backward.range == 1..<5)
+
+    backward.move(to: 2, upperBound: 6, selecting: true)
+    #expect(backward.range == 2..<5)
+    backward.move(to: 6, upperBound: 6, selecting: true)
+    #expect(backward.anchor == 5)
+    #expect(backward.offset == 6)
+    #expect(backward.range == 5..<6)
+
+    let forward = TextSelectionState(offset: 5) {}
+    forward.begin(at: 5, upperBound: 6)
+    forward.extendFromPointer(to: 2, upperBound: 6)
+    forward.prepareForSelectionNavigation(
+        toward: .forward,
+        behavior: .navigationDirection,
+        upperBound: 6
+    )
+    forward.move(to: 6, upperBound: 6, selecting: true)
+    #expect(forward.anchor == 2)
+    #expect(forward.offset == 6)
+    #expect(forward.range == 2..<6)
+}
+
+@Test func dragEndpointContinuesFromThePointerEndpoint() {
+    let forwardDrag = TextSelectionState(offset: 2) {}
+    forwardDrag.begin(at: 2, upperBound: 6)
+    forwardDrag.extendFromPointer(to: 5, upperBound: 6)
+    forwardDrag.prepareForSelectionNavigation(
+        toward: .backward,
+        behavior: .dragEndpoint,
+        upperBound: 6
+    )
+    forwardDrag.move(to: 4, upperBound: 6, selecting: true)
+    #expect(forwardDrag.anchor == 2)
+    #expect(forwardDrag.offset == 4)
+    #expect(forwardDrag.range == 2..<4)
+
+    let reverseDrag = TextSelectionState(offset: 5) {}
+    reverseDrag.begin(at: 5, upperBound: 6)
+    reverseDrag.extendFromPointer(to: 2, upperBound: 6)
+    reverseDrag.prepareForSelectionNavigation(
+        toward: .forward,
+        behavior: .dragEndpoint,
+        upperBound: 6
+    )
+    reverseDrag.move(to: 3, upperBound: 6, selecting: true)
+    #expect(reverseDrag.anchor == 5)
+    #expect(reverseDrag.offset == 3)
+    #expect(reverseDrag.range == 3..<5)
+}
+
 @Test func selectionForegroundEnvironmentSupportsDirectAndNestedNilOverrides() {
     var environment = EnvironmentValues()
     environment.textSelectionForegroundStyle = AnyShapeStyle(Color16.green)
@@ -2034,6 +2111,200 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.caret == RenderedCaret(column: 1))
 }
 
+@Test func navigationDirectionExpandsTextFieldSelectionFromTheCommandSide() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcdef")
+        .environment(\.textSelectionNavigationBehavior, .navigationDirection)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 3,
+        fromRow: 1,
+        toColumn: 6,
+        toRow: 1
+    )
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+
+    #expect(runtime.block(from: view)?.text == "aXf ")
+}
+
+@Test func nearestNavigationBehaviorModifierOverridesOuterEnvironment() {
+    let runtime = StateRuntime()
+    let view = TextFieldInitialTextView(text: "abcdef")
+        .textSelectionNavigationBehavior(.dragEndpoint)
+        .environment(\.textSelectionNavigationBehavior, .navigationDirection)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 3,
+        fromRow: 1,
+        toColumn: 6,
+        toRow: 1
+    )
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+
+    #expect(runtime.block(from: view)?.text == "abXef ")
+}
+
+@Test func navigationDirectionAppliesToSecureFieldSelection() {
+    let runtime = StateRuntime()
+    let probe = BindingProbe<String>()
+    let view = SecureFieldEditingView(textProbe: probe)
+        .textSelectionNavigationBehavior(.navigationDirection)
+
+    _ = runtime.block(from: view)
+    _ = runtime.consumeInvalidation()
+    _ = runtime.block(from: view)
+    for character in "abcdef" {
+        let characters = String(character)
+        #expect(
+            runtime.dispatch(KeyPress(key: KeyEquivalent(character), characters: characters))
+                == .handled
+        )
+    }
+    _ = runtime.block(from: view)
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 3,
+        fromRow: 1,
+        toColumn: 6,
+        toRow: 1
+    )
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+
+    #expect(probe.binding?.wrappedValue == "aXf")
+}
+
+@Test func directionalTextFieldHomeAndEndUseTheCommandSide() {
+    let start = TextFieldState(initialText: "abcdef") {}
+    start.beginSelection(toColumn: 2, layoutText: start.text)
+    start.extendSelection(toColumn: 5, layoutText: start.text)
+    start.moveToStart(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(start.offset == 0)
+    #expect(start.selectedRange == 0..<5)
+
+    let end = TextFieldState(initialText: "abcdef") {}
+    end.beginSelection(toColumn: 5, layoutText: end.text)
+    end.extendSelection(toColumn: 2, layoutText: end.text)
+    end.moveToEnd(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(end.offset == 6)
+    #expect(end.selectedRange == 2..<6)
+}
+
+@Test func nonDragSelectionDoesNotRequireNavigationEndpointResolution() {
+    let click = TextFieldState(initialText: "abcdef") {}
+    click.beginSelection(toColumn: 2, layoutText: click.text)
+    click.moveRight(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(click.offset == 3)
+    #expect(click.selectedRange == 2..<3)
+
+    let externalChange = TextFieldState(initialText: "abcdef") {}
+    externalChange.beginSelection(toColumn: 2, layoutText: externalChange.text)
+    externalChange.extendSelection(toColumn: 5, layoutText: externalChange.text)
+    externalChange.synchronize(with: "xy")
+    externalChange.moveLeft(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(externalChange.offset == 1)
+    #expect(externalChange.selectedRange == 1..<2)
+}
+
+@Test func navigationDirectionResolvesAtBoundaryWithoutExpanding() {
+    let state = TextFieldState(initialText: "abcdef") {}
+    state.beginSelection(toColumn: 0, layoutText: state.text)
+    state.extendSelection(toColumn: 5, layoutText: state.text)
+
+    state.moveLeft(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(state.offset == 0)
+    #expect(state.selectedRange == 0..<5)
+
+    state.moveRight(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(state.offset == 1)
+    #expect(state.selectedRange == 1..<5)
+}
+
+@Test func textChangesClearPendingPointerNavigationEndpoint() {
+    var insertedText = "abcdef"
+    let insertion = TextFieldState(initialText: insertedText) {}
+    insertion.beginSelection(toColumn: 2, layoutText: insertion.text)
+    insertion.extendSelection(toColumn: 5, layoutText: insertion.text)
+    insertion.insert(
+        "X",
+        update: Binding(
+            get: {
+                insertedText
+            },
+            set: {
+                insertedText = $0
+            }
+        )
+    )
+    insertion.moveLeft(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(insertedText == "abXf")
+    #expect(insertion.selectedRange == 2..<3)
+
+    var deletedText = "abcdef"
+    let deletion = TextFieldState(initialText: deletedText) {}
+    deletion.beginSelection(toColumn: 2, layoutText: deletion.text)
+    deletion.extendSelection(toColumn: 5, layoutText: deletion.text)
+    deletion.deleteBackward(
+        update: Binding(
+            get: {
+                deletedText
+            },
+            set: {
+                deletedText = $0
+            }
+        )
+    )
+    deletion.moveRight(
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(deletedText == "abf")
+    #expect(deletion.selectedRange == 2..<3)
+}
+
 @Test func draggingTextFieldOutsideFrameScrollsToCaret() {
     let runtime = StateRuntime()
     let view = PrefixedNarrowTextFieldInitialTextView(text: "abcdef")
@@ -2321,6 +2592,75 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["X   "])
     #expect(block?.caret == RenderedCaret(row: 0, column: 1))
+}
+
+@Test func navigationDirectionUsesTextEditorVisualMovementFromTheCommandSide() {
+    let text = "ab\ncd\nef\ngh"
+    let layout = TextEditorLayout(text: text, maxWidth: 4)
+
+    let up = TextEditorState(initialText: text) {}
+    up.beginSelection(to: Point(column: 1, row: 1), layout: layout)
+    up.extendSelection(to: Point(column: 1, row: 2), layout: layout)
+    up.moveVertically(
+        by: -1,
+        layout: layout,
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(up.offset == 1)
+    #expect(up.selectedRange == 1..<7)
+
+    let down = TextEditorState(initialText: text) {}
+    down.beginSelection(to: Point(column: 1, row: 2), layout: layout)
+    down.extendSelection(to: Point(column: 1, row: 1), layout: layout)
+    down.moveVertically(
+        by: 1,
+        layout: layout,
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(down.offset == 10)
+    #expect(down.selectedRange == 4..<10)
+
+    let home = TextEditorState(initialText: text) {}
+    home.beginSelection(to: Point(column: 1, row: 1), layout: layout)
+    home.extendSelection(to: Point(column: 1, row: 2), layout: layout)
+    home.moveToLineStart(
+        layout: layout,
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(home.offset == 3)
+    #expect(home.selectedRange == 3..<7)
+
+    let end = TextEditorState(initialText: text) {}
+    end.beginSelection(to: Point(column: 1, row: 2), layout: layout)
+    end.extendSelection(to: Point(column: 1, row: 1), layout: layout)
+    end.moveToLineEnd(
+        layout: layout,
+        selecting: true,
+        navigationBehavior: .navigationDirection
+    )
+    #expect(end.offset == 8)
+    #expect(end.selectedRange == 4..<8)
+}
+
+@Test func dragEndpointUsesTextEditorPointerLocationForVisualMovement() {
+    let text = "ab\ncd\nef"
+    let layout = TextEditorLayout(text: text, maxWidth: 4)
+    let state = TextEditorState(initialText: text) {}
+    state.beginSelection(to: Point(column: 1, row: 1), layout: layout)
+    state.extendSelection(to: Point(column: 1, row: 2), layout: layout)
+
+    state.moveVertically(
+        by: -1,
+        layout: layout,
+        selecting: true,
+        navigationBehavior: .dragEndpoint
+    )
+
+    #expect(state.offset == 4)
+    #expect(state.selectedRange == nil)
 }
 
 @Test func draggingTextEditorOutsideFrameScrollsToCaret() {
@@ -12011,6 +12351,45 @@ private func dispatchClick(
             PointerEvent(button: .left, column: column, row: row, phase: .up),
             at: date
         ) == result
+    )
+}
+
+private func dispatchSelectionDrag(
+    to runtime: StateRuntime,
+    fromColumn: Int,
+    fromRow: Int,
+    toColumn: Int,
+    toRow: Int
+) {
+    #expect(
+        runtime.dispatch(
+            PointerEvent(
+                button: .left,
+                column: fromColumn,
+                row: fromRow,
+                phase: .down
+            )
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            PointerEvent(
+                button: .left,
+                column: toColumn,
+                row: toRow,
+                phase: .motion
+            )
+        ) == .handled
+    )
+    #expect(
+        runtime.dispatch(
+            PointerEvent(
+                button: .left,
+                column: toColumn,
+                row: toRow,
+                phase: .up
+            )
+        ) == .handled
     )
 }
 

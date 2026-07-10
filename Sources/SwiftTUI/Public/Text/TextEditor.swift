@@ -160,24 +160,50 @@ extension TextEditor {
 
         let layout = TextEditorLayout(text: state.text, maxWidth: state.layoutWidth)
         let selecting = keyPress.modifiers.contains(.shift)
+        let navigationBehavior =
+            EnvironmentRenderContext.current.textSelectionNavigationBehavior
         switch keyPress.key {
         case .leftArrow:
-            state.moveLeft(selecting: selecting)
+            state.moveLeft(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .rightArrow:
-            state.moveRight(selecting: selecting)
+            state.moveRight(
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .upArrow:
-            state.moveVertically(by: -1, layout: layout, selecting: selecting)
+            state.moveVertically(
+                by: -1,
+                layout: layout,
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .downArrow:
-            state.moveVertically(by: 1, layout: layout, selecting: selecting)
+            state.moveVertically(
+                by: 1,
+                layout: layout,
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .home:
-            state.moveToLineStart(layout: layout, selecting: selecting)
+            state.moveToLineStart(
+                layout: layout,
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .end:
-            state.moveToLineEnd(layout: layout, selecting: selecting)
+            state.moveToLineEnd(
+                layout: layout,
+                selecting: selecting,
+                navigationBehavior: navigationBehavior
+            )
             return .handled
         case .delete:
             state.deleteBackward(update: text)
@@ -260,25 +286,51 @@ final class TextEditorState {
         layoutWidth = width
     }
 
-    func moveLeft(selecting: Bool = false) {
+    func moveLeft(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
         if !selecting, let selectedRange {
             move(to: selectedRange.lowerBound, preservesPreferredColumn: false, selecting: false)
             return
         }
 
+        prepareForSelectionNavigation(
+            toward: .backward,
+            selecting: selecting,
+            behavior: navigationBehavior
+        )
         move(to: offset - 1, preservesPreferredColumn: false, selecting: selecting)
     }
 
-    func moveRight(selecting: Bool = false) {
+    func moveRight(
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
         if !selecting, let selectedRange {
             move(to: selectedRange.upperBound, preservesPreferredColumn: false, selecting: false)
             return
         }
 
+        prepareForSelectionNavigation(
+            toward: .forward,
+            selecting: selecting,
+            behavior: navigationBehavior
+        )
         move(to: offset + 1, preservesPreferredColumn: false, selecting: selecting)
     }
 
-    func moveVertically(by delta: Int, layout: TextEditorLayout, selecting: Bool = false) {
+    func moveVertically(
+        by delta: Int,
+        layout: TextEditorLayout,
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
+        prepareForSelectionNavigation(
+            toward: delta < 0 ? .backward : .forward,
+            selecting: selecting,
+            behavior: navigationBehavior
+        )
         let current = layout.lineAndColumn(at: offset)
         let column = preferredColumn ?? current.column
         preferredColumn = column
@@ -290,7 +342,16 @@ final class TextEditorState {
         )
     }
 
-    func moveToLineStart(layout: TextEditorLayout, selecting: Bool = false) {
+    func moveToLineStart(
+        layout: TextEditorLayout,
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
+        prepareForSelectionNavigation(
+            toward: .backward,
+            selecting: selecting,
+            behavior: navigationBehavior
+        )
         let current = layout.lineAndColumn(at: offset)
         move(
             to: layout.lines[current.lineIndex].lowerOffset,
@@ -299,7 +360,16 @@ final class TextEditorState {
         )
     }
 
-    func moveToLineEnd(layout: TextEditorLayout, selecting: Bool = false) {
+    func moveToLineEnd(
+        layout: TextEditorLayout,
+        selecting: Bool = false,
+        navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
+    ) {
+        prepareForSelectionNavigation(
+            toward: .forward,
+            selecting: selecting,
+            behavior: navigationBehavior
+        )
         let current = layout.lineAndColumn(at: offset)
         move(
             to: layout.lines[current.lineIndex].upperOffset,
@@ -317,11 +387,11 @@ final class TextEditorState {
     }
 
     func extendSelection(to point: Point, layout: TextEditorLayout) {
-        move(
+        selection.extendFromPointer(
             to: offset(to: point, layout: layout),
-            preservesPreferredColumn: false,
-            selecting: true
+            upperBound: text.count
         )
+        preferredColumn = nil
     }
 
     private func offset(to point: Point, layout: TextEditorLayout) -> Int {
@@ -375,6 +445,22 @@ final class TextEditorState {
     private func commit(update binding: Binding<String>) {
         binding.wrappedValue = text
         lastObservedBindingText = binding.wrappedValue
+    }
+
+    private func prepareForSelectionNavigation(
+        toward direction: TextSelectionNavigationDirection,
+        selecting: Bool,
+        behavior: TextSelectionNavigationBehavior
+    ) {
+        guard selecting else {
+            return
+        }
+
+        selection.prepareForSelectionNavigation(
+            toward: direction,
+            behavior: behavior,
+            upperBound: text.count
+        )
     }
 
     func updateScrollPoint(

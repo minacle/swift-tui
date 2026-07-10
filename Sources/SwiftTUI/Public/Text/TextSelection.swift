@@ -1,5 +1,15 @@
 import Terminal
 
+/// A behavior that determines how keyboard navigation continues a pointer selection.
+public nonisolated enum TextSelectionNavigationBehavior: Equatable, Hashable, Sendable {
+
+    /// Continues selection from the endpoint where the pointer drag finished.
+    case dragEndpoint
+
+    /// Chooses the active endpoint from the first Shift-modified navigation direction.
+    case navigationDirection
+}
+
 /// A type-erased shape style value.
 @frozen
 public nonisolated struct AnyShapeStyle: ShapeStyle, Sendable {
@@ -75,6 +85,20 @@ public extension View {
         )
     }
 
+    /// Sets how keyboard navigation continues a selection created by pointer dragging.
+    ///
+    /// - Parameter behavior: The navigation behavior to apply to editable text.
+    /// - Returns: A view with the updated text-selection navigation behavior.
+    nonisolated func textSelectionNavigationBehavior(
+        _ behavior: TextSelectionNavigationBehavior
+    ) -> some View {
+        EnvironmentValueView(
+            content: self,
+            keyPath: \.textSelectionNavigationBehavior,
+            value: behavior
+        )
+    }
+
     /// Sets the foreground style used for selected text.
     ///
     /// Pass an optional style so that `nil` preserves each selected character's
@@ -86,6 +110,20 @@ public extension View {
 }
 
 public extension EnvironmentValues {
+
+    /// The behavior used when keyboard navigation continues a pointer selection.
+    ///
+    /// iOS, macOS, tvOS, visionOS, and watchOS default to
+    /// ``TextSelectionNavigationBehavior/navigationDirection``. Other platforms
+    /// default to ``TextSelectionNavigationBehavior/dragEndpoint``.
+    nonisolated var textSelectionNavigationBehavior: TextSelectionNavigationBehavior {
+        get {
+            self[TextSelectionNavigationBehaviorKey.self]
+        }
+        set {
+            self[TextSelectionNavigationBehaviorKey.self] = newValue
+        }
+    }
 
     /// The optional foreground style applied to selected text.
     nonisolated var textSelectionForegroundStyle: AnyShapeStyle? {
@@ -115,9 +153,27 @@ private struct TextSelectionForegroundStyleKey: EnvironmentKey {
     nonisolated static let defaultValue: AnyShapeStyle? = nil
 }
 
+private struct TextSelectionNavigationBehaviorKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: TextSelectionNavigationBehavior {
+        #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS) || os(watchOS)
+        .navigationDirection
+        #else
+        .dragEndpoint
+        #endif
+    }
+}
+
 private struct IsTextSelectionEnabledKey: EnvironmentKey {
 
     nonisolated static let defaultValue = false
+}
+
+enum TextSelectionNavigationDirection {
+
+    case backward
+
+    case forward
 }
 
 final class TextSelectionState {
@@ -127,6 +183,8 @@ final class TextSelectionState {
     private(set) var anchor: Int?
 
     private(set) var offset: Int
+
+    private var awaitsNavigationEndpoint = false
 
     var range: Range<Int>? {
         guard let anchor, anchor != offset else {
@@ -142,19 +200,59 @@ final class TextSelectionState {
     }
 
     func begin(at offset: Int, upperBound: Int) {
+        awaitsNavigationEndpoint = false
         update(anchor: clamped(offset, upperBound: upperBound), offset: offset, upperBound: upperBound)
     }
 
     func move(to offset: Int, upperBound: Int, selecting: Bool = false) {
+        awaitsNavigationEndpoint = false
         let anchor = selecting ? self.anchor ?? self.offset : nil
         update(anchor: anchor, offset: offset, upperBound: upperBound)
     }
 
+    func extendFromPointer(to offset: Int, upperBound: Int) {
+        let anchor = self.anchor ?? self.offset
+        update(anchor: anchor, offset: offset, upperBound: upperBound)
+        awaitsNavigationEndpoint = range != nil
+    }
+
+    func prepareForSelectionNavigation(
+        toward direction: TextSelectionNavigationDirection,
+        behavior: TextSelectionNavigationBehavior,
+        upperBound: Int
+    ) {
+        guard awaitsNavigationEndpoint else {
+            return
+        }
+
+        awaitsNavigationEndpoint = false
+        guard behavior == .navigationDirection, let range else {
+            return
+        }
+
+        switch direction {
+        case .backward:
+            update(
+                anchor: range.upperBound,
+                offset: range.lowerBound,
+                upperBound: upperBound
+            )
+        case .forward:
+            update(
+                anchor: range.lowerBound,
+                offset: range.upperBound,
+                upperBound: upperBound
+            )
+        }
+    }
+
     func collapse(to offset: Int, upperBound: Int) {
+        awaitsNavigationEndpoint = false
         update(anchor: nil, offset: offset, upperBound: upperBound)
     }
 
     func clearSelection(upperBound: Int) {
+        awaitsNavigationEndpoint = false
         update(anchor: nil, offset: offset, upperBound: upperBound)
     }
 
@@ -164,6 +262,9 @@ final class TextSelectionState {
             offset: offset,
             upperBound: upperBound
         )
+        if clearsSelection || range == nil {
+            awaitsNavigationEndpoint = false
+        }
     }
 
     private func update(anchor: Int?, offset: Int, upperBound: Int) {

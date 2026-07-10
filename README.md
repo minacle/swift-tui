@@ -131,6 +131,24 @@ Text("Keep my original foreground")
 Passing `nil` to `tint(_:)` independently clears selection backgrounds and link
 tint without changing the selected-text foreground setting.
 
+Editable text controls use `TextSelectionNavigationBehavior` when a
+Shift-modified navigation key continues a pointer selection. On iOS, macOS,
+tvOS, visionOS, and watchOS, the default `.navigationDirection` behavior first
+expands toward the navigation command and then fixes that endpoint as the
+active caret. Other platforms default to `.dragEndpoint`, which continues from
+the endpoint where the pointer drag finished.
+
+Use `textSelectionNavigationBehavior(_:)` or its environment value to override
+the platform default for a view hierarchy:
+
+```swift
+TextEditor(text: $text)
+    .textSelectionNavigationBehavior(.dragEndpoint)
+
+TextField("Name", text: $name)
+    .environment(\.textSelectionNavigationBehavior, .navigationDirection)
+```
+
 ## Validation
 
 Use these commands from the package root:

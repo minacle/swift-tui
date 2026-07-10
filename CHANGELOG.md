@@ -11,8 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `Rectangle.edge(style:)` and `RectangleHalfCellEdgeStyle` for drawing
   selected rectangle edges with half-cell and quarter-cell block characters.
-- Added SwiftUI-shaped `TextSelectability`, `View.textSelection(_:)`, and
-  drag-based range selection for static `Text` and editable text controls.
+- Added SwiftUI-shaped `TextSelectability`, `View.textSelection(_:)`,
+  `TextSelectionNavigationBehavior`,
+  `EnvironmentValues.textSelectionNavigationBehavior`,
+  `View.textSelectionNavigationBehavior(_:)`, and drag-based range selection
+  for static `Text` and editable text controls.
 - Added `AnyShapeStyle`, optional
   `EnvironmentValues.textSelectionForegroundStyle`, and
   `View.textSelectionForegroundStyle(_:)` for overriding selected text while
@@ -24,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its background, while `.tint(nil)` clears selection and link tint.
 - Changed editable text dragging from caret-only movement to range selection,
   with selection replacement, range deletion, and Shift-modified navigation.
+  iOS, macOS, tvOS, visionOS, and watchOS resolve the first Shift navigation
+  from its command direction by default, while other platforms continue from
+  the drag endpoint.
 - Changed attributed links so pointer dragging selects text and cancels link or
   tap activation, while a pointer click without movement still opens the link.
 
