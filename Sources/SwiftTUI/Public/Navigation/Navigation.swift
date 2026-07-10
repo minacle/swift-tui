@@ -1190,12 +1190,16 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        guard var block = ViewResolver.block(
-            from: label,
-            in: proposal,
-            path: path + [0],
-            runtime: runtime
-        ) else {
+        var environment = EnvironmentRenderContext.current
+        environment.isFocused = runtime?.isFocused(at: path) == true
+        guard var block = EnvironmentRenderContext.withValues(environment, perform: {
+            ViewResolver.block(
+                from: label,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            )
+        }) else {
             return nil
         }
 

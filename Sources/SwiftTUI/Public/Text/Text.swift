@@ -349,7 +349,9 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
     let lineLimit: TextLineLimit
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
+        render {
+            ViewResolver.layoutTraits(from: content)
+        }
     }
 
     func renderedBlock(
@@ -357,7 +359,7 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        TextLineLimitContext.withLineLimit(lineLimit) {
+        render {
             ViewResolver.block(
                 from: content,
                 in: proposal,
@@ -372,7 +374,7 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        TextLineLimitContext.withLineLimit(lineLimit) {
+        render {
             ViewResolver.element(
                 from: content,
                 in: proposal,
@@ -380,6 +382,12 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
                 runtime: runtime
             )
         }
+    }
+
+    private func render<Value>(_ operation: () -> Value) -> Value {
+        var environment = EnvironmentRenderContext.current
+        environment.textLineLimit = lineLimit
+        return EnvironmentRenderContext.withValues(environment, perform: operation)
     }
 }
 
@@ -659,6 +667,25 @@ public extension View {
     }
 }
 
+public extension EnvironmentValues {
+
+    /// The maximum number of terminal rows that text can occupy.
+    ///
+    /// A value less than one is treated as one. The default value is `nil`,
+    /// which allows text to use as many rows as it needs.
+    nonisolated var lineLimit: Int? {
+        get {
+            textLineLimit.number
+        }
+        set {
+            textLineLimit = TextLineLimit(
+                number: newValue.map { max(1, $0) },
+                reservesSpace: false
+            )
+        }
+    }
+}
+
 extension EnvironmentValues {
 
     var textStyle: TextStyle {
@@ -678,6 +705,15 @@ extension EnvironmentValues {
             self[TintKey.self] = newValue
         }
     }
+
+    nonisolated var textLineLimit: TextLineLimit {
+        get {
+            self[TextLineLimitKey.self]
+        }
+        set {
+            self[TextLineLimitKey.self] = newValue
+        }
+    }
 }
 
 private struct TextStyleKey: EnvironmentKey {
@@ -690,24 +726,10 @@ private struct TintKey: EnvironmentKey {
     nonisolated static let defaultValue: AnyColor? = AnyColor(Color16.blue)
 }
 
-enum TextLineLimitContext {
+private struct TextLineLimitKey: EnvironmentKey {
 
-    @TaskLocal
-    private static var taskCurrent = TextLineLimit(
+    nonisolated static let defaultValue = TextLineLimit(
         number: nil,
         reservesSpace: false
     )
-
-    static var current: TextLineLimit {
-        taskCurrent
-    }
-
-    static func withLineLimit<Value>(
-        _ lineLimit: TextLineLimit,
-        perform operation: () -> Value
-    ) -> Value {
-        $taskCurrent.withValue(lineLimit) {
-            return operation()
-        }
-    }
 }

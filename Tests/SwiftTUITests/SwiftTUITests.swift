@@ -1057,6 +1057,31 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     #expect(block?.lines == ["Hello", "     ", "     "])
 }
 
+@Test func lineLimitEnvironmentDefaultsToNil() {
+    #expect(EnvironmentValues().lineLimit == nil)
+    #expect(ViewResolver.text(from: LineLimitEnvironmentMarkerText()) == "nil")
+}
+
+@Test func lineLimitModifierUpdatesDescendantEnvironmentSnapshot() {
+    let view = LineLimitEnvironmentMarkerText()
+        .lineLimit(2)
+
+    #expect(ViewResolver.text(from: view) == "2")
+}
+
+@Test func directLineLimitEnvironmentClampsValuesBelowOne() {
+    var environment = EnvironmentValues()
+    environment.lineLimit = 0
+
+    let block = ViewResolver.block(
+        from: Text("Alpha beta").environment(\.lineLimit, Optional(0)),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(environment.lineLimit == 1)
+    #expect(block?.lines == ["Al..."])
+}
+
 @Test func lineLimitAppliesThroughViewTree() {
     let view = VStack(alignment: .leading) {
         Text("Alpha beta gamma")
@@ -7797,6 +7822,71 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(probe.field == .first)
 }
 
+@Test func isFocusedEnvironmentDefaultsToFalse() {
+    #expect(!EnvironmentValues().isFocused)
+    #expect(ViewResolver.text(from: IsFocusedEnvironmentMarkerText()) == "unfocused")
+}
+
+@Test func focusedModifierUpdatesDescendantEnvironmentSnapshot() {
+    let runtime = StateRuntime()
+    let probe = FocusBindingProbe<Bool>()
+    let view = FocusedEnvironmentMarkerView(probe: probe)
+
+    #expect(runtime.block(from: view)?.text == "unfocused")
+
+    probe.binding?.wrappedValue = true
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "focused")
+
+    probe.binding?.wrappedValue = false
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "focused")
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "unfocused")
+}
+
+@Test func nearestFocusableAncestorOverridesFocusedEnvironment() {
+    let runtime = StateRuntime()
+
+    #expect(runtime.block(from: NestedFocusableEnvironmentMarkerView())?.text == "unfocused")
+}
+
+@Test func focusedButtonInjectsIsFocusedIntoItsLabel() {
+    let runtime = StateRuntime()
+    let view = FocusableEnvironmentButton()
+
+    #expect(runtime.block(from: view)?.text == "unfocused")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "focused")
+}
+
+@Test func focusedTextFieldInjectsIsFocusedIntoItsLabel() {
+    let runtime = StateRuntime()
+    let view = FocusableEnvironmentTextField()
+
+    #expect(runtime.block(from: view)?.text == "unfocused")
+
+    dispatchClick(to: runtime, column: 1, row: 1)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "focused")
+}
+
+@Test func focusedNavigationLinkInjectsIsFocusedIntoItsLabel() {
+    let runtime = StateRuntime()
+    let view = FocusableEnvironmentNavigationLink()
+
+    #expect(runtime.block(from: view)?.text == "unfocused")
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "focused")
+}
+
 @Test func focusStateBindingMutationInvalidatesAndRerendersRootView() {
     let runtime = StateRuntime()
     let probe = FocusBindingProbe<Bool>()
@@ -11895,6 +11985,24 @@ private struct EnvironmentMarkerText: View {
     }
 }
 
+private struct LineLimitEnvironmentMarkerText: View {
+
+    @Environment(\.lineLimit) private var lineLimit
+
+    var body: some View {
+        Text(lineLimit.map(String.init) ?? "nil")
+    }
+}
+
+private struct IsFocusedEnvironmentMarkerText: View {
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        Text(isFocused ? "focused" : "unfocused")
+    }
+}
+
 private struct TypedEnvironmentObjectMarkerText: View {
 
     @Environment(TestObservableModel.self) private var model
@@ -13281,6 +13389,84 @@ private struct BoolFocusableThenFocusedView: View {
 
     var body: some View {
         CapturedBoolFocusableThenFocusedText(binding: $isFocused, probe: probe)
+    }
+}
+
+private struct FocusedEnvironmentMarkerView: View {
+
+    @FocusState private var isFocused: Bool
+
+    let probe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedFocusedEnvironmentMarker(
+            binding: $isFocused,
+            probe: probe
+        )
+    }
+}
+
+private struct CapturedFocusedEnvironmentMarker: View {
+
+    let binding: FocusState<Bool>.Binding
+
+    init(
+        binding: FocusState<Bool>.Binding,
+        probe: FocusBindingProbe<Bool>
+    ) {
+        self.binding = binding
+        probe.capture(binding)
+    }
+
+    var body: some View {
+        IsFocusedEnvironmentMarkerText()
+            .focused(binding)
+    }
+}
+
+private struct NestedFocusableEnvironmentMarkerView: View {
+
+    @FocusState private var isFocused = true
+
+    var body: some View {
+        VStack {
+            IsFocusedEnvironmentMarkerText()
+                .focusable()
+        }
+        .focused($isFocused)
+    }
+}
+
+private struct FocusableEnvironmentButton: View {
+
+    var body: some View {
+        Button(action: {}) {
+            IsFocusedEnvironmentMarkerText()
+        }
+    }
+}
+
+private struct FocusableEnvironmentTextField: View {
+
+    @State private var text = ""
+
+    var body: some View {
+        TextField(text: $text) {
+            IsFocusedEnvironmentMarkerText()
+        }
+    }
+}
+
+private struct FocusableEnvironmentNavigationLink: View {
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink(destination: {
+                Text("destination")
+            }) {
+                IsFocusedEnvironmentMarkerText()
+            }
+        }
     }
 }
 

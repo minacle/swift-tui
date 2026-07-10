@@ -145,6 +145,7 @@ extension Button {
         let environment = EnvironmentRenderContext.current
         var labelEnvironment = environment
         labelEnvironment.isTextSelectionEnabled = false
+        labelEnvironment.isFocused = runtime?.isFocused(at: path) == true
         guard var block = EnvironmentRenderContext.withValues(labelEnvironment, perform: {
             ViewResolver.block(
                 from: label,

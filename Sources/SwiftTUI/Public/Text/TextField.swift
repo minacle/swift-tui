@@ -389,12 +389,16 @@ private enum TextInputRenderer {
             layoutText,
             upToCharacterOffset: horizontalScrollOffset
         )
-        let displayText = displayText(
-            using: currentText,
-            layoutText: layoutText,
-            prompt: prompt,
-            label: label
-        )
+        var labelEnvironment = EnvironmentRenderContext.current
+        labelEnvironment.isFocused = isFocused
+        let displayText = EnvironmentRenderContext.withValues(labelEnvironment) {
+            displayText(
+                using: currentText,
+                layoutText: layoutText,
+                prompt: prompt,
+                label: label
+            )
+        }
         let caret: RenderedCaret? = fieldState?.selectedRange == nil
             ? renderedCaret(
                 state: fieldState,

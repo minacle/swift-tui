@@ -8,7 +8,9 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
     let isFocusable: Bool
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
+        render(isFocused: false) {
+            ViewResolver.layoutTraits(from: content)
+        }
     }
 
     func renderedBlock(
@@ -17,11 +19,16 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
         runtime: StateRuntime?
     ) -> RenderedBlock? {
         runtime?.registerFocusable(isFocusable, at: path)
-        guard var block = ViewResolver.block(
-            from: content,
-            in: proposal,
-            path: path,
-            runtime: runtime
+        guard var block = render(
+            isFocused: isFocusable && runtime?.isFocused(at: path) == true,
+            operation: {
+                ViewResolver.block(
+                    from: content,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
         ) else {
             return nil
         }
@@ -39,11 +46,16 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
         runtime: StateRuntime?
     ) -> RenderedElement? {
         runtime?.registerFocusable(isFocusable, at: path)
-        guard let element = ViewResolver.element(
-            from: content,
-            in: proposal,
-            path: path,
-            runtime: runtime
+        guard let element = render(
+            isFocused: isFocusable && runtime?.isFocused(at: path) == true,
+            operation: {
+                ViewResolver.element(
+                    from: content,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
         ) else {
             return nil
         }
@@ -54,6 +66,15 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
 
         block.focusRegions.append(RenderedFocusRegion(path: path, frame: block.bounds))
         return .block(block)
+    }
+
+    private func render<Value>(
+        isFocused: Bool,
+        operation: () -> Value
+    ) -> Value {
+        var environment = EnvironmentRenderContext.current
+        environment.isFocused = isFocused
+        return EnvironmentRenderContext.withValues(environment, perform: operation)
     }
 }
 
@@ -67,7 +88,9 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
     let attachment: any FocusAttachment
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
+        render(isFocused: false) {
+            ViewResolver.layoutTraits(from: content)
+        }
     }
 
     func renderedBlock(
@@ -77,11 +100,16 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
     ) -> RenderedBlock? {
         runtime?.registerFocusable(true, at: path)
         runtime?.registerFocusAttachment(attachment, at: path)
-        guard var block = ViewResolver.block(
-            from: content,
-            in: proposal,
-            path: path,
-            runtime: runtime
+        guard var block = render(
+            isFocused: runtime?.isFocused(at: path) == true,
+            operation: {
+                ViewResolver.block(
+                    from: content,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
         ) else {
             return nil
         }
@@ -99,11 +127,16 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
     ) -> RenderedElement? {
         runtime?.registerFocusable(true, at: path)
         runtime?.registerFocusAttachment(attachment, at: path)
-        guard let element = ViewResolver.element(
-            from: content,
-            in: proposal,
-            path: path,
-            runtime: runtime
+        guard let element = render(
+            isFocused: runtime?.isFocused(at: path) == true,
+            operation: {
+                ViewResolver.element(
+                    from: content,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
         ) else {
             return nil
         }
@@ -116,6 +149,15 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
             block.focusRegions.append(RenderedFocusRegion(path: path, frame: block.bounds))
         }
         return .block(block)
+    }
+
+    private func render<Value>(
+        isFocused: Bool,
+        operation: () -> Value
+    ) -> Value {
+        var environment = EnvironmentRenderContext.current
+        environment.isFocused = isFocused
+        return EnvironmentRenderContext.withValues(environment, perform: operation)
     }
 }
 

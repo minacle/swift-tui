@@ -207,6 +207,16 @@ public extension EnvironmentValues {
         }
     }
 
+    /// A Boolean value that indicates whether the nearest focusable ancestor has focus.
+    internal(set) nonisolated var isFocused: Bool {
+        get {
+            self[IsFocusedKey.self]
+        }
+        set {
+            self[IsFocusedKey.self] = newValue
+        }
+    }
+
     /// An action that copies text to the terminal clipboard.
     ///
     /// The default action discards text until the root app runner installs a
@@ -879,6 +889,11 @@ private struct IsEnabledKey: EnvironmentKey {
     nonisolated static var defaultValue: Bool {
         true
     }
+}
+
+private struct IsFocusedKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = false
 }
 
 private struct CopyActionKey: EnvironmentKey {

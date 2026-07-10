@@ -1362,7 +1362,7 @@ enum TextLayoutRenderer {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock {
-        let lineLimit = TextLineLimitContext.current
+        let lineLimit = EnvironmentRenderContext.current.textLineLimit
         var lines = TextSourceLine.mappedLines(for: text.content, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
 

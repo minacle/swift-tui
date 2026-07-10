@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added SwiftUI-compatible `EnvironmentValues.lineLimit` and read-only
+  `EnvironmentValues.isFocused`, with existing line-limit and focus modifiers
+  propagating their values through descendant environment snapshots.
+
 ## [0.7.0] - 2026-07-10
 
 ### Added
