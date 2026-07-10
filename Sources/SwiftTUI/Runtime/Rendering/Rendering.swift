@@ -139,7 +139,7 @@ nonisolated struct RenderedRun: Equatable, Sendable {
     }
 }
 
-nonisolated struct RenderedCursor: Equatable, Sendable {
+nonisolated struct RenderedCaret: Equatable, Sendable {
 
     var row: Int
 
@@ -311,7 +311,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     // Used only when projecting coordinate-based runs back to legacy lines.
     var paddedRows: Set<Int>
 
-    var cursor: RenderedCursor?
+    var caret: RenderedCaret?
 
     var hitRegions: [RenderedHitRegion]
 
@@ -326,7 +326,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     init(
         lines: [String],
         style: TextStyle = .plain,
-        cursor: RenderedCursor? = nil,
+        caret: RenderedCaret? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
@@ -344,7 +344,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 line.isEmpty && minimumWidth > 0 ? row : nil
             }
         )
-        self.cursor = cursor
+        self.caret = caret
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
@@ -357,7 +357,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         width: Int? = nil,
         height: Int? = nil,
         paddedRows: Set<Int> = [],
-        cursor: RenderedCursor? = nil,
+        caret: RenderedCaret? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
@@ -368,7 +368,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.minimumWidth = max(width ?? 0, 0)
         self.minimumHeight = max(height ?? 0, 0)
         self.paddedRows = paddedRows
-        self.cursor = cursor
+        self.caret = caret
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
@@ -456,7 +456,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             width: targetWidth,
             height: targetHeight,
             paddedRows: Set(0..<targetHeight),
-            cursor: framedCursor(x: x, y: y, width: targetWidth, height: targetHeight),
+            caret: framedCaret(x: x, y: y, width: targetWidth, height: targetHeight),
             hitRegions: framedHitRegions(x: x, y: y, width: targetWidth, height: targetHeight),
             scrollRegions: framedScrollRegions(x: x, y: y, width: targetWidth, height: targetHeight),
             focusRegions: framedFocusRegions(x: x, y: y, width: targetWidth, height: targetHeight),
@@ -486,8 +486,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             width: targetWidth,
             height: height + insets.vertical,
             paddedRows: Set(0..<(height + insets.vertical)),
-            cursor: cursor.map {
-                RenderedCursor(row: $0.row + insets.top, column: $0.column + insets.leading)
+            caret: caret.map {
+                RenderedCaret(row: $0.row + insets.top, column: $0.column + insets.leading)
             },
             hitRegions: hitRegions.map {
                 $0.offsetBy(x: insets.leading, y: insets.top)
@@ -519,7 +519,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                     $0 >= 0 && $0 < bounds.height
                 }
             ),
-            cursor: offsetCursor(x: x, y: y, bounds: bounds),
+            caret: offsetCaret(x: x, y: y, bounds: bounds),
             hitRegions: hitRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             },
@@ -574,7 +574,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             width: width,
             height: height,
             paddedRows: visiblePaddedRows,
-            cursor: blocks.reversed().compactMap(\.cursor).first,
+            caret: blocks.reversed().compactMap(\.caret).first,
             hitRegions: blocks.reversed().flatMap(\.hitRegions),
             scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
             focusRegions: blocks.reversed().flatMap(\.focusRegions),
@@ -583,18 +583,18 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         )
     }
 
-    private func framedCursor(
+    private func framedCaret(
         x: Int,
         y: Int,
         width targetWidth: Int,
         height targetHeight: Int
-    ) -> RenderedCursor? {
-        guard let cursor else {
+    ) -> RenderedCaret? {
+        guard let caret else {
             return nil
         }
 
-        let row = cursor.row + y
-        let column = cursor.column + x
+        let row = caret.row + y
+        let column = caret.column + x
         guard row >= 0,
               row < targetHeight,
               column >= 0,
@@ -602,16 +602,16 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             return nil
         }
 
-        return RenderedCursor(row: row, column: min(column, targetWidth - 1))
+        return RenderedCaret(row: row, column: min(column, targetWidth - 1))
     }
 
-    private func offsetCursor(x: Int, y: Int, bounds: RenderedRect) -> RenderedCursor? {
-        guard let cursor else {
+    private func offsetCaret(x: Int, y: Int, bounds: RenderedRect) -> RenderedCaret? {
+        guard let caret else {
             return nil
         }
 
-        let row = cursor.row + y
-        let column = cursor.column + x
+        let row = caret.row + y
+        let column = caret.column + x
         guard row >= bounds.y,
               row < bounds.y + bounds.height,
               column >= bounds.x,
@@ -619,7 +619,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             return nil
         }
 
-        return RenderedCursor(
+        return RenderedCaret(
             row: row - bounds.y,
             column: min(column - bounds.x, bounds.width - 1)
         )
@@ -2259,12 +2259,12 @@ enum TextRenderer {
                 }
                 return lhs.row < rhs.row
             }.map { run in
-                TerminalControl.cursorPositionSequence(
+                TerminalControl.caretPositionSequence(
                     row: frame.row + run.row,
                     column: frame.column + run.column
                 ) + styledText(for: run)
             }.joined()
-            + cursorSequence(for: block, in: frame, viewport: viewport)
+            + caretSequence(for: block, in: frame, viewport: viewport)
     }
 
     static func redraw(
@@ -2292,12 +2292,12 @@ enum TextRenderer {
         let frame = frame(for: block, in: viewport)
 
         return changedRuns(in: screen.cells, changedCells: changedCells).map { run in
-            TerminalControl.cursorPositionSequence(
+            TerminalControl.caretPositionSequence(
                 row: run.row + 1,
                 column: run.column + 1
             ) + styledText(for: run)
         }.joined()
-            + cursorSequence(for: block, in: frame, viewport: viewport)
+            + caretSequence(for: block, in: frame, viewport: viewport)
     }
 
     private static func changedCells(
@@ -2419,19 +2419,19 @@ enum TextRenderer {
             + TerminalControl.resetSGRSequence(for: run.style)
     }
 
-    private static func cursorSequence(
+    private static func caretSequence(
         for block: RenderedBlock,
         in frame: TextFrame,
         viewport: TerminalViewportSize
     ) -> String {
-        guard let cursor = block.cursor else {
-            return TerminalControl.hideCursorSequence
+        guard let caret = block.caret else {
+            return TerminalControl.hideCaretSequence
         }
 
-        let row = min(max(frame.row + cursor.row, 1), viewport.rows)
-        let column = min(max(frame.column + cursor.column, 1), viewport.columns)
-        return TerminalControl.showCursorSequence
-            + TerminalControl.cursorPositionSequence(row: row, column: column)
+        let row = min(max(frame.row + caret.row, 1), viewport.rows)
+        let column = min(max(frame.column + caret.column, 1), viewport.columns)
+        return TerminalControl.showCaretSequence
+            + TerminalControl.caretPositionSequence(row: row, column: column)
     }
 }
 
@@ -3011,7 +3011,7 @@ enum StackRenderer {
             width: width,
             height: height,
             paddedRows: paddedRows,
-            cursor: horizontalCursor(from: items, height: height, alignment: alignment),
+            caret: horizontalCaret(from: items, height: height, alignment: alignment),
             hitRegions: horizontalHitRegions(from: items, height: height, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             scrollRegions: horizontalScrollRegions(from: items, height: height, alignment: alignment)
@@ -3078,7 +3078,7 @@ enum StackRenderer {
             width: width,
             height: height,
             paddedRows: paddedRows,
-            cursor: verticalCursor(from: items, width: width, alignment: alignment),
+            caret: verticalCaret(from: items, width: width, alignment: alignment),
             hitRegions: verticalHitRegions(from: items, width: width, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             scrollRegions: verticalScrollRegions(from: items, width: width, alignment: alignment)
@@ -3441,23 +3441,23 @@ enum StackRenderer {
         }
     }
 
-    private static func horizontalCursor(
+    private static func horizontalCaret(
         from items: [HorizontalItem],
         height: Int,
         alignment: VerticalAlignment
-    ) -> RenderedCursor? {
+    ) -> RenderedCaret? {
         for item in items {
-            guard let block = item.block, let cursor = block.cursor else {
+            guard let block = item.block, let caret = block.caret else {
                 continue
             }
 
-            return RenderedCursor(
+            return RenderedCaret(
                 row: verticalOffset(
                     contentHeight: block.height,
                     containerHeight: height,
                     alignment: alignment
-                ) + cursor.row,
-                column: item.x + cursor.column
+                ) + caret.row,
+                column: item.x + caret.column
             )
         }
 
@@ -3569,23 +3569,23 @@ enum StackRenderer {
         }
     }
 
-    private static func verticalCursor(
+    private static func verticalCaret(
         from items: [VerticalItem],
         width: Int,
         alignment: HorizontalAlignment
-    ) -> RenderedCursor? {
+    ) -> RenderedCaret? {
         for item in items {
-            guard let block = item.block, let cursor = block.cursor else {
+            guard let block = item.block, let caret = block.caret else {
                 continue
             }
 
-            return RenderedCursor(
-                row: item.y + cursor.row,
+            return RenderedCaret(
+                row: item.y + caret.row,
                 column: horizontalOffset(
                     contentWidth: block.width,
                     containerWidth: width,
                     alignment: alignment
-                ) + cursor.column
+                ) + caret.column
             )
         }
 

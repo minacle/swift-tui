@@ -64,7 +64,7 @@ import Testing
     ])
 }
 
-@Test func customLayoutOffsetsCursorAndInteractionRegions() {
+@Test func customLayoutOffsetsCaretAndInteractionRegions() {
     let runtime = StateRuntime()
     let tapProbe = LayoutTapGestureProbe()
     let view = RegionOffsetLayout() {
@@ -97,9 +97,9 @@ import Testing
     ])
 }
 
-@Test func customLayoutOffsetsTextFieldCursor() {
+@Test func customLayoutOffsetsTextFieldCaret() {
     let runtime = StateRuntime()
-    let view = CursorOffsetTextFieldView()
+    let view = CaretOffsetTextFieldView()
 
     _ = runtime.block(from: view)
     _ = runtime.consumeInvalidation()
@@ -110,7 +110,7 @@ import Testing
         " Name  ",
         "       ",
     ])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func layoutPriorityIsVisibleThroughTypeErasureAndLayoutModifiers() {
@@ -327,7 +327,7 @@ private struct RegionOffsetLayout: Layout {
     }
 }
 
-private struct CursorOffsetTextFieldView: View {
+private struct CaretOffsetTextFieldView: View {
 
     @State var text = ""
 

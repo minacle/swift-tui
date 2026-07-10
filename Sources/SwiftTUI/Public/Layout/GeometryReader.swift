@@ -131,7 +131,7 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
             width: targetWidth,
             height: targetHeight,
             paddedRows: Set(0..<targetHeight),
-            cursor: frameCursor(block.cursor, width: targetWidth, height: targetHeight),
+            caret: frameCaret(block.caret, width: targetWidth, height: targetHeight),
             hitRegions: frameHitRegions(
                 block.hitRegions,
                 width: targetWidth,
@@ -155,22 +155,22 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
         )
     }
 
-    private func frameCursor(
-        _ cursor: RenderedCursor?,
+    private func frameCaret(
+        _ caret: RenderedCaret?,
         width: Int,
         height: Int
-    ) -> RenderedCursor? {
-        guard let cursor,
-              cursor.row >= 0,
-              cursor.row < height,
-              cursor.column >= 0,
-              cursor.column <= width else {
+    ) -> RenderedCaret? {
+        guard let caret,
+              caret.row >= 0,
+              caret.row < height,
+              caret.column >= 0,
+              caret.column <= width else {
             return nil
         }
 
-        return RenderedCursor(
-            row: cursor.row,
-            column: min(cursor.column, width - 1)
+        return RenderedCaret(
+            row: caret.row,
+            column: min(caret.column, width - 1)
         )
     }
 

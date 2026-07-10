@@ -161,7 +161,7 @@ private extension RenderedBlock {
             width: width,
             height: height,
             paddedRows: Set(0..<height),
-            cursor: cursor,
+            caret: caret,
             hitRegions: hitRegions,
             scrollRegions: scrollRegions,
             focusRegions: focusRegions,

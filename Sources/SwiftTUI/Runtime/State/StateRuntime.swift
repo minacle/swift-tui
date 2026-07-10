@@ -574,17 +574,17 @@ final class StateRuntime {
     }
 
     func textFieldState(at path: [Int], initialText: String) -> TextFieldState {
-        if let cursor = textFieldStates[path] {
-            return cursor
+        if let state = textFieldStates[path] {
+            return state
         }
 
-        let cursor = TextFieldState(initialText: initialText) {
+        let state = TextFieldState(initialText: initialText) {
             [weak self] in
 
             self?.invalidated = true
         }
-        textFieldStates[path] = cursor
-        return cursor
+        textFieldStates[path] = state
+        return state
     }
 
     func textEditorState(at path: [Int], initialText: String) -> TextEditorState {

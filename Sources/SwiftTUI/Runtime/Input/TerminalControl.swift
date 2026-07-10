@@ -35,9 +35,9 @@ enum TerminalControl {
 
     static let clearScreenSequence = "\u{001B}[2J"
 
-    static let hideCursorSequence = "\u{001B}[?25l"
+    static let hideCaretSequence = "\u{001B}[?25l"
 
-    static let showCursorSequence = "\u{001B}[?25h"
+    static let showCaretSequence = "\u{001B}[?25h"
 
     static let enterAlternateScreenSequence = "\u{001B}[?1049h"
 
@@ -47,7 +47,7 @@ enum TerminalControl {
 
     static let disablePointerTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
 
-    static func cursorPositionSequence(row: Int, column: Int) -> String {
+    static func caretPositionSequence(row: Int, column: Int) -> String {
         "\u{001B}[\(max(row, 1));\(max(column, 1))H"
     }
 
@@ -500,7 +500,7 @@ final class TerminalSession {
         previousWindowChangeHandler = signal(SIGWINCH, handleTerminalWindowChangeSignal)
         TerminalControl.write(TerminalControl.enterAlternateScreenSequence)
         TerminalControl.write(TerminalControl.enablePointerTrackingSequence)
-        TerminalControl.write(TerminalControl.hideCursorSequence)
+        TerminalControl.write(TerminalControl.hideCaretSequence)
         isActive = true
     }
 
@@ -514,7 +514,7 @@ final class TerminalSession {
             _ = signal(SIGWINCH, previousWindowChangeHandler)
             self.previousWindowChangeHandler = nil
         }
-        TerminalControl.write(TerminalControl.showCursorSequence)
+        TerminalControl.write(TerminalControl.showCaretSequence)
         TerminalControl.write(TerminalControl.disablePointerTrackingSequence)
         TerminalControl.write(TerminalControl.exitAlternateScreenSequence)
         isActive = false

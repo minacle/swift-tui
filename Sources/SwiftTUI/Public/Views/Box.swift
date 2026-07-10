@@ -279,7 +279,7 @@ enum BoxRenderer {
             width: width,
             height: height,
             paddedRows: Set(0..<height),
-            cursor: clippedContent?.cursor,
+            caret: clippedContent?.caret,
             hitRegions: clippedContent?.hitRegions ?? [],
             scrollRegions: clippedContent?.scrollRegions ?? [],
             focusRegions: clippedContent?.focusRegions ?? [],

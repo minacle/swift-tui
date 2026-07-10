@@ -1276,7 +1276,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(block?.text == "mayu ")
     #expect(block?.width == 5)
-    #expect(block?.cursor == nil)
+    #expect(block?.caret == nil)
 }
 
 @Test func textFieldDisplayTextInheritsTextStyle() {
@@ -1416,7 +1416,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.text == "Password")
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "Password")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "e", characters: "e")) == .handled)
@@ -1424,7 +1424,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     #expect(probe.binding?.wrappedValue == "sec")
     #expect(runtime.block(from: view)?.text == "••• ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 3))
 
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "r", characters: "r")) == .handled)
@@ -1432,7 +1432,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     #expect(probe.binding?.wrappedValue == "sec")
     #expect(runtime.block(from: view)?.text == "••• ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 }
 
 @Test func clickingSecureFieldMovesCaretWithinMaskedText() {
@@ -1464,7 +1464,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(probe.binding?.wrappedValue == "seXcret")
     #expect(runtime.block(from: view)?.text == "••••••• ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 3))
 }
 
 @Test func draggingSecureFieldMovesCaretWithinMaskedText() {
@@ -1503,16 +1503,16 @@ private func lineBreakKinds(in text: String) -> [String] {
         ),
         RenderedRun(text: "•••", column: 3),
     ])
-    #expect(runtime.block(from: view)?.cursor == nil)
+    #expect(runtime.block(from: view)?.caret == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
     #expect(probe.binding?.wrappedValue == "Xret")
     #expect(runtime.block(from: view)?.text == "•••• ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 }
 
-@Test func focusedSecureFieldUsesMaskedColumnWidthForCursorAndScroll() {
+@Test func focusedSecureFieldUsesMaskedColumnWidthForCaretAndScroll() {
     let runtime = StateRuntime()
     let view = SecureFieldInitialTextView(text: "한ABC")
         .frame(width: 3)
@@ -1522,12 +1522,12 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["•• "])
-    #expect(block?.cursor == RenderedCursor(column: 2))
+    #expect(block?.caret == RenderedCaret(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .home, characters: "\u{F729}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["•••"])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 0))
 }
 
 @Test func submittingSecureFieldWithReturnKey() {
@@ -1542,7 +1542,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["• ", "s "])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 }
 
 @Test func flexibleSecureFieldTakesRemainingColumnsBeforeSpacer() {
@@ -1567,19 +1567,19 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.block(from: view)?.text == "Name")
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "Name")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "a ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: "c", characters: "c", modifiers: .control)) == .ignored)
     #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "a ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 }
 
 @Test func focusedEmptyTextFieldPlaceholderDoesNotReserveTrailingCaretCell() {
@@ -1592,7 +1592,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(block?.lines == ["Placeholder"])
     #expect(block?.width == 11)
-    #expect(block?.cursor == RenderedCursor(column: 0))
+    #expect(block?.caret == RenderedCaret(column: 0))
 }
 
 @Test func disabledTextFieldIgnoresFocusAndTyping() {
@@ -1623,22 +1623,22 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "ab ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "ab ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "acb ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "acb ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 3))
 }
 
 @Test func shiftArrowsSelectAndReplaceTextFieldRange() {
@@ -1663,7 +1663,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.text == "abX ")
-    #expect(block?.cursor == RenderedCursor(column: 3))
+    #expect(block?.caret == RenderedCaret(column: 3))
 }
 
 @Test func unmodifiedArrowCollapsesTextFieldSelection() {
@@ -1705,10 +1705,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{0008}")) == .handled)
 
     #expect(runtime.block(from: view)?.text == "ab ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 }
 
-@Test func focusedTextFieldCursorComposesThroughStacks() {
+@Test func focusedTextFieldCaretComposesThroughStacks() {
     let runtime = StateRuntime()
     let view = LabeledTextFieldEditingView()
 
@@ -1717,10 +1717,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["Label: Name"])
-    #expect(block?.cursor == RenderedCursor(column: 7))
+    #expect(block?.caret == RenderedCaret(column: 7))
 }
 
-@Test func focusedTextFieldCursorUsesTerminalColumnWidth() {
+@Test func focusedTextFieldCaretUsesTerminalColumnWidth() {
     let runtime = StateRuntime()
     let view = TextFieldEditingView()
 
@@ -1732,7 +1732,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "A", characters: "A")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "한A ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 3))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 3))
 }
 
 @Test func focusedTextFieldScrollsHorizontallyToKeepCaretVisible() {
@@ -1753,14 +1753,14 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["cd "])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["bcd"])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 0))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 0))
 }
 
 @Test func focusedTextFieldScrollsWideTextByTerminalColumns() {
@@ -1776,7 +1776,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: "B", characters: "B")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["AB "])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 2))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
 }
 
 @Test func focusedTextFieldDoesNotScrollExactWideTextFit() {
@@ -1790,10 +1790,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == [text])
-    #expect(block?.cursor == RenderedCursor(column: 31))
+    #expect(block?.caret == RenderedCaret(column: 31))
 }
 
-@Test func fixedSizeTextFieldRightBoundaryCursorDoesNotEnterTrailingSibling() {
+@Test func fixedSizeTextFieldRightBoundaryCaretDoesNotEnterTrailingSibling() {
     let runtime = StateRuntime()
     let view = ExactFitDelimitedFixedSizeTextFieldView()
 
@@ -1808,7 +1808,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["[abc ]"])
-    #expect(block?.cursor == RenderedCursor(column: 4))
+    #expect(block?.caret == RenderedCaret(column: 4))
 }
 
 @Test func focusedTextFieldScrollsRightWhenNextWideCharacterIsHidden() {
@@ -1830,7 +1830,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["ㄴㄷㄹ"])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 4))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 4))
 }
 
 @Test func focusedTextFieldDeletionDoesNotScrollIntoWideCharacterMiddle() {
@@ -1848,7 +1848,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.lines == ["ㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅃ  "])
-    #expect(block?.cursor == RenderedCursor(column: 30))
+    #expect(block?.caret == RenderedCaret(column: 30))
 }
 
 @Test func framedTextFieldInsertionAtTrailingCaretScrollsBeforeTrailingSibling() {
@@ -1865,7 +1865,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["[CDEFGHIJKLMNOPQRSTUVWXYZabcdefg ]"])
-    #expect(block?.cursor == RenderedCursor(column: 32))
+    #expect(block?.caret == RenderedCaret(column: 32))
 }
 
 @Test func flexibleTextFieldWideScrollStabilizesAfterMeasurementRender() {
@@ -1954,7 +1954,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .ignored)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "a ")
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 }
 
 @Test func clickingTextFieldMovesCaretToClickedColumn() {
@@ -1975,7 +1975,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.text == "abXcd ")
-    #expect(block?.cursor == RenderedCursor(column: 3))
+    #expect(block?.caret == RenderedCaret(column: 3))
 }
 
 @Test func clickingTextFieldTrailingCaretCellMovesCaretToEnd() {
@@ -1992,7 +1992,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     var block = runtime.block(from: view)
     #expect(block?.lines == ["[abc ]"])
-    #expect(block?.cursor == RenderedCursor(column: 3))
+    #expect(block?.caret == RenderedCaret(column: 3))
 
     #expect(
         runtime.dispatch(
@@ -2004,7 +2004,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view)
     #expect(block?.lines == ["[abcX ]"])
-    #expect(block?.cursor == RenderedCursor(column: 5))
+    #expect(block?.caret == RenderedCaret(column: 5))
 }
 
 @Test func draggingTextFieldMovesCaretToPointerColumn() {
@@ -2025,13 +2025,13 @@ private func lineBreakKinds(in text: String) -> [String] {
             PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
         ) == .handled
     )
-    #expect(runtime.block(from: view)?.cursor == nil)
+    #expect(runtime.block(from: view)?.caret == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view)
     #expect(block?.text == "Xd ")
-    #expect(block?.cursor == RenderedCursor(column: 1))
+    #expect(block?.caret == RenderedCaret(column: 1))
 }
 
 @Test func draggingTextFieldOutsideFrameScrollsToCaret() {
@@ -2041,7 +2041,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view) <= 3)
     var block = runtime.block(from: view)
     #expect(block?.lines == ["|ef "])
-    #expect(block?.cursor == RenderedCursor(column: 3))
+    #expect(block?.caret == RenderedCaret(column: 3))
 
     #expect(
         runtime.dispatch(
@@ -2057,7 +2057,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view)
     #expect(block?.lines == ["|def"])
-    #expect(block?.cursor == nil)
+    #expect(block?.caret == nil)
 }
 
 @Test func textFieldPointerMotionWithoutPressDoesNotMoveCaret() {
@@ -2078,7 +2078,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.text == "abcdX ")
-    #expect(block?.cursor == RenderedCursor(column: 5))
+    #expect(block?.caret == RenderedCaret(column: 5))
 }
 
 @Test func textFieldPointerUpEndsCaretDrag() {
@@ -2109,7 +2109,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.text == "Xabcd ")
-    #expect(block?.cursor == RenderedCursor(column: 1))
+    #expect(block?.caret == RenderedCaret(column: 1))
 }
 
 @Test func clickingScrolledWideTextFieldMovesCaretByTerminalColumns() {
@@ -2121,7 +2121,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     var block = runtime.block(from: view)
     #expect(block?.lines == ["BC "])
-    #expect(block?.cursor == RenderedCursor(column: 2))
+    #expect(block?.caret == RenderedCaret(column: 2))
 
     #expect(
         runtime.dispatch(
@@ -2133,7 +2133,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view)
     #expect(block?.lines == ["BXC"])
-    #expect(block?.cursor == RenderedCursor(column: 2))
+    #expect(block?.caret == RenderedCaret(column: 2))
 }
 
 @Test func clickingTextFieldMovesFocusAndSubsequentTyping() {
@@ -2189,10 +2189,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.lines == ["a ", "a "])
-    #expect(runtime.block(from: view)?.cursor == RenderedCursor(column: 1))
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
 }
 
-@Test func emptyTextEditorRendersFocusableRowsAndCursor() {
+@Test func emptyTextEditorRendersFocusableRowsAndCaret() {
     let runtime = StateRuntime()
     let view = TextEditorEditingView()
 
@@ -2201,7 +2201,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view, in: RenderProposal(columns: 5, rows: 2))
 
     #expect(block?.lines == ["     ", "     "])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 0))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 0))
     #expect(block?.focusRegions.map(\.frame) == [
         RenderedRect(x: 0, y: 0, width: 5, height: 2),
     ])
@@ -2222,7 +2222,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.lines == ["a", "b"])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func shiftHomeSelectsAndReplacesTextEditorLineSuffix() {
@@ -2243,7 +2243,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["ab  ", "X   "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func textEditorReturnReplacesSelectionAndExternalChangesClearIt() {
@@ -2292,7 +2292,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["ab  ", "cXd "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 2))
 }
 
 @Test func draggingTextEditorMovesCaretToPointerLineAndColumn() {
@@ -2314,13 +2314,13 @@ private func lineBreakKinds(in text: String) -> [String] {
             PointerEvent(button: .left, column: 3, row: 2, phase: .motion)
         ) == .handled
     )
-    #expect(runtime.block(from: view, in: proposal)?.cursor == nil)
+    #expect(runtime.block(from: view, in: proposal)?.caret == nil)
     #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
     #expect(runtime.consumeInvalidation())
 
     let block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["X   "])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 1))
 }
 
 @Test func draggingTextEditorOutsideFrameScrollsToCaret() {
@@ -2331,7 +2331,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     var block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["top ", "c   ", "d   "])
-    #expect(block?.cursor == RenderedCursor(row: 2, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 2, column: 1))
 
     #expect(
         runtime.dispatch(
@@ -2347,7 +2347,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["top ", "b   ", "c   "])
-    #expect(block?.cursor == nil)
+    #expect(block?.caret == nil)
 }
 
 @Test func clickingScrolledTextEditorMovesCaretThroughScrollPoint() {
@@ -2358,7 +2358,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     var block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["c  ", "d  "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 
     #expect(
         runtime.dispatch(
@@ -2370,7 +2370,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["cX ", "d  "])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 2))
 }
 
 @Test func disabledTextEditorIgnoresFocusAndTyping() {
@@ -2402,7 +2402,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.lines == ["    ", "    ", "none"])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 0))
 }
 
 @Test func focusedTextEditorDeletionWorksAcrossLineBoundaries() {
@@ -2420,7 +2420,7 @@ private func lineBreakKinds(in text: String) -> [String] {
 
     let block = runtime.block(from: view)
     #expect(block?.lines == ["ab"])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 2))
 }
 
 @Test func focusedTextEditorMovesCaretAcrossVisualLines() {
@@ -2431,24 +2431,24 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     var block = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(block?.lines == ["abc", "de "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .upArrow, characters: "\u{F700}")) == .handled)
     #expect(runtime.consumeInvalidation())
     block = runtime.block(from: view, in: RenderProposal(columns: 3))
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: .home, characters: "\u{F729}")) == .handled)
     #expect(runtime.consumeInvalidation())
     block = runtime.block(from: view, in: RenderProposal(columns: 3))
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 0))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .handled)
     #expect(runtime.consumeInvalidation())
     block = runtime.block(from: view, in: RenderProposal(columns: 3))
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 2))
 }
 
 @Test func focusedTextEditorMovesCaretToNextRowWhenLineExactlyFilled() {
@@ -2468,13 +2468,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     var block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["abc", "   "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "d", characters: "d")) == .handled)
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     block = runtime.block(from: view, in: proposal)
     #expect(block?.lines == ["abc", "d  "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func focusedTextEditorPreservesTrailingSpacesWhenTheyWrapPastLineEnd() {
@@ -2490,7 +2490,7 @@ private func lineBreakKinds(in text: String) -> [String] {
         line + " ",
         String(repeating: " ", count: 28),
     ])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func focusedTextEditorPreservesTrailingSpacesBeforeNextWrappedCharacter() {
@@ -2506,10 +2506,10 @@ private func lineBreakKinds(in text: String) -> [String] {
         line + " ",
         " a" + String(repeating: " ", count: 26),
     ])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 2))
 }
 
-@Test func focusedTextEditorCursorUsesTerminalColumnWidth() {
+@Test func focusedTextEditorCaretUsesTerminalColumnWidth() {
     let runtime = StateRuntime()
     let view = TextEditorEditingView()
 
@@ -2523,7 +2523,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["한A"])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 3))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 3))
 }
 
 @Test func focusedTextEditorScrollsVerticallyToKeepCaretVisible() {
@@ -2535,7 +2535,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
 
     #expect(block?.lines == ["c  ", "d  "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func focusedTextEditorKeepsEditingAfterReturnAtViewportBottom() {
@@ -2550,19 +2550,19 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     let bottomBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
-    #expect(bottomBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(bottomBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     let scrolledBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
     #expect(scrolledBlock?.lines == ["   ", "   "])
-    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(scrolledBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
     #expect(editedBlock?.lines == ["   ", "b  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func framedTextEditorKeepsEditingAfterReturnAtFrameBottom() {
@@ -2579,13 +2579,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     let scrolledBlock = runtime.block(from: view)
     #expect(scrolledBlock?.lines == ["   ", "   "])
-    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(scrolledBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view)
     #expect(editedBlock?.lines == ["   ", "b  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func maxHeightFramedTextEditorKeepsEditingAfterReturnAtFrameBottom() {
@@ -2596,7 +2596,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     let initialBlock = runtime.block(from: view)
     #expect(initialBlock?.lines == ["   "])
-    #expect(initialBlock?.cursor == RenderedCursor(row: 0, column: 0))
+    #expect(initialBlock?.caret == RenderedCaret(row: 0, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
@@ -2604,13 +2604,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     let scrolledBlock = runtime.block(from: view)
     #expect(scrolledBlock?.lines == ["   ", "   "])
-    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(scrolledBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view)
     #expect(editedBlock?.lines == ["   ", "b  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func maxHeightOnlyTextEditorAcceptsTyping() {
@@ -2621,13 +2621,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     let initialBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(initialBlock?.lines == ["   "])
-    #expect(initialBlock?.cursor == RenderedCursor(row: 0, column: 0))
+    #expect(initialBlock?.caret == RenderedCaret(row: 0, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(editedBlock?.lines == ["a  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 0, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 0, column: 1))
 }
 
 @Test func maxHeightOnlyTextEditorAcceptsTypingAfterClickFocus() {
@@ -2647,7 +2647,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 3))
     #expect(editedBlock?.lines == ["a  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 0, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 0, column: 1))
 }
 
 @Test func maxHeightConstantTextEditorBelowScrollViewAcceptsTypingAfterClickFocus() {
@@ -2667,7 +2667,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     let editedBlock = runtime.block(from: view, in: proposal)
     #expect(editedBlock?.lines.suffix(2) == ["│a     │", "└──────┘"])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 4, column: 2))
+    #expect(editedBlock?.caret == RenderedCaret(row: 4, column: 2))
 }
 
 @Test func maxHeightConstantTextEditorBelowScrollViewAcceptsTypingAfterClickFocusInTallViewport() {
@@ -2690,7 +2690,7 @@ private func lineBreakKinds(in text: String) -> [String] {
         "│a                                                                             │",
         "└──────────────────────────────────────────────────────────────────────────────┘"
     ])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 22, column: 2))
+    #expect(editedBlock?.caret == RenderedCaret(row: 22, column: 2))
 }
 
 @Test func maxHeightConstantTextEditorBelowScrollViewKeepsPriorLineVisibleAfterReturns() {
@@ -2756,19 +2756,19 @@ private func lineBreakKinds(in text: String) -> [String] {
     _ = runtime.consumeInvalidation()
     let initialBlock = runtime.block(from: view)
     #expect(initialBlock?.lines == ["def", "   "])
-    #expect(initialBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(initialBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     let scrolledBlock = runtime.block(from: view)
     #expect(scrolledBlock?.lines == ["def", "   "])
-    #expect(scrolledBlock?.cursor == RenderedCursor(row: 1, column: 0))
+    #expect(scrolledBlock?.caret == RenderedCaret(row: 1, column: 0))
 
     #expect(runtime.dispatch(KeyPress(key: "g", characters: "g")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view)
     #expect(editedBlock?.lines == ["def", "g  "])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func wrappingTextEditorKeepsEditingAfterCaretScrollsPastFrameBottom() {
@@ -2789,7 +2789,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
     let block = runtime.block(from: view)
     #expect(block?.lines == ["def", "g  "])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 1))
 }
 
 @Test func boxedTextEditorBelowScrollViewKeepsEditingAtBottom() {
@@ -2805,13 +2805,13 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(runtime.consumeInvalidation())
     let bottomBlock = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
-    #expect(bottomBlock?.cursor == RenderedCursor(row: 4, column: 1))
+    #expect(bottomBlock?.caret == RenderedCaret(row: 4, column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(runtime.consumeInvalidation())
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
     #expect(editedBlock?.lines.suffix(2) == ["│b     │", "└──────┘"])
-    #expect(editedBlock?.cursor == RenderedCursor(row: 4, column: 2))
+    #expect(editedBlock?.caret == RenderedCaret(row: 4, column: 2))
 }
 
 @Test func boxedTextEditorBelowScrollViewKeepsEditingAfterFillingVisibleRows() {
@@ -2827,17 +2827,17 @@ private func lineBreakKinds(in text: String) -> [String] {
     }
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     let bottomBlock = runtime.block(from: view, in: proposal)
-    #expect(bottomBlock?.cursor == RenderedCursor(row: 22, column: 1))
+    #expect(bottomBlock?.caret == RenderedCaret(row: 22, column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     let scrolledBlock = runtime.block(from: view, in: proposal)
-    #expect(scrolledBlock?.cursor == RenderedCursor(row: 22, column: 1))
+    #expect(scrolledBlock?.caret == RenderedCaret(row: 22, column: 1))
 
     #expect(runtime.dispatch(KeyPress(key: "b", characters: "b")) == .handled)
     #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
     let editedBlock = runtime.block(from: view, in: proposal)
-    #expect(editedBlock?.cursor == RenderedCursor(row: 22, column: 2))
+    #expect(editedBlock?.caret == RenderedCaret(row: 22, column: 2))
 }
 
 @Test func clickingTextEditorBlankAreaRequestsFocus() {
@@ -2868,10 +2868,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["x"])
-    #expect(block?.cursor == RenderedCursor(row: 0, column: 1))
+    #expect(block?.caret == RenderedCaret(row: 0, column: 1))
 }
 
-@Test func dynamicTextFieldFocusWithOptionalRowFocusShowsCursorAndEdits() {
+@Test func dynamicTextFieldFocusWithOptionalRowFocusShowsCaretAndEdits() {
     let runtime = StateRuntime()
     let view = DynamicTextFieldFocusWithOptionalRowFocusView()
 
@@ -2883,17 +2883,17 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let editorBlock = runtime.block(from: view, in: RenderProposal(columns: 20, rows: 3))
-    #expect(editorBlock?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(editorBlock?.caret == RenderedCaret(row: 1, column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.consumeInvalidation())
 
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 20, rows: 3))
     #expect(editedBlock?.lines.dropFirst().first?.hasPrefix("> a") == true)
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 3))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 3))
 }
 
-@Test func dynamicTextFieldFocusInsideVerticalScrollViewShowsCursorAndEdits() {
+@Test func dynamicTextFieldFocusInsideVerticalScrollViewShowsCaretAndEdits() {
     let runtime = StateRuntime()
     let view = ScrollWrappedDynamicTextFieldFocusView()
 
@@ -2905,14 +2905,14 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(runtime.consumeInvalidation())
 
     let editorBlock = runtime.block(from: view, in: RenderProposal(columns: 20, rows: 3))
-    #expect(editorBlock?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(editorBlock?.caret == RenderedCaret(row: 1, column: 2))
 
     #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
     #expect(runtime.consumeInvalidation())
 
     let editedBlock = runtime.block(from: view, in: RenderProposal(columns: 20, rows: 3))
     #expect(editedBlock?.lines.dropFirst().first?.hasPrefix("> a") == true)
-    #expect(editedBlock?.cursor == RenderedCursor(row: 1, column: 3))
+    #expect(editedBlock?.caret == RenderedCaret(row: 1, column: 3))
 }
 
 @Test func compositeViewResolvesToTextBody() {
@@ -3287,7 +3287,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.width == 1)
     #expect(block?.height == 1)
     #expect(block?.runs == [])
-    #expect(block?.cursor == nil)
+    #expect(block?.caret == nil)
     #expect(block?.hitRegions == [])
     #expect(block?.scrollRegions == [])
     #expect(block?.focusRegions == [])
@@ -4626,7 +4626,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(block?.lines == ["      ", " 4x1  ", "      "])
 }
 
-@Test func paddingOffsetsCursor() {
+@Test func paddingOffsetsCaret() {
     let runtime = StateRuntime()
     let view = TextFieldEditingView()
         .padding(EdgeInsets(top: 1, leading: 2, bottom: 0, trailing: 0))
@@ -4636,7 +4636,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
 
     #expect(block?.lines == ["      ", "  Name"])
-    #expect(block?.cursor == RenderedCursor(row: 1, column: 2))
+    #expect(block?.caret == RenderedCaret(row: 1, column: 2))
 }
 
 @Test func paddingOffsetsHitRegions() {
@@ -4974,7 +4974,7 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(frame == TextFrame(text: "Hello", row: 120, column: 198))
 }
 
-@Test func screenOutputClearsAndMovesCursorBeforeText() {
+@Test func screenOutputClearsAndMovesCaretBeforeText() {
     let output = TextRenderer.screen(
         for: "Hello",
         in: TerminalViewportSize(columns: 10, rows: 5)
@@ -5222,9 +5222,9 @@ private func lineBreakKinds(in text: String) -> [String] {
     )
 }
 
-@Test func screenOutputShowsAndPositionsRenderedCursor() {
+@Test func screenOutputShowsAndPositionsRenderedCaret() {
     let output = TextRenderer.screen(
-        for: RenderedBlock(lines: ["Hello"], cursor: RenderedCursor(column: 2)),
+        for: RenderedBlock(lines: ["Hello"], caret: RenderedCaret(column: 2)),
         in: TerminalViewportSize(columns: 10, rows: 5)
     )
 
@@ -5256,9 +5256,9 @@ private func lineBreakKinds(in text: String) -> [String] {
     )
 }
 
-@Test func screenOutputPositionsRenderedCursorAfterWideText() {
+@Test func screenOutputPositionsRenderedCaretAfterWideText() {
     let output = TextRenderer.screen(
-        for: RenderedBlock(lines: ["한A"], cursor: RenderedCursor(column: 3)),
+        for: RenderedBlock(lines: ["한A"], caret: RenderedCaret(column: 3)),
         in: TerminalViewportSize(columns: 10, rows: 5)
     )
 
@@ -5295,10 +5295,10 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(output == "\u{001B}[1;1H\u{001B}[1m\u{001B}[34mA\u{001B}[22m\u{001B}[39m\u{001B}[?25l")
 }
 
-@Test func screenOutputDiffCanMoveOnlyCursor() {
+@Test func screenOutputDiffCanMoveOnlyCaret() {
     let output = TextRenderer.diff(
-        from: RenderedBlock(lines: ["A"], cursor: RenderedCursor(column: 0)),
-        to: RenderedBlock(lines: ["A"], cursor: RenderedCursor(column: 1)),
+        from: RenderedBlock(lines: ["A"], caret: RenderedCaret(column: 0)),
+        to: RenderedBlock(lines: ["A"], caret: RenderedCaret(column: 1)),
         in: TerminalViewportSize(columns: 2, rows: 1)
     )
 
@@ -5359,8 +5359,8 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func terminalSessionSequencesAreStable() {
     #expect(TerminalControl.enterAlternateScreenSequence == "\u{001B}[?1049h")
-    #expect(TerminalControl.hideCursorSequence == "\u{001B}[?25l")
-    #expect(TerminalControl.showCursorSequence == "\u{001B}[?25h")
+    #expect(TerminalControl.hideCaretSequence == "\u{001B}[?25l")
+    #expect(TerminalControl.showCaretSequence == "\u{001B}[?25h")
     #expect(TerminalControl.exitAlternateScreenSequence == "\u{001B}[?1049l")
     #expect(TerminalControl.enablePointerTrackingSequence == "\u{001B}[?1003h\u{001B}[?1006h")
     #expect(TerminalControl.disablePointerTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")

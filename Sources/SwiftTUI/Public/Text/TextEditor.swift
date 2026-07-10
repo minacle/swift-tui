@@ -4,7 +4,7 @@ import Terminal
 /// A control that displays editable multi-line text in the terminal.
 ///
 /// `TextEditor` binds its editable string to a source of truth, renders text
-/// across terminal rows, scrolls to keep the caret visible, and shows a cursor
+/// across terminal rows, scrolls to keep the caret visible, and shows a caret
 /// while focused.
 public nonisolated struct TextEditor: View, TextEditorRenderable, LayoutTraitRenderable {
 
@@ -95,10 +95,10 @@ extension TextEditor {
 
         let currentText = editorState?.text ?? text.wrappedValue
         let layout = TextEditorLayout(text: currentText, maxWidth: proposal?.columns)
-        let cursor = renderedCursor(state: editorState, layout: layout, runtime: runtime, path: path)
+        let caret = renderedCaret(state: editorState, layout: layout, runtime: runtime, path: path)
         if updatesInteractiveState {
             editorState?.updateScrollPoint(
-                for: cursor,
+                for: caret,
                 viewportWidth: proposal?.columns,
                 viewportHeight: proposal?.rows,
                 contentWidth: layout.width,
@@ -107,7 +107,7 @@ extension TextEditor {
         }
 
         let environment = EnvironmentRenderContext.current
-        let visibleCursor = editorState?.selectedRange == nil ? cursor : nil
+        let visibleCaret = editorState?.selectedRange == nil ? caret : nil
         let content = RenderedBlock(
             runs: layout.lines.enumerated().flatMap { row, line in
                 TextSelectionRenderer.runs(
@@ -123,7 +123,7 @@ extension TextEditor {
             width: layout.width,
             height: layout.height,
             paddedRows: Set(0..<layout.height),
-            cursor: visibleCursor
+            caret: visibleCaret
         )
 
         var block = ScrollViewRenderer.render(
@@ -136,17 +136,17 @@ extension TextEditor {
         return block
     }
 
-    private func renderedCursor(
+    private func renderedCaret(
         state: TextEditorState?,
         layout: TextEditorLayout,
         runtime: StateRuntime?,
         path: [Int]
-    ) -> RenderedCursor? {
+    ) -> RenderedCaret? {
         guard runtime?.isFocused(at: path) == true, let state else {
             return nil
         }
 
-        return layout.cursor(at: state.offset)
+        return layout.caret(at: state.offset)
     }
 
     private func handle(
@@ -378,24 +378,24 @@ final class TextEditorState {
     }
 
     func updateScrollPoint(
-        for cursor: RenderedCursor?,
+        for caret: RenderedCaret?,
         viewportWidth: Int?,
         viewportHeight: Int?,
         contentWidth: Int,
         contentHeight: Int
     ) {
-        guard let cursor else {
+        guard let caret else {
             return
         }
 
         var x = scrollPoint.x
         var y = scrollPoint.y
         if let viewportWidth, viewportWidth > 0 {
-            if cursor.column < x {
-                x = cursor.column
+            if caret.column < x {
+                x = caret.column
             }
-            else if cursor.column >= x + viewportWidth {
-                x = cursor.column - viewportWidth + 1
+            else if caret.column >= x + viewportWidth {
+                x = caret.column - viewportWidth + 1
             }
             x = min(max(x, 0), max(contentWidth - viewportWidth, 0))
         }
@@ -404,11 +404,11 @@ final class TextEditorState {
         }
 
         if let viewportHeight, viewportHeight > 0 {
-            if cursor.row < y {
-                y = cursor.row
+            if caret.row < y {
+                y = caret.row
             }
-            else if cursor.row >= y + viewportHeight {
-                y = cursor.row - viewportHeight + 1
+            else if caret.row >= y + viewportHeight {
+                y = caret.row - viewportHeight + 1
             }
             y = min(max(y, 0), max(contentHeight - viewportHeight, 0))
         }
@@ -452,9 +452,9 @@ struct TextEditorLayout {
         max(lines.count, 1)
     }
 
-    func cursor(at offset: Int) -> RenderedCursor {
+    func caret(at offset: Int) -> RenderedCaret {
         let current = lineAndColumn(at: offset)
-        return RenderedCursor(row: current.lineIndex, column: current.column)
+        return RenderedCaret(row: current.lineIndex, column: current.column)
     }
 
     func lineAndColumn(at offset: Int) -> (lineIndex: Int, column: Int) {

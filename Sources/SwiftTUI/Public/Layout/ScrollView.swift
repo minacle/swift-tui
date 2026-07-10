@@ -608,8 +608,8 @@ enum ScrollViewRenderer {
                 width: width,
                 height: height,
                 paddedRows: Set(0..<height),
-                cursor: cursor(
-                    from: content.cursor,
+                caret: caret(
+                    from: content.caret,
                     x: clampedX,
                     y: clampedY,
                     width: width,
@@ -657,33 +657,33 @@ enum ScrollViewRenderer {
         )
     }
 
-    private static func cursor(
-        from cursor: RenderedCursor?,
+    private static func caret(
+        from caret: RenderedCaret?,
         x: Int,
         y: Int,
         width: Int,
         height: Int,
         constrainToBounds: Bool
-    ) -> RenderedCursor? {
-        guard let cursor else {
+    ) -> RenderedCaret? {
+        guard let caret else {
             return nil
         }
 
-        let row = cursor.row - y
-        let column = cursor.column - x
+        let row = caret.row - y
+        let column = caret.column - x
         guard row >= 0, row < height, column >= 0, column <= width else {
             return nil
         }
 
-        return RenderedCursor(
+        return RenderedCaret(
             row: row,
             column: constrainToBounds ? min(column, width - 1) : column
         )
     }
 
     private static func maxHorizontalOffset(for content: RenderedBlock, width: Int) -> Int {
-        let cursorAllowance = content.cursor == nil || content.width < width ? 0 : 1
-        var offset = max(content.width - width + cursorAllowance, 0)
+        let caretAllowance = content.caret == nil || content.width < width ? 0 : 1
+        var offset = max(content.width - width + caretAllowance, 0)
         while offset > 0 && content.lines.contains(where: { line in
             !TerminalText.isCharacterBoundary(line, atColumn: offset)
         }) {

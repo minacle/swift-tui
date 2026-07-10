@@ -168,7 +168,7 @@ public nonisolated enum DefaultColor: Color, ShapeStyle {
 /// A view that displays text in the terminal.
 ///
 /// `Text` renders its string content using terminal character-cell layout.
-/// Unicode display width is considered during wrapping, clipping, and cursor
+/// Unicode display width is considered during wrapping, clipping, and caret
 /// placement around adjacent controls.
 public nonisolated struct Text: View, Equatable, Sendable {
 

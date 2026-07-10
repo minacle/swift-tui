@@ -4,7 +4,7 @@ import Foundation
 ///
 /// `TextField` binds its editable string to a source of truth, renders one
 /// terminal row, scrolls horizontally when the text is wider than the proposed
-/// width, and shows a cursor while focused.
+/// width, and shows a caret while focused.
 public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
 
     /// The body type for this primitive view.
@@ -66,7 +66,7 @@ public extension TextField where Label == Text {
 ///
 /// `SecureField` binds its editable string to a source of truth, renders one
 /// terminal row, scrolls horizontally when the masked text is wider than the
-/// proposed width, and shows a cursor while focused. Non-empty input is masked
+/// proposed width, and shows a caret while focused. Non-empty input is masked
 /// with bullet characters in rendered output.
 public nonisolated struct SecureField<Label: View>: View, TextFieldRenderable, LayoutTraitRenderable {
 
@@ -348,8 +348,8 @@ private enum TextInputRenderer {
             prompt: prompt,
             label: label
         )
-        let cursor: RenderedCursor? = fieldState?.selectedRange == nil
-            ? renderedCursor(
+        let caret: RenderedCaret? = fieldState?.selectedRange == nil
+            ? renderedCaret(
                 state: fieldState,
                 isFocused: isFocused,
                 layoutText: layoutText
@@ -372,7 +372,7 @@ private enum TextInputRenderer {
             ),
             width: contentWidth,
             height: 1,
-            cursor: cursor
+            caret: caret
         )
 
         var block = ScrollViewRenderer.render(
@@ -412,16 +412,16 @@ private enum TextInputRenderer {
         return style
     }
 
-    private static func renderedCursor(
+    private static func renderedCaret(
         state: TextFieldState?,
         isFocused: Bool,
         layoutText: String
-    ) -> RenderedCursor? {
+    ) -> RenderedCaret? {
         guard isFocused, let state else {
             return nil
         }
 
-        return RenderedCursor(
+        return RenderedCaret(
             column: TerminalText.columnWidth(
                 layoutText,
                 upToCharacterOffset: state.offset
