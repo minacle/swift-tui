@@ -99,6 +99,19 @@ public nonisolated enum AttributedTextAlignment: Hashable, Sendable {
     case right
 }
 
+/// An alignment position for text along the horizontal terminal axis.
+public nonisolated enum TextAlignment: CaseIterable, Hashable, Sendable {
+
+    /// Align text to the leading terminal edge.
+    case leading
+
+    /// Center text between the terminal edges.
+    case center
+
+    /// Align text to the trailing terminal edge.
+    case trailing
+}
+
 public enum SwiftTUIForegroundColorAttribute: AttributedStringKey {
 
     public typealias Value = AnyColor
@@ -208,6 +221,22 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// - Parameter attributedContent: The attributed string to render.
     public init(_ attributedContent: AttributedString) {
         self.runs = TextRun.runs(from: attributedContent)
+    }
+}
+
+public extension Text {
+
+    /// The part of a line that remains visible when text is truncated.
+    nonisolated enum TruncationMode: Equatable, Hashable, Sendable {
+
+        /// Truncate at the beginning of the line.
+        case head
+
+        /// Truncate in the middle of the line.
+        case middle
+
+        /// Truncate at the end of the line.
+        case tail
     }
 }
 
@@ -665,6 +694,30 @@ public extension View {
             lineLimit: TextLineLimit(number: number, reservesSpace: reservesSpace)
         )
     }
+
+    /// Sets how the last visible line of text is truncated.
+    ///
+    /// - Parameter mode: The portion of text to replace with an ellipsis.
+    /// - Returns: A view with the specified truncation mode.
+    nonisolated func truncationMode(_ mode: Text.TruncationMode) -> some View {
+        EnvironmentValueView(
+            content: self,
+            keyPath: \.truncationMode,
+            value: mode
+        )
+    }
+
+    /// Sets the horizontal alignment of multiline text.
+    ///
+    /// - Parameter alignment: The alignment to apply to text lines.
+    /// - Returns: A view with the specified multiline text alignment.
+    nonisolated func multilineTextAlignment(_ alignment: TextAlignment) -> some View {
+        EnvironmentValueView(
+            content: self,
+            keyPath: \.multilineTextAlignment,
+            value: alignment
+        )
+    }
 }
 
 public extension EnvironmentValues {
@@ -682,6 +735,26 @@ public extension EnvironmentValues {
                 number: newValue.map { max(1, $0) },
                 reservesSpace: false
             )
+        }
+    }
+
+    /// The mode used to truncate the last visible line of text.
+    nonisolated var truncationMode: Text.TruncationMode {
+        get {
+            self[TruncationModeKey.self]
+        }
+        set {
+            self[TruncationModeKey.self] = newValue
+        }
+    }
+
+    /// The horizontal alignment used for multiline text.
+    nonisolated var multilineTextAlignment: TextAlignment {
+        get {
+            self[MultilineTextAlignmentKey.self]
+        }
+        set {
+            self[MultilineTextAlignmentKey.self] = newValue
         }
     }
 }
@@ -732,4 +805,14 @@ private struct TextLineLimitKey: EnvironmentKey {
         number: nil,
         reservesSpace: false
     )
+}
+
+private struct TruncationModeKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = Text.TruncationMode.tail
+}
+
+private struct MultilineTextAlignmentKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = TextAlignment.leading
 }

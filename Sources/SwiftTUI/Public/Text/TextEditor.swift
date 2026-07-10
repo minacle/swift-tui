@@ -57,6 +57,7 @@ extension TextEditor {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        let alignment = EnvironmentRenderContext.current.multilineTextAlignment
         let editorState = runtime?.textEditorState(
             at: path,
             initialText: text.wrappedValue
@@ -101,7 +102,8 @@ extension TextEditor {
 
                     let layout = TextEditorLayout(
                         text: editorState.text,
-                        maxWidth: editorState.layoutWidth
+                        maxWidth: editorState.layoutWidth,
+                        alignment: alignment
                     )
                     return editorState.selectionContains(point, layout: layout)
                 },
@@ -112,7 +114,8 @@ extension TextEditor {
 
                     let layout = TextEditorLayout(
                         text: editorState.text,
-                        maxWidth: editorState.layoutWidth
+                        maxWidth: editorState.layoutWidth,
+                        alignment: alignment
                     )
                     editorState.beginSelection(to: point, layout: layout)
                     editorState.publishSelection(to: selection)
@@ -124,7 +127,8 @@ extension TextEditor {
 
                     let layout = TextEditorLayout(
                         text: editorState.text,
-                        maxWidth: editorState.layoutWidth
+                        maxWidth: editorState.layoutWidth,
+                        alignment: alignment
                     )
                     editorState.extendSelection(to: point, layout: layout)
                     editorState.publishSelection(to: selection)
@@ -134,7 +138,11 @@ extension TextEditor {
         )
 
         let currentText = editorState?.text ?? text.wrappedValue
-        let layout = TextEditorLayout(text: currentText, maxWidth: proposal?.columns)
+        let layout = TextEditorLayout(
+            text: currentText,
+            maxWidth: proposal?.columns,
+            alignment: alignment
+        )
         let caret = renderedCaret(state: editorState, layout: layout, runtime: runtime, path: path)
         if updatesInteractiveState {
             editorState?.publishSelectionOnFocus(
@@ -145,7 +153,7 @@ extension TextEditor {
                 for: caret,
                 viewportWidth: proposal?.columns,
                 viewportHeight: proposal?.rows,
-                contentWidth: layout.width,
+                contentWidth: layout.renderedWidth,
                 contentHeight: layout.height
             )
         }
@@ -163,8 +171,11 @@ extension TextEditor {
                     tint: environment.tint,
                     foregroundStyle: environment.textSelectionForegroundStyle
                 )
+                .map {
+                    $0.offsetBy(x: layout.horizontalOffset(onLine: row), y: 0)
+                }
             },
-            width: layout.width,
+            width: layout.renderedWidth,
             height: layout.height,
             paddedRows: Set(0..<layout.height),
             caret: visibleCaret
@@ -203,7 +214,11 @@ extension TextEditor {
             return .ignored
         }
 
-        let layout = TextEditorLayout(text: state.text, maxWidth: state.layoutWidth)
+        let layout = TextEditorLayout(
+            text: state.text,
+            maxWidth: state.layoutWidth,
+            alignment: EnvironmentRenderContext.current.multilineTextAlignment
+        )
         let selecting = keyPress.modifiers.contains(.shift)
         let navigationBehavior =
             EnvironmentRenderContext.current.textSelectionNavigationBehavior
@@ -474,7 +489,7 @@ final class TextEditorState {
     private func offset(to point: Point, layout: TextEditorLayout) -> Int {
         let lineIndex = min(max(scrollPoint.y + point.row, 0), layout.lines.count - 1)
         let column = max(scrollPoint.x + point.column, 0)
-        return layout.offset(onLine: lineIndex, nearestColumn: column)
+        return layout.offset(onLine: lineIndex, nearestRenderedColumn: column)
     }
 
     func insert(_ newText: String, update binding: Binding<String>) {
@@ -598,13 +613,23 @@ struct TextEditorLayout {
 
     let lines: [TextEditorLine]
 
-    init(text: String, maxWidth: Int?) {
+    let maximumWidth: Int?
+
+    let alignment: TextAlignment
+
+    init(
+        text: String,
+        maxWidth: Int?,
+        alignment: TextAlignment = .leading
+    ) {
         let displayLines = TextLineWrapper.wrappedLines(for: text, maxWidth: maxWidth)
         self.lines = TextEditorLayout.lines(
             from: displayLines,
             in: text,
             maxWidth: maxWidth
         )
+        self.maximumWidth = maxWidth
+        self.alignment = alignment
     }
 
     var width: Int {
@@ -615,9 +640,16 @@ struct TextEditorLayout {
         max(lines.count, 1)
     }
 
+    var renderedWidth: Int {
+        max(width, maximumWidth ?? width)
+    }
+
     func caret(at offset: Int) -> RenderedCaret {
         let current = lineAndColumn(at: offset)
-        return RenderedCaret(row: current.lineIndex, column: current.column)
+        return RenderedCaret(
+            row: current.lineIndex,
+            column: horizontalOffset(onLine: current.lineIndex) + current.column
+        )
     }
 
     func lineAndColumn(at offset: Int) -> (lineIndex: Int, column: Int) {
@@ -651,6 +683,26 @@ struct TextEditorLayout {
             offset += 1
         }
         return min(offset, line.upperOffset)
+    }
+
+    func offset(onLine lineIndex: Int, nearestRenderedColumn column: Int) -> Int {
+        offset(
+            onLine: lineIndex,
+            nearestColumn: max(column - horizontalOffset(onLine: lineIndex), 0)
+        )
+    }
+
+    func horizontalOffset(onLine lineIndex: Int) -> Int {
+        let line = lines[min(max(lineIndex, 0), lines.count - 1)]
+        let padding = max(renderedWidth - TerminalText.columnWidth(line.text), 0)
+        switch alignment {
+        case .leading:
+            return 0
+        case .center:
+            return padding / 2
+        case .trailing:
+            return padding
+        }
     }
 
     private static func mappedLines(

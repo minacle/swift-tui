@@ -422,6 +422,20 @@ public extension View {
     func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
         ScrollPositionView(content: self, position: position)
     }
+
+    /// Disables or enables user scrolling in scrollable descendant views.
+    ///
+    /// - Parameter disabled: Whether user-driven scrolling is disabled.
+    /// - Returns: A view that controls scrolling in its descendants.
+    nonisolated func scrollDisabled(_ disabled: Bool) -> some View {
+        TransformedEnvironmentView(
+            content: self,
+            keyPath: \.isScrollEnabled,
+            transform: {
+                $0 = $0 && !disabled
+            }
+        )
+    }
 }
 
 extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
@@ -473,7 +487,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         }
 
         var block = result.block
-        if EnvironmentRenderContext.current.isEnabled {
+        if EnvironmentRenderContext.current.isEnabled
+            && EnvironmentRenderContext.current.isScrollEnabled {
             block.scrollRegions.append(RenderedScrollRegion(path: path, frame: block.bounds))
         }
         return block

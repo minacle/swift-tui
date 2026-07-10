@@ -1322,14 +1322,13 @@ private struct TextSourceLine {
         return lines
     }
 
-    func truncated(maxWidth: Int?) -> TextSourceLine {
+    func truncated(
+        maxWidth: Int?,
+        mode: Text.TruncationMode,
+        endingWith endingLine: TextSourceLine
+    ) -> TextSourceLine {
         guard let maxWidth else {
-            return TextSourceLine(
-                text: text + "...",
-                sourceOffsets: sourceOffsets + [nil, nil, nil],
-                lowerOffset: lowerOffset,
-                upperOffset: upperOffset
-            )
+            return unboundedTruncation(mode: mode, endingWith: endingLine)
         }
         guard maxWidth > 0 else {
             return TextSourceLine(text: "", sourceOffsets: [], lowerOffset: lowerOffset, upperOffset: lowerOffset)
@@ -1343,14 +1342,85 @@ private struct TextSourceLine {
             )
         }
 
-        let prefix = TerminalText.prefix(text, maxWidth: maxWidth - 3)
-        let prefixCount = prefix.count
-        return TextSourceLine(
-            text: prefix + "...",
-            sourceOffsets: Array(sourceOffsets.prefix(prefixCount)) + [nil, nil, nil],
-            lowerOffset: lowerOffset,
-            upperOffset: lowerOffset + prefixCount
-        )
+        let contentWidth = maxWidth - 3
+        switch mode {
+        case .head:
+            let suffix = TerminalText.suffix(endingLine.text, maxWidth: contentWidth)
+            let suffixCount = suffix.count
+            return TextSourceLine(
+                text: "..." + suffix,
+                sourceOffsets: Array(repeating: nil, count: 3)
+                    + endingLine.sourceOffsets.suffix(suffixCount),
+                lowerOffset: endingLine.upperOffset - suffixCount,
+                upperOffset: endingLine.upperOffset
+            )
+        case .middle:
+            let preferredPrefixWidth = (contentWidth + 1) / 2
+            var prefix = TerminalText.prefix(text, maxWidth: preferredPrefixWidth)
+            var suffix = TerminalText.suffix(
+                endingLine.text,
+                maxWidth: contentWidth - TerminalText.columnWidth(prefix)
+            )
+            prefix = TerminalText.prefix(
+                text,
+                maxWidth: contentWidth - TerminalText.columnWidth(suffix)
+            )
+            suffix = TerminalText.suffix(
+                endingLine.text,
+                maxWidth: contentWidth - TerminalText.columnWidth(prefix)
+            )
+            let prefixCount = prefix.count
+            let suffixCount = suffix.count
+            return TextSourceLine(
+                text: prefix + "..." + suffix,
+                sourceOffsets: Array(sourceOffsets.prefix(prefixCount))
+                    + Array(repeating: nil, count: 3)
+                    + endingLine.sourceOffsets.suffix(suffixCount),
+                lowerOffset: lowerOffset,
+                upperOffset: endingLine.upperOffset
+            )
+        case .tail:
+            let prefix = TerminalText.prefix(text, maxWidth: contentWidth)
+            let prefixCount = prefix.count
+            return TextSourceLine(
+                text: prefix + "...",
+                sourceOffsets: Array(sourceOffsets.prefix(prefixCount))
+                    + Array(repeating: nil, count: 3),
+                lowerOffset: lowerOffset,
+                upperOffset: lowerOffset + prefixCount
+            )
+        }
+    }
+
+    private func unboundedTruncation(
+        mode: Text.TruncationMode,
+        endingWith endingLine: TextSourceLine
+    ) -> TextSourceLine {
+        switch mode {
+        case .head:
+            return TextSourceLine(
+                text: "..." + endingLine.text,
+                sourceOffsets: Array(repeating: nil, count: 3) + endingLine.sourceOffsets,
+                lowerOffset: endingLine.lowerOffset,
+                upperOffset: endingLine.upperOffset
+            )
+        case .middle:
+            return TextSourceLine(
+                text: text + "..." + endingLine.text,
+                sourceOffsets: sourceOffsets
+                    + Array(repeating: nil, count: 3)
+                    + endingLine.sourceOffsets,
+                lowerOffset: lowerOffset,
+                upperOffset: endingLine.upperOffset
+            )
+        case .tail:
+            return TextSourceLine(
+                text: text + "...",
+                sourceOffsets: sourceOffsets + Array(repeating: nil, count: 3),
+                lowerOffset: lowerOffset,
+                upperOffset: upperOffset
+            )
+        }
     }
 }
 
@@ -1365,11 +1435,16 @@ enum TextLayoutRenderer {
         let lineLimit = EnvironmentRenderContext.current.textLineLimit
         var lines = TextSourceLine.mappedLines(for: text.content, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
+        let endingLine = lines.last
 
         if let number = lineLimit.number {
             lines = Array(lines.prefix(number))
-            if isTruncated, !lines.isEmpty {
-                lines[lines.count - 1] = lines[lines.count - 1].truncated(maxWidth: proposal?.columns)
+            if isTruncated, !lines.isEmpty, let endingLine {
+                lines[lines.count - 1] = lines[lines.count - 1].truncated(
+                    maxWidth: proposal?.columns,
+                    mode: EnvironmentRenderContext.current.truncationMode,
+                    endingWith: endingLine
+                )
             }
             if lineLimit.reservesSpace, lines.count < number {
                 let offset = lines.last?.upperOffset ?? text.content.count
@@ -1393,6 +1468,13 @@ enum TextLayoutRenderer {
             ? runtime?.textSelectionState(at: path)
             : nil
         selectionState?.clamp(upperBound: text.content.count)
+        let naturalWidth = lines.map { TerminalText.columnWidth($0.text) }.max() ?? 0
+        let alignmentWidth = if text.hasAttributedAlignment {
+            proposal?.columns
+        }
+        else {
+            naturalWidth
+        }
         let layout = TextRunLayoutMapper.renderedRuns(
             for: lines,
             text: text,
@@ -1400,13 +1482,14 @@ enum TextLayoutRenderer {
             tint: environment.tint,
             selection: selectionState?.range,
             selectionForegroundStyle: environment.textSelectionForegroundStyle,
-            alignmentWidth: text.hasAttributedAlignment ? proposal?.columns : nil
+            defaultAlignment: environment.multilineTextAlignment,
+            alignmentWidth: alignmentWidth
         )
         let width = if text.hasAttributedAlignment, let columns = proposal?.columns {
             columns
         }
         else {
-            lines.map { TerminalText.columnWidth($0.text) }.max() ?? 0
+            naturalWidth
         }
         var block = RenderedBlock(
             runs: layout.runs,
@@ -1509,17 +1592,15 @@ private struct TextRunLayoutResult {
         var column = 0
         var offset = line.source.lowerOffset
         for (character, sourceOffset) in zip(line.source.text, line.source.sourceOffsets) {
-            guard let sourceOffset else {
-                break
-            }
-
             let width = TerminalText.columnWidth(String(character))
             guard column + width <= targetColumn else {
-                return sourceOffset
+                return sourceOffset ?? offset
             }
 
             column += width
-            offset = sourceOffset + 1
+            if let sourceOffset {
+                offset = sourceOffset + 1
+            }
         }
         return min(offset, line.source.upperOffset)
     }
@@ -1545,6 +1626,7 @@ private enum TextRunLayoutMapper {
         tint: AnyColor?,
         selection: Range<Int>?,
         selectionForegroundStyle: AnyShapeStyle?,
+        defaultAlignment: TextAlignment = .leading,
         alignmentWidth: Int? = nil
     ) -> TextRunLayoutResult {
         let characters = styledCharacters(for: text, baseStyle: baseStyle, tint: tint)
@@ -1612,6 +1694,7 @@ private enum TextRunLayoutMapper {
             let offset = horizontalOffset(
                 for: line.text,
                 alignment: rowAlignment,
+                defaultAlignment: defaultAlignment,
                 width: alignmentWidth
             )
             renderedRuns.append(contentsOf: rowRuns.map { $0.offsetBy(x: offset, y: 0) })
@@ -1646,19 +1729,30 @@ private enum TextRunLayoutMapper {
     private static func horizontalOffset(
         for line: String,
         alignment: AttributedTextAlignment?,
+        defaultAlignment: TextAlignment,
         width: Int?
     ) -> Int {
-        guard let alignment, let width else {
+        guard let width else {
             return 0
         }
 
         let padding = max(width - TerminalText.columnWidth(line), 0)
-        switch alignment {
-        case .left:
+        if let alignment {
+            switch alignment {
+            case .left:
+                return 0
+            case .center:
+                return padding / 2
+            case .right:
+                return padding
+            }
+        }
+        switch defaultAlignment {
+        case .leading:
             return 0
         case .center:
             return padding / 2
-        case .right:
+        case .trailing:
             return padding
         }
     }

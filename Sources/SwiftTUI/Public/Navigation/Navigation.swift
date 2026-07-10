@@ -611,6 +611,7 @@ struct NavigationDestination {
             }
             var destinationEnvironment = environment
             destinationEnvironment.dismiss = dismiss
+            destinationEnvironment.isPresented = true
             return EnvironmentRenderContext.withValues(destinationEnvironment) {
                 ViewResolver.block(
                     from: content,
@@ -630,6 +631,7 @@ struct NavigationDestination {
             }
             var destinationEnvironment = environment
             destinationEnvironment.dismiss = dismiss
+            destinationEnvironment.isPresented = true
             return EnvironmentRenderContext.withValues(destinationEnvironment) {
                 ViewResolver.element(
                     from: content,

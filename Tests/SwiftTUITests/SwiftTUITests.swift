@@ -574,6 +574,19 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     #expect(rightBlock?.lines == ["    A"])
 }
 
+@Test func attributedTextAlignmentOverridesMultilineTextAlignment() {
+    var attributed = AttributedString("A")
+    attributed.alignment = .left
+
+    let block = ViewResolver.block(
+        from: Text(attributed).multilineTextAlignment(.trailing),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(block?.runs == [RenderedRun(text: "A")])
+    #expect(block?.lines == ["A    "])
+}
+
 @Test func attributedTextPreservesAlignmentAcrossWrapping() {
     var attributed = AttributedString("AB CD")
     attributed.alignment = .center
@@ -1048,6 +1061,94 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     )
 
     #expect(block?.lines == ["Lorem   ", "ipsum..."])
+}
+
+@Test func textTruncationModeSelectsVisibleContent() {
+    let text = "Alpha beta gamma"
+    let proposal = RenderProposal(columns: 8)
+
+    let tail = ViewResolver.block(
+        from: Text(text).lineLimit(1).truncationMode(.tail),
+        in: proposal
+    )
+    let head = ViewResolver.block(
+        from: Text(text).lineLimit(1).truncationMode(.head),
+        in: proposal
+    )
+    let middle = ViewResolver.block(
+        from: Text(text).lineLimit(1).truncationMode(.middle),
+        in: proposal
+    )
+
+    #expect(tail?.lines == ["Alpha..."])
+    #expect(head?.lines == ["...gamma"])
+    #expect(middle?.lines == ["Alp...ma"])
+}
+
+#if canImport(Darwin)
+@Test func headTruncationPreservesAttributedSuffixStyle() {
+    var attributed = AttributedString("Alpha beta gamma")
+    attributed[attributed.range(of: "gamma")!].inlinePresentationIntent = .stronglyEmphasized
+
+    let block = ViewResolver.block(
+        from: Text(attributed).lineLimit(1).truncationMode(.head),
+        in: RenderProposal(columns: 8)
+    )
+
+    #expect(block?.runs == [
+        RenderedRun(text: "..."),
+        RenderedRun(text: "gamma", column: 3, style: TextStyle(isBold: true)),
+    ])
+}
+#endif
+
+@Test func truncationModeEnvironmentDefaultsToTailAndPropagates() {
+    #expect(EnvironmentValues().truncationMode == .tail)
+    #expect(ViewResolver.text(from: TruncationModeEnvironmentMarkerText()) == "tail")
+    #expect(
+        ViewResolver.text(
+            from: TruncationModeEnvironmentMarkerText().truncationMode(.middle)
+        ) == "middle"
+    )
+}
+
+@Test func multilineTextAlignmentAlignsWithinNaturalMultilineWidth() {
+    let text = "A\nBBB"
+
+    let leading = ViewResolver.block(
+        from: Text(text).multilineTextAlignment(.leading)
+    )
+    let center = ViewResolver.block(
+        from: Text(text).multilineTextAlignment(.center)
+    )
+    let trailing = ViewResolver.block(
+        from: Text(text).multilineTextAlignment(.trailing)
+    )
+
+    #expect(leading?.lines == ["A  ", "BBB"])
+    #expect(center?.lines == [" A ", "BBB"])
+    #expect(trailing?.lines == ["  A", "BBB"])
+}
+
+@Test func multilineTextAlignmentDoesNotExpandSingleLineText() {
+    let block = ViewResolver.block(
+        from: Text("A").multilineTextAlignment(.center),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(block?.width == 1)
+    #expect(block?.lines == ["A"])
+}
+
+@Test func multilineTextAlignmentEnvironmentDefaultsToLeadingAndPropagates() {
+    #expect(EnvironmentValues().multilineTextAlignment == .leading)
+    #expect(ViewResolver.text(from: MultilineTextAlignmentEnvironmentMarkerText()) == "leading")
+    #expect(
+        ViewResolver.text(
+            from: MultilineTextAlignmentEnvironmentMarkerText()
+                .multilineTextAlignment(.trailing)
+        ) == "trailing"
+    )
 }
 
 @Test func textLineLimitReservesSpace() {
@@ -2939,6 +3040,26 @@ private func lineBreakKinds(in text: String) -> [String] {
     state.moveToLineEnd(layout: layout)
     state.insert("y", update: binding)
     #expect(boundText == "xy")
+}
+
+@Test func multilineTextAlignmentAlignsTextEditorRenderingAndHitMapping() {
+    let layout = TextEditorLayout(
+        text: "A\nBBB",
+        maxWidth: 5,
+        alignment: .trailing
+    )
+    let block = ViewResolver.block(
+        from: TextEditor(text: .constant("A\nBBB"))
+            .multilineTextAlignment(.trailing),
+        in: RenderProposal(columns: 5)
+    )
+
+    #expect(layout.renderedWidth == 5)
+    #expect(layout.horizontalOffset(onLine: 0) == 4)
+    #expect(layout.horizontalOffset(onLine: 1) == 2)
+    #expect(layout.offset(onLine: 0, nearestRenderedColumn: 4) == 0)
+    #expect(layout.offset(onLine: 0, nearestRenderedColumn: 5) == 1)
+    #expect(block?.lines == ["    A", "  BBB"])
 }
 
 @Test func clickingTextEditorMovesCaretToClickedLineAndColumn() {
@@ -5162,6 +5283,27 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(!runtime.consumeInvalidation())
 }
 
+@Test func scrollDisabledPreventsWheelInputAndPreservesProgrammaticPosition() {
+    let scrollView = ScrollView {
+        VStack {
+            Text("A")
+            Text("B")
+            Text("C")
+        }
+    }
+    .scrollPosition(.constant(ScrollPosition(point: ScrollPoint(y: 1))))
+    .frame(width: 1, height: 2)
+    .scrollDisabled(true)
+    let runtime = StateRuntime()
+
+    let block = runtime.block(from: scrollView)
+
+    #expect(block?.lines == ["B", "C"])
+    #expect(block?.scrollRegions == [])
+    dispatchWheel(to: runtime, button: .wheelUp, column: 1, row: 1, expecting: .ignored)
+    #expect(!runtime.consumeInvalidation())
+}
+
 @Test func scrollViewWheelStoresPositionWithoutBinding() {
     let scrollView = ScrollView {
         VStack {
@@ -6442,6 +6584,24 @@ private func lineBreakKinds(in text: String) -> [String] {
 
 @Test func environmentReadsDefaultValue() {
     #expect(ViewResolver.text(from: EnvironmentMarkerText()) == "default")
+}
+
+@Test func isScrollEnabledEnvironmentDefaultsToTrueAndPropagates() {
+    #expect(EnvironmentValues().isScrollEnabled)
+    #expect(ViewResolver.text(from: IsScrollEnabledEnvironmentMarkerText()) == "enabled")
+    #expect(
+        ViewResolver.text(
+            from: IsScrollEnabledEnvironmentMarkerText().scrollDisabled(true)
+        ) == "disabled"
+    )
+}
+
+@Test func ancestorScrollDisabledCannotBeOverriddenByDescendant() {
+    let view = IsScrollEnabledEnvironmentMarkerText()
+        .scrollDisabled(false)
+        .scrollDisabled(true)
+
+    #expect(ViewResolver.text(from: view) == "disabled")
 }
 
 @Test func environmentWrapperReadsDefaultSnapshotBeforeMaterialization() {
@@ -8617,6 +8777,32 @@ func NavigationDestinationIsPresentedBindingPresentsAndResetsOnEscape() {
     #expect(!isPresented)
     #expect(runtime.consumeInvalidation())
     #expect(runtime.block(from: view)?.text == "Root")
+}
+
+@Test func isPresentedEnvironmentTracksNavigationPresentation() {
+    var isPresented = false
+    let runtime = StateRuntime()
+    let view = NavigationIsPresentedEnvironmentView(
+        isPresented: Binding(
+            get: {
+                isPresented
+            },
+            set: {
+                isPresented = $0
+            }
+        )
+    )
+
+    #expect(!EnvironmentValues().isPresented)
+    #expect(runtime.block(from: view)?.text == "root")
+
+    isPresented = true
+    #expect(runtime.block(from: view)?.text == "presented")
+
+    #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
+    #expect(!isPresented)
+    #expect(runtime.consumeInvalidation())
+    #expect(runtime.block(from: view)?.text == "root")
 }
 
 @Test("Navigation destination isPresented state presents after global key press")
@@ -11152,6 +11338,20 @@ private struct NavigationPresentedBoolView: View {
     }
 }
 
+private struct NavigationIsPresentedEnvironmentView: View {
+
+    let isPresented: Binding<Bool>
+
+    var body: some View {
+        NavigationStack {
+            IsPresentedEnvironmentMarkerText(rootLabel: "root")
+                .navigationDestination(isPresented: isPresented) {
+                    IsPresentedEnvironmentMarkerText(rootLabel: "root")
+                }
+        }
+    }
+}
+
 private struct NavigationPresentedBoolStateGlobalKeyView: View {
 
     @State
@@ -11994,12 +12194,50 @@ private struct LineLimitEnvironmentMarkerText: View {
     }
 }
 
+private struct TruncationModeEnvironmentMarkerText: View {
+
+    @Environment(\.truncationMode) private var truncationMode
+
+    var body: some View {
+        Text(String(describing: truncationMode))
+    }
+}
+
+private struct MultilineTextAlignmentEnvironmentMarkerText: View {
+
+    @Environment(\.multilineTextAlignment) private var alignment
+
+    var body: some View {
+        Text(String(describing: alignment))
+    }
+}
+
 private struct IsFocusedEnvironmentMarkerText: View {
 
     @Environment(\.isFocused) private var isFocused
 
     var body: some View {
         Text(isFocused ? "focused" : "unfocused")
+    }
+}
+
+private struct IsPresentedEnvironmentMarkerText: View {
+
+    @Environment(\.isPresented) private var isPresented
+
+    let rootLabel: String
+
+    var body: some View {
+        Text(isPresented ? "presented" : rootLabel)
+    }
+}
+
+private struct IsScrollEnabledEnvironmentMarkerText: View {
+
+    @Environment(\.isScrollEnabled) private var isScrollEnabled
+
+    var body: some View {
+        Text(isScrollEnabled ? "enabled" : "disabled")
     }
 }
 

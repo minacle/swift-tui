@@ -52,6 +52,26 @@ nonisolated enum TerminalText {
         return result
     }
 
+    static func suffix(_ text: String, maxWidth: Int) -> String {
+        guard maxWidth > 0 else {
+            return ""
+        }
+
+        var characters: [Character] = []
+        var usedWidth = 0
+        for character in text.reversed() {
+            let width = columnWidth(String(character))
+            guard usedWidth + width <= maxWidth else {
+                break
+            }
+
+            characters.append(character)
+            usedWidth += width
+        }
+
+        return String(characters.reversed())
+    }
+
     static func isCharacterBoundary(_ text: String, atColumn column: Int) -> Bool {
         guard column > 0 else {
             return true

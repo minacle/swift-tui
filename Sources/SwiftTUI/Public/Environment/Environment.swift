@@ -217,6 +217,26 @@ public extension EnvironmentValues {
         }
     }
 
+    /// A Boolean value that indicates whether this view is currently presented.
+    internal(set) nonisolated var isPresented: Bool {
+        get {
+            self[IsPresentedKey.self]
+        }
+        set {
+            self[IsPresentedKey.self] = newValue
+        }
+    }
+
+    /// A Boolean value that indicates whether scrollable views allow scrolling.
+    nonisolated var isScrollEnabled: Bool {
+        get {
+            self[IsScrollEnabledKey.self]
+        }
+        set {
+            self[IsScrollEnabledKey.self] = newValue
+        }
+    }
+
     /// An action that copies text to the terminal clipboard.
     ///
     /// The default action discards text until the root app runner installs a
@@ -894,6 +914,16 @@ private struct IsEnabledKey: EnvironmentKey {
 private struct IsFocusedKey: EnvironmentKey {
 
     nonisolated static let defaultValue = false
+}
+
+private struct IsPresentedKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = false
+}
+
+private struct IsScrollEnabledKey: EnvironmentKey {
+
+    nonisolated static let defaultValue = true
 }
 
 private struct CopyActionKey: EnvironmentKey {
