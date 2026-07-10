@@ -166,6 +166,43 @@ if let selection, case .selection(let range) = selection.indices {
 SwiftTUI currently supports one selection. Create an insertion point with
 `TextSelection(insertionPoint:)` or a range with `TextSelection(range:)`.
 
+Read the `copy` and `paste` environment actions to exchange UTF-8 text with a
+terminal clipboard that supports OSC 52. `CopyAction` accepts a `Substring`,
+so a bound text selection can be copied directly:
+
+```swift
+@State var text = "Edit this text"
+@State var selection: TextSelection?
+
+@Environment(\.copy) var copy
+@Environment(\.paste) var paste
+
+func copySelection() {
+    guard
+        let selection,
+        case .selection(let range) = selection.indices,
+        !range.isEmpty
+    else {
+        return
+    }
+
+    copy(text[range])
+}
+
+func pasteAtEnd() {
+    if let pastedText = paste() {
+        text.append(pastedText)
+    }
+}
+```
+
+`paste()` performs a synchronous OSC 52 query and returns `nil` when the
+terminal doesn't respond with Base64-encoded UTF-8 text. Each response byte
+has a 100 millisecond timeout that restarts when another byte arrives. Terminal
+and multiplexer clipboard support and permission settings determine whether
+OSC 52 reads and writes succeed. SwiftTUI doesn't automatically insert pasted
+text or attach copy and paste keyboard shortcuts.
+
 ## Validation
 
 Use these commands from the package root:

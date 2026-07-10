@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `CopyAction`, `PasteAction`, and the `copy` and `paste` environment
+  values for exchanging UTF-8 text with OSC 52 terminal clipboards, including
+  direct copying of `StringProtocol` values such as selected substrings.
 - Added `Rectangle.edge(style:)` and `RectangleHalfCellEdgeStyle` for drawing
   selected rectangle edges with half-cell and quarter-cell block characters.
 - Added SwiftUI-shaped `TextSelectability`, `View.textSelection(_:)`,

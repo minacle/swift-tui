@@ -19,21 +19,31 @@ struct AppRunner<Application: App> {
         }
 
         var viewportTracker = TerminalViewportTracker(
-            renderedViewport: render(root, using: runtime, termination: termination)
+            renderedViewport: render(
+                root,
+                using: runtime,
+                termination: termination,
+                session: session
+            )
         )
 
         while true {
             if viewportTracker.needsRedraw(for: TerminalControl.currentTerminalSize()) {
                 viewportTracker.update(
-                    renderedViewport: render(root, using: runtime, termination: termination)
+                    renderedViewport: render(
+                        root,
+                        using: runtime,
+                        termination: termination,
+                        session: session
+                    )
                 )
             }
 
             if dispatch(
-                TerminalControl.readInput(timeout: inputTimeout(using: runtime)),
+                session.readInput(timeout: inputTimeout(using: runtime)),
                 using: runtime
             ) {
-                dispatchPendingInput(using: runtime)
+                dispatchPendingInput(using: runtime, session: session)
             }
 
             _ = runtime.dispatchExpiredTapActions()
@@ -47,6 +57,7 @@ struct AppRunner<Application: App> {
                         root,
                         using: runtime,
                         termination: termination,
+                        session: session,
                         previousRender: viewportTracker.renderedViewport
                     )
                 )
@@ -75,14 +86,15 @@ struct AppRunner<Application: App> {
         }
     }
 
-    private func dispatchPendingInput(using runtime: StateRuntime) {
-        while dispatch(TerminalControl.readInput(timeout: 0), using: runtime) {}
+    private func dispatchPendingInput(using runtime: StateRuntime, session: TerminalSession) {
+        while dispatch(session.readInput(timeout: 0), using: runtime) {}
     }
 
     private func render(
         _ root: any RootScene,
         using runtime: StateRuntime,
         termination: TerminationController,
+        session: TerminalSession,
         previousRender: RenderedTerminalViewport? = nil
     ) -> RenderedTerminalViewport {
         while true {
@@ -90,7 +102,8 @@ struct AppRunner<Application: App> {
             guard let block = root.renderedBlock(
                 in: RenderProposal(viewport),
                 using: runtime,
-                termination: termination
+                termination: termination,
+                session: session
             ) else {
                 return RenderedTerminalViewport(viewport: viewport, block: nil)
             }
@@ -172,7 +185,8 @@ private extension RootScene {
     func renderedBlock(
         in proposal: RenderProposal,
         using runtime: StateRuntime,
-        termination: TerminationController
+        termination: TerminationController,
+        session: TerminalSession
     ) -> RenderedBlock? {
         let action = termination.action
         return runtime.block(
@@ -180,7 +194,9 @@ private extension RootScene {
                 .onTerminate {
                     action()
                 }
-                .environment(\.terminate, action),
+                .environment(\.terminate, action)
+                .environment(\.copy, CopyAction(session.copy(_:)))
+                .environment(\.paste, PasteAction(session.paste)),
             in: proposal
         )
     }

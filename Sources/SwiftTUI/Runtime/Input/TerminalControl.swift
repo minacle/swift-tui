@@ -47,6 +47,13 @@ enum TerminalControl {
 
     static let disablePointerTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
 
+    static let pasteFromClipboardSequence = "\u{001B}]52;c;?\u{001B}\\"
+
+    static func copyToClipboardSequence(_ text: String) -> String {
+        let payload = Data(text.utf8).base64EncodedString()
+        return "\u{001B}]52;c;\(payload)\u{001B}\\"
+    }
+
     static func caretPositionSequence(row: Int, column: Int) -> String {
         "\u{001B}[\(max(row, 1));\(max(column, 1))H"
     }
@@ -212,7 +219,7 @@ enum TerminalControl {
         FileHandle.standardOutput.write(Data(output.utf8))
     }
 
-    private static func readByte(timeout: TimeInterval?) -> UInt8? {
+    static func readByte(timeout: TimeInterval?) -> UInt8? {
         guard waitForInput(timeout: timeout) else {
             return nil
         }
@@ -473,11 +480,116 @@ enum TerminalControl {
     }
 }
 
+final class TerminalIO {
+
+    private static let clipboardResponsePrefix = Array("\u{001B}]52;c;".utf8)
+
+    private static let clipboardResponseByteTimeout: TimeInterval = 0.1
+
+    private let readTerminalByte: (TimeInterval?) -> UInt8?
+
+    private let writeOutput: (String) -> Void
+
+    private var pendingInputBytes: [UInt8] = []
+
+    private var pendingInputOffset = 0
+
+    init(
+        readByte: @escaping (TimeInterval?) -> UInt8?,
+        write: @escaping (String) -> Void
+    ) {
+        self.readTerminalByte = readByte
+        self.writeOutput = write
+    }
+
+    func readInput(timeout: TimeInterval? = nil) -> TerminalInput {
+        TerminalControl.readInput(timeout: timeout, readByte: readBufferedByte(timeout:))
+    }
+
+    func copy(_ text: String) {
+        writeOutput(TerminalControl.copyToClipboardSequence(text))
+    }
+
+    func paste() -> String? {
+        writeOutput(TerminalControl.pasteFromClipboardSequence)
+        return readClipboardResponse()
+    }
+
+    private func readClipboardResponse() -> String? {
+        var candidate: [UInt8] = []
+        while let byte = readTerminalByte(Self.clipboardResponseByteTimeout) {
+            candidate.append(byte)
+            while !Self.clipboardResponsePrefix.starts(with: candidate) {
+                enqueueInput(candidate.removeFirst())
+            }
+            if candidate == Self.clipboardResponsePrefix {
+                return readClipboardPayload()
+            }
+        }
+
+        enqueueInput(candidate)
+        return nil
+    }
+
+    private func readClipboardPayload() -> String? {
+        var payload: [UInt8] = []
+        while let byte = readTerminalByte(Self.clipboardResponseByteTimeout) {
+            switch byte {
+            case 7:
+                return decodeClipboardPayload(payload)
+            case 27:
+                guard let terminator = readTerminalByte(Self.clipboardResponseByteTimeout),
+                      terminator == 92 else {
+                    return nil
+                }
+                return decodeClipboardPayload(payload)
+            default:
+                payload.append(byte)
+            }
+        }
+
+        return nil
+    }
+
+    private func decodeClipboardPayload(_ payload: [UInt8]) -> String? {
+        guard let encoded = String(bytes: payload, encoding: .ascii),
+              let data = Data(base64Encoded: encoded) else {
+            return nil
+        }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func readBufferedByte(timeout: TimeInterval?) -> UInt8? {
+        if pendingInputOffset < pendingInputBytes.count {
+            let byte = pendingInputBytes[pendingInputOffset]
+            pendingInputOffset += 1
+            if pendingInputOffset == pendingInputBytes.count {
+                pendingInputBytes.removeAll(keepingCapacity: true)
+                pendingInputOffset = 0
+            }
+            return byte
+        }
+
+        return readTerminalByte(timeout)
+    }
+
+    private func enqueueInput(_ byte: UInt8) {
+        pendingInputBytes.append(byte)
+    }
+
+    private func enqueueInput(_ bytes: [UInt8]) {
+        pendingInputBytes.append(contentsOf: bytes)
+    }
+}
+
 final class TerminalSession {
 
     private let original: Termios
 
     private let raw: Termios
+
+    private let io: TerminalIO
 
     private var previousWindowChangeHandler: (@convention(c) (Int32) -> Void)?
 
@@ -489,6 +601,22 @@ final class TerminalSession {
         raw.makeRaw()
         self.original = original
         self.raw = raw
+        self.io = TerminalIO(
+            readByte: TerminalControl.readByte(timeout:),
+            write: TerminalControl.write(_:)
+        )
+    }
+
+    func readInput(timeout: TimeInterval? = nil) -> TerminalInput {
+        io.readInput(timeout: timeout)
+    }
+
+    func copy(_ text: String) {
+        io.copy(text)
+    }
+
+    func paste() -> String? {
+        io.paste()
     }
 
     func start() throws {

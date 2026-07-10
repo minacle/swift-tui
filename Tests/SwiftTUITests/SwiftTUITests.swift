@@ -5966,6 +5966,86 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.disablePointerTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")
 }
 
+@Test func osc52ClipboardSequencesEncodeUTF8Text() {
+    #expect(TerminalControl.copyToClipboardSequence("") == "\u{001B}]52;c;\u{001B}\\")
+    #expect(
+        TerminalControl.copyToClipboardSequence("A한")
+            == "\u{001B}]52;c;Qe2VnA==\u{001B}\\"
+    )
+    #expect(TerminalControl.pasteFromClipboardSequence == "\u{001B}]52;c;?\u{001B}\\")
+}
+
+@Test func terminalClipboardReadsBELAndSTTerminatedResponses() {
+    let expected = "A👨‍👩‍👧‍👦한"
+    for terminator in ["\u{0007}", "\u{001B}\\"] {
+        let probe = TerminalIOProbe(
+            input: osc52ClipboardResponse(expected, terminator: terminator)
+        )
+        let terminal = probe.terminalIO()
+
+        #expect(terminal.paste() == expected)
+        #expect(probe.output == [TerminalControl.pasteFromClipboardSequence])
+        #expect(probe.timeouts.allSatisfy { $0 == 0.1 })
+    }
+}
+
+@Test func terminalClipboardReadsResponsesLongerThanInputEscapeSequences() {
+    let expected = String(repeating: "긴 clipboard text ", count: 512)
+    let probe = TerminalIOProbe(input: osc52ClipboardResponse(expected))
+
+    #expect(probe.terminalIO().paste() == expected)
+}
+
+@Test func terminalClipboardReturnsNilForTimeoutAndInvalidResponses() {
+    let timeoutProbe = TerminalIOProbe(input: [])
+    #expect(timeoutProbe.terminalIO().paste() == nil)
+    #expect(timeoutProbe.timeouts == [0.1])
+
+    let invalidBase64 = TerminalIOProbe(
+        input: Array("\u{001B}]52;c;***\u{0007}".utf8)
+    )
+    #expect(invalidBase64.terminalIO().paste() == nil)
+
+    let invalidUTF8Payload = Data([0xFF]).base64EncodedString()
+    let invalidUTF8 = TerminalIOProbe(
+        input: Array("\u{001B}]52;c;\(invalidUTF8Payload)\u{0007}".utf8)
+    )
+    #expect(invalidUTF8.terminalIO().paste() == nil)
+
+    let incomplete = TerminalIOProbe(
+        input: Array("\u{001B}]52;c;SGVsbG8=".utf8)
+    )
+    #expect(incomplete.terminalIO().paste() == nil)
+}
+
+@Test func terminalClipboardPreservesUnrelatedKeyAndPointerInput() {
+    let pointerBytes = Array("\u{001B}[<0;2;3M".utf8)
+    let response = osc52ClipboardResponse("clipboard")
+    let probe = TerminalIOProbe(input: Array("a".utf8) + pointerBytes + response)
+    let terminal = probe.terminalIO()
+
+    #expect(terminal.paste() == "clipboard")
+    #expect(
+        terminal.readInput(timeout: 0)
+            == .keyPress(KeyPress(key: "a", characters: "a"))
+    )
+    #expect(
+        terminal.readInput(timeout: 0)
+            == .pointer(PointerEvent(button: .left, column: 2, row: 3, phase: .down))
+    )
+}
+
+@Test func terminalClipboardPreservesEscapeWhenQueryTimesOut() {
+    let probe = TerminalIOProbe(input: [27])
+    let terminal = probe.terminalIO()
+
+    #expect(terminal.paste() == nil)
+    #expect(
+        terminal.readInput(timeout: 0)
+            == .keyPress(KeyPress(key: .escape, characters: "\u{001B}"))
+    )
+}
+
 @Test func terminalViewportTrackerIgnoresSameViewport() {
     let viewport = TerminalViewportSize(columns: 80, rows: 24)
     let tracker = TerminalViewportTracker(renderedViewport: viewport)
@@ -5999,6 +6079,57 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(TerminalControl.input(for: 3) == .quit)
     #expect(TerminalControl.input(for: 27) == .keyPress(KeyPress(key: .escape, characters: "\u{001B}")))
     #expect(TerminalControl.input(for: 113) == .keyPress(KeyPress(key: "q", characters: "q")))
+}
+
+@Test func copyAndPasteActionsSupportTextSelectionSlices() {
+    var copied: [String] = []
+    let copy = CopyAction {
+        copied.append($0)
+    }
+    copy("literal")
+
+    let text = "A👨‍👩‍👧‍👦한"
+    let lowerBound = text.index(after: text.startIndex)
+    let upperBound = text.index(after: lowerBound)
+    let selection = TextSelection(range: lowerBound..<upperBound)
+    guard case .selection(let range) = selection.indices else {
+        Issue.record("Expected a single text selection")
+        return
+    }
+    copy(text[range])
+
+    let paste = PasteAction {
+        "붙여넣기"
+    }
+
+    #expect(copied == ["literal", "👨‍👩‍👧‍👦"])
+    #expect(paste() == "붙여넣기")
+}
+
+@Test func clipboardEnvironmentActionsHaveSafeDefaults() {
+    let environment = EnvironmentValues()
+
+    environment.copy("discarded")
+
+    #expect(environment.paste() == nil)
+}
+
+@Test func clipboardActionsCanBeReadFromEnvironmentSnapshots() {
+    var copied: [String] = []
+    let probe = ClipboardActionProbe()
+    let view = CapturedClipboardActionsView(probe: probe)
+        .environment(\.copy, CopyAction {
+            copied.append($0)
+        })
+        .environment(\.paste, PasteAction {
+            "snapshot"
+        })
+
+    _ = ViewResolver.text(from: view)
+    probe.copy?("selected")
+
+    #expect(copied == ["selected"])
+    #expect(probe.paste?() == "snapshot")
 }
 
 @Test func terminateActionPerformsStoredOperation() {
@@ -11518,6 +11649,61 @@ private final class TerminateActionProbe {
     }
 }
 
+private final class ClipboardActionProbe {
+
+    var copy: CopyAction?
+
+    var paste: PasteAction?
+
+    func capture(copy: CopyAction, paste: PasteAction) {
+        self.copy = copy
+        self.paste = paste
+    }
+}
+
+private final class TerminalIOProbe {
+
+    private var input: [UInt8]
+
+    private var inputOffset = 0
+
+    private(set) var output: [String] = []
+
+    private(set) var timeouts: [TimeInterval?] = []
+
+    init(input: [UInt8]) {
+        self.input = input
+    }
+
+    func terminalIO() -> TerminalIO {
+        TerminalIO(readByte: readByte(timeout:), write: write(_:))
+    }
+
+    private func readByte(timeout: TimeInterval?) -> UInt8? {
+        timeouts.append(timeout)
+        guard inputOffset < input.count else {
+            return nil
+        }
+
+        defer {
+            inputOffset += 1
+        }
+        return input[inputOffset]
+    }
+
+    private func write(_ value: String) {
+        output.append(value)
+    }
+}
+
+private func osc52ClipboardResponse(
+    _ text: String,
+    terminator: String = "\u{001B}\\"
+) -> [UInt8] {
+    let payload = Data(text.utf8).base64EncodedString()
+    return Array("\u{001B}]52;c;\(payload)\(terminator)".utf8)
+}
+
 private struct ForEachTestItem: Identifiable {
 
     let id: String
@@ -12442,6 +12628,30 @@ private struct CapturedTerminateAction: View {
 
     init(action: TerminateAction, probe: TerminateActionProbe) {
         probe.capture(action)
+    }
+
+    var body: some View {
+        Text("A")
+    }
+}
+
+private struct CapturedClipboardActionsView: View {
+
+    @Environment(\.copy) private var copy
+
+    @Environment(\.paste) private var paste
+
+    let probe: ClipboardActionProbe
+
+    var body: some View {
+        CapturedClipboardActions(copy: copy, paste: paste, probe: probe)
+    }
+}
+
+private struct CapturedClipboardActions: View {
+
+    init(copy: CopyAction, paste: PasteAction, probe: ClipboardActionProbe) {
+        probe.capture(copy: copy, paste: paste)
     }
 
     var body: some View {

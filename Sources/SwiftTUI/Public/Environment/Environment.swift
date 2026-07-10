@@ -94,6 +94,54 @@ public nonisolated struct OpenURLAction: @unchecked Sendable {
     }
 }
 
+/// An action that copies text to the terminal clipboard.
+///
+/// Read this action from `Environment(\.copy)` and call it with a string or
+/// substring to publish the text through the clipboard service installed by
+/// the running app.
+public nonisolated struct CopyAction {
+
+    private let action: (String) -> Void
+
+    /// Creates a copy action.
+    ///
+    /// - Parameter action: The closure to run with copied text.
+    public init(_ action: @escaping (String) -> Void) {
+        self.action = action
+    }
+
+    /// Copies text by invoking the installed clipboard service.
+    ///
+    /// - Parameter text: The string or substring to copy.
+    public func callAsFunction<S>(_ text: S) where S: StringProtocol {
+        action(String(text))
+    }
+}
+
+/// An action that reads text from the terminal clipboard.
+///
+/// Read this action from `Environment(\.paste)`. The action returns `nil`
+/// when the clipboard service is unavailable or doesn't contain readable
+/// UTF-8 text.
+public nonisolated struct PasteAction {
+
+    private let action: () -> String?
+
+    /// Creates a paste action.
+    ///
+    /// - Parameter action: The closure that reads clipboard text.
+    public init(_ action: @escaping () -> String?) {
+        self.action = action
+    }
+
+    /// Reads text from the installed clipboard service.
+    ///
+    /// - Returns: Clipboard text, or `nil` when no text is available.
+    public func callAsFunction() -> String? {
+        action()
+    }
+}
+
 /// A key for accessing values in the environment.
 public protocol EnvironmentKey {
 
@@ -156,6 +204,32 @@ public extension EnvironmentValues {
         }
         set {
             self[IsEnabledKey.self] = newValue
+        }
+    }
+
+    /// An action that copies text to the terminal clipboard.
+    ///
+    /// The default action discards text until the root app runner installs a
+    /// terminal clipboard service.
+    nonisolated var copy: CopyAction {
+        get {
+            self[CopyActionKey.self]
+        }
+        set {
+            self[CopyActionKey.self] = newValue
+        }
+    }
+
+    /// An action that reads text from the terminal clipboard.
+    ///
+    /// The default action returns `nil` until the root app runner installs a
+    /// terminal clipboard service.
+    nonisolated var paste: PasteAction {
+        get {
+            self[PasteActionKey.self]
+        }
+        set {
+            self[PasteActionKey.self] = newValue
         }
     }
 
@@ -804,6 +878,20 @@ private struct IsEnabledKey: EnvironmentKey {
 
     nonisolated static var defaultValue: Bool {
         true
+    }
+}
+
+private struct CopyActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: CopyAction {
+        CopyAction { _ in }
+    }
+}
+
+private struct PasteActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: PasteAction {
+        PasteAction { nil }
     }
 }
 
