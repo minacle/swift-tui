@@ -13,6 +13,8 @@ public nonisolated struct TextEditor: View, TextEditorRenderable, LayoutTraitRen
 
     let text: Binding<String>
 
+    let selection: Binding<TextSelection?>?
+
     var layoutTraits: LayoutTraits {
         LayoutTraits(flexibleAxes: [.horizontal, .vertical])
     }
@@ -22,6 +24,20 @@ public nonisolated struct TextEditor: View, TextEditorRenderable, LayoutTraitRen
     /// - Parameter text: A binding to the editable string.
     public init(text: Binding<String>) {
         self.text = text
+        self.selection = nil
+    }
+
+    /// Creates a text editor with bindings to its text and current selection.
+    ///
+    /// - Parameters:
+    ///   - text: A binding to the editable string.
+    ///   - selection: A binding to the current selection.
+    public init(
+        text: Binding<String>,
+        selection: Binding<TextSelection?>
+    ) {
+        self.text = text
+        self.selection = selection
     }
 }
 
@@ -48,7 +64,13 @@ extension TextEditor {
         let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
             && runtime?.isSuppressingInteractiveRenderRegistrations != true
         if updatesInteractiveState {
-            editorState?.synchronize(with: text.wrappedValue)
+            let bindingText = text.wrappedValue
+            let textChanged = editorState?.text != bindingText
+            editorState?.synchronize(with: bindingText)
+            editorState?.synchronizeSelection(
+                with: selection,
+                textChanged: textChanged
+            )
             editorState?.clamp()
             editorState?.updateLayoutWidth(proposal?.columns)
         }
@@ -58,7 +80,12 @@ extension TextEditor {
                 actionPath: path,
                 matches: TextEditorInput.matches,
                 action: {
-                    handle($0, text: text, state: editorState)
+                    handle(
+                        $0,
+                        text: text,
+                        selection: selection,
+                        state: editorState
+                    )
                 }
             ),
             at: path
@@ -77,6 +104,7 @@ extension TextEditor {
                         maxWidth: editorState.layoutWidth
                     )
                     editorState.beginSelection(to: point, layout: layout)
+                    editorState.publishSelection(to: selection)
                 },
                 changed: { point in
                     guard let editorState else {
@@ -88,6 +116,7 @@ extension TextEditor {
                         maxWidth: editorState.layoutWidth
                     )
                     editorState.extendSelection(to: point, layout: layout)
+                    editorState.publishSelection(to: selection)
                 }
             ),
             at: path
@@ -97,6 +126,10 @@ extension TextEditor {
         let layout = TextEditorLayout(text: currentText, maxWidth: proposal?.columns)
         let caret = renderedCaret(state: editorState, layout: layout, runtime: runtime, path: path)
         if updatesInteractiveState {
+            editorState?.publishSelectionOnFocus(
+                runtime?.isFocused(at: path) == true,
+                to: selection
+            )
             editorState?.updateScrollPoint(
                 for: caret,
                 viewportWidth: proposal?.columns,
@@ -152,6 +185,7 @@ extension TextEditor {
     private func handle(
         _ keyPress: KeyPress,
         text: Binding<String>,
+        selection: Binding<TextSelection?>?,
         state: TextEditorState?
     ) -> KeyPress.Result {
         guard let state else {
@@ -168,12 +202,14 @@ extension TextEditor {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .rightArrow:
             state.moveRight(
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .upArrow:
             state.moveVertically(
@@ -182,6 +218,7 @@ extension TextEditor {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .downArrow:
             state.moveVertically(
@@ -190,6 +227,7 @@ extension TextEditor {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .home:
             state.moveToLineStart(
@@ -197,6 +235,7 @@ extension TextEditor {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .end:
             state.moveToLineEnd(
@@ -204,15 +243,19 @@ extension TextEditor {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .delete:
             state.deleteBackward(update: text)
+            state.publishSelection(to: selection)
             return .handled
         case .deleteForward:
             state.deleteForward(update: text)
+            state.publishSelection(to: selection)
             return .handled
         case .return:
             state.insert("\n", update: text)
+            state.publishSelection(to: selection)
             return .handled
         default:
             guard TextEditorInput.isTextInsertion(keyPress) else {
@@ -220,6 +263,7 @@ extension TextEditor {
             }
 
             state.insert(keyPress.characters, update: text)
+            state.publishSelection(to: selection)
             return .handled
         }
     }
@@ -280,6 +324,24 @@ final class TextEditorState {
 
     func clamp() {
         selection.clamp(upperBound: text.count)
+    }
+
+    func synchronizeSelection(
+        with binding: Binding<TextSelection?>?,
+        textChanged: Bool
+    ) {
+        selection.synchronize(with: binding, in: text, force: textChanged)
+    }
+
+    func publishSelection(to binding: Binding<TextSelection?>?) {
+        selection.publish(to: binding, in: text)
+    }
+
+    func publishSelectionOnFocus(
+        _ isFocused: Bool,
+        to binding: Binding<TextSelection?>?
+    ) {
+        selection.publishOnFocus(isFocused, to: binding, in: text)
     }
 
     func updateLayoutWidth(_ width: Int?) {

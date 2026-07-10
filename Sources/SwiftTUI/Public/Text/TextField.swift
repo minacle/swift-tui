@@ -12,6 +12,8 @@ public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, Lay
 
     let text: Binding<String>
 
+    let selection: Binding<TextSelection?>?
+
     let prompt: Text?
 
     let label: Label
@@ -33,6 +35,7 @@ public nonisolated struct TextField<Label: View>: View, TextFieldRenderable, Lay
         @ViewBuilder label: () -> Label
     ) {
         self.text = text
+        self.selection = nil
         self.prompt = prompt
         self.label = label()
     }
@@ -59,6 +62,25 @@ public extension TextField where Label == Text {
         self.init(text: text, prompt: prompt) {
             Text(title)
         }
+    }
+
+    /// Creates a text field with bindings to its text and current selection.
+    ///
+    /// - Parameters:
+    ///   - title: The field label and fallback placeholder text.
+    ///   - text: A binding to the editable string.
+    ///   - selection: A binding to the current selection.
+    ///   - prompt: Placeholder text shown when `text` is empty.
+    init(
+        _ title: String,
+        text: Binding<String>,
+        selection: Binding<TextSelection?>,
+        prompt: Text? = nil
+    ) {
+        self.text = text
+        self.selection = selection
+        self.prompt = prompt
+        self.label = Text(title)
     }
 }
 
@@ -229,6 +251,7 @@ extension TextField {
     ) -> RenderedBlock? {
         TextInputRenderer.renderedBlock(
             text: text,
+            selection: selection,
             prompt: prompt,
             label: label,
             displayMode: .plain,
@@ -248,6 +271,7 @@ extension SecureField {
     ) -> RenderedBlock? {
         TextInputRenderer.renderedBlock(
             text: text,
+            selection: nil,
             prompt: prompt,
             label: label,
             displayMode: .secure,
@@ -262,6 +286,7 @@ private enum TextInputRenderer {
 
     static func renderedBlock<Label: View>(
         text: Binding<String>,
+        selection: Binding<TextSelection?>?,
         prompt: Text?,
         label: Label,
         displayMode: TextFieldDisplayMode,
@@ -277,7 +302,13 @@ private enum TextInputRenderer {
         let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
             && runtime?.isSuppressingInteractiveRenderRegistrations != true
         if updatesInteractiveState {
-            fieldState?.synchronize(with: text.wrappedValue)
+            let bindingText = text.wrappedValue
+            let textChanged = fieldState?.text != bindingText
+            fieldState?.synchronize(with: bindingText)
+            fieldState?.synchronizeSelection(
+                with: selection,
+                textChanged: textChanged
+            )
             fieldState?.clamp()
         }
         runtime?.registerFocusable(true, at: path)
@@ -291,6 +322,7 @@ private enum TextInputRenderer {
                     handle(
                         $0,
                         text: text,
+                        selection: selection,
                         state: fieldState,
                         submitAction: submitAction
                     )
@@ -311,6 +343,7 @@ private enum TextInputRenderer {
                         toColumn: point.column,
                         layoutText: displayMode.layoutText(for: fieldState.text)
                     )
+                    fieldState.publishSelection(to: selection)
                 },
                 changed: { point in
                     guard let fieldState else {
@@ -321,6 +354,7 @@ private enum TextInputRenderer {
                         toColumn: point.column,
                         layoutText: displayMode.layoutText(for: fieldState.text)
                     )
+                    fieldState.publishSelection(to: selection)
                 }
             ),
             at: path
@@ -329,6 +363,9 @@ private enum TextInputRenderer {
         let currentText = fieldState?.text ?? text.wrappedValue
         let layoutText = displayMode.layoutText(for: currentText)
         let isFocused = runtime?.isFocused(at: path) == true
+        if updatesInteractiveState {
+            fieldState?.publishSelectionOnFocus(isFocused, to: selection)
+        }
         if updatesInteractiveState, let maxWidth = proposal?.columns {
             fieldState?.updateHorizontalScrollOffset(
                 maxWidth: maxWidth,
@@ -432,6 +469,7 @@ private enum TextInputRenderer {
     private static func handle(
         _ keyPress: KeyPress,
         text: Binding<String>,
+        selection: Binding<TextSelection?>?,
         state: TextFieldState?,
         submitAction: SubmitAction?
     ) -> KeyPress.Result {
@@ -448,30 +486,36 @@ private enum TextInputRenderer {
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .rightArrow:
             state.moveRight(
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .home:
             state.moveToStart(
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .end:
             state.moveToEnd(
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
+            state.publishSelection(to: selection)
             return .handled
         case .delete:
             state.deleteBackward(update: text)
+            state.publishSelection(to: selection)
             return .handled
         case .deleteForward:
             state.deleteForward(update: text)
+            state.publishSelection(to: selection)
             return .handled
         case .return:
             submitAction?.action()
@@ -482,6 +526,7 @@ private enum TextInputRenderer {
             }
 
             state.insert(keyPress.characters, update: text)
+            state.publishSelection(to: selection)
             return .handled
         }
     }
@@ -556,6 +601,24 @@ final class TextFieldState {
     func clamp() {
         selection.clamp(upperBound: text.count)
         horizontalScrollOffset = min(horizontalScrollOffset, offset)
+    }
+
+    func synchronizeSelection(
+        with binding: Binding<TextSelection?>?,
+        textChanged: Bool
+    ) {
+        selection.synchronize(with: binding, in: text, force: textChanged)
+    }
+
+    func publishSelection(to binding: Binding<TextSelection?>?) {
+        selection.publish(to: binding, in: text)
+    }
+
+    func publishSelectionOnFocus(
+        _ isFocused: Bool,
+        to binding: Binding<TextSelection?>?
+    ) {
+        selection.publishOnFocus(isFocused, to: binding, in: text)
     }
 
     func moveLeft(

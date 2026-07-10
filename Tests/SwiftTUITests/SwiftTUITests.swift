@@ -15,6 +15,22 @@ nonisolated struct CustomErasedShapeStyle: ShapeStyle {
     let _swiftTUIAnyColor = AnyColor(Color16.brightMagenta)
 }
 
+@Test func textSelectionRepresentsInsertionPointsAndSingleRanges() {
+    let text = "A👨‍👩‍👧‍👦한"
+    let emojiStart = text.index(after: text.startIndex)
+    let emojiEnd = text.index(after: emojiStart)
+    let insertion = TextSelection(insertionPoint: emojiStart)
+    var selection = insertion
+
+    #expect(insertion.isInsertion)
+    #expect(selectionCharacterOffsets(insertion, in: text) == 1..<1)
+
+    selection.indices = .selection(emojiStart..<emojiEnd)
+    #expect(!selection.isInsertion)
+    #expect(selectionCharacterOffsets(selection, in: text) == 1..<2)
+    #expect(Set([insertion, insertion, selection]).count == 2)
+}
+
 @Test func anyColorConvenienceFactoriesCreateTypeErasedColors() {
     let defaultColor: AnyColor = .default
 
@@ -1347,6 +1363,176 @@ private func lineBreakKinds(in text: String) -> [String] {
     #expect(ViewResolver.text(from: textField) == "mayu ")
 }
 
+@Test func textFieldSelectionBindingAppliesRangeAndPublishesReplacement() {
+    let text = "A👨‍👩‍👧‍👦한"
+    let emojiStart = text.index(after: text.startIndex)
+    let emojiEnd = text.index(after: emojiStart)
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextFieldView(
+        text: text,
+        selection: TextSelection(range: emojiStart..<emojiEnd),
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(runtime.block(from: view)?.caret == nil)
+    #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+
+    let updatedText = textProbe.binding?.wrappedValue
+    #expect(updatedText == "AX한")
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: updatedText ?? ""
+        ) == 2..<2
+    )
+}
+
+@Test func textFieldSelectionBindingTracksPointerAndKeyboardNavigation() {
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextFieldView(
+        text: "abcd",
+        selection: nil,
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 4..<4
+    )
+
+    dispatchSelectionDrag(
+        to: runtime,
+        fromColumn: 1,
+        fromRow: 1,
+        toColumn: 4,
+        toRow: 1
+    )
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 0..<3
+    )
+
+    #expect(runtime.dispatch(KeyPress(key: .rightArrow, characters: "\u{F703}")) == .handled)
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 3..<3
+    )
+    #expect(runtime.dispatch(KeyPress(
+        key: .leftArrow,
+        characters: "\u{F702}",
+        modifiers: .shift
+    )) == .handled)
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 2..<3
+    )
+}
+
+@Test func textFieldSelectionBindingCollapsesNilAndInvalidSelectionsSafely() {
+    let source = "abcdef"
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextFieldView(
+        text: "ab",
+        selection: TextSelection(insertionPoint: source.endIndex),
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 2..<2
+    )
+
+    let currentText = textProbe.binding?.wrappedValue ?? ""
+    selectionProbe.binding?.wrappedValue = TextSelection(
+        range: currentText.startIndex..<currentText.endIndex
+    )
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(runtime.block(from: view)?.caret == nil)
+
+    selectionProbe.binding?.wrappedValue = nil
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 2))
+    #expect(selectionProbe.binding?.wrappedValue == nil)
+
+    #expect(runtime.dispatch(KeyPress(key: .leftArrow, characters: "\u{F702}")) == .handled)
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 1..<1
+    )
+}
+
+@Test func textFieldSelectionDeletionPublishesCaretInUpdatedText() {
+    let initialText = "abcd"
+    let lowerBound = initialText.index(after: initialText.startIndex)
+    let upperBound = initialText.index(before: initialText.endIndex)
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextFieldView(
+        text: initialText,
+        selection: TextSelection(
+            range: lowerBound..<upperBound
+        ),
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(runtime.dispatch(KeyPress(key: .delete, characters: "\u{7F}")) == .handled)
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(textProbe.binding?.wrappedValue == "ad")
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 1..<1
+    )
+
+    let currentText = textProbe.binding?.wrappedValue ?? ""
+    selectionProbe.binding?.wrappedValue = TextSelection(
+        range: currentText.index(after: currentText.startIndex)..<currentText.endIndex
+    )
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(
+        runtime.dispatch(
+            KeyPress(key: .deleteForward, characters: "\u{F728}")
+        ) == .handled
+    )
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    #expect(textProbe.binding?.wrappedValue == "a")
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 1..<1
+    )
+}
+
 @Test func nonFocusedTextFieldWithTextReservesTrailingCaretCell() {
     let textField = TextField("Name", text: .constant("mayu"))
     let block = ViewResolver.block(from: textField)
@@ -2494,6 +2680,80 @@ private func lineBreakKinds(in text: String) -> [String] {
     let block = runtime.block(from: view)
     #expect(block?.lines == ["a", "b"])
     #expect(block?.caret == RenderedCaret(row: 1, column: 1))
+}
+
+@Test func textEditorSelectionBindingReplacesExternalRangeAndPublishesNewlineCaret() {
+    let text = "ab\ncd"
+    let lowerBound = text.index(after: text.startIndex)
+    let upperBound = text.index(text.startIndex, offsetBy: 4)
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextEditorView(
+        text: text,
+        selection: TextSelection(range: lowerBound..<upperBound),
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view, in: RenderProposal(columns: 4)) <= 4)
+    #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+    #expect(renderUntilStable(runtime, view: view, in: RenderProposal(columns: 4)) <= 4)
+
+    let updatedText = textProbe.binding?.wrappedValue
+    #expect(updatedText == "a\nd")
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: updatedText ?? ""
+        ) == 2..<2
+    )
+}
+
+@Test func scrolledTextEditorClickPublishesSelectionInSourceText() {
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextEditorView(
+        text: "a\nb\nc\nd",
+        selection: nil,
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+    let proposal = RenderProposal(columns: 3, rows: 2)
+
+    #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+    #expect(
+        runtime.dispatch(
+            PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+        ) == .handled
+    )
+    #expect(
+        selectionCharacterOffsets(
+            selectionProbe.binding?.wrappedValue,
+            in: textProbe.binding?.wrappedValue ?? ""
+        ) == 5..<5
+    )
+}
+
+@Test func measurementRenderDoesNotWriteTextSelectionBinding() {
+    let textProbe = BindingProbe<String>()
+    let selectionProbe = BindingProbe<TextSelection?>()
+    let view = SelectionTextEditorView(
+        text: "abc",
+        selection: nil,
+        textProbe: textProbe,
+        selectionProbe: selectionProbe
+    )
+    let runtime = StateRuntime()
+
+    #expect(renderUntilStable(runtime, view: view) <= 4)
+    selectionProbe.binding?.wrappedValue = nil
+    _ = LayoutMeasurementContext.withMeasurement {
+        runtime.block(from: view, in: RenderProposal(columns: 2, rows: 1))
+    }
+
+    #expect(selectionProbe.binding?.wrappedValue == nil)
 }
 
 @Test func shiftHomeSelectsAndReplacesTextEditorLineSuffix() {
@@ -13222,6 +13482,32 @@ private func renderUntilStable<Content: View>(
     return maximumPasses + 1
 }
 
+private func selectionCharacterOffsets(
+    _ selection: TextSelection?,
+    in text: String
+) -> Range<Int>? {
+    guard let selection else {
+        return nil
+    }
+
+    let range: Range<String.Index>
+    switch selection.indices {
+    case .selection(let selection):
+        range = selection
+    }
+
+    guard
+        let lowerBound = String.Index(range.lowerBound, within: text),
+        let upperBound = String.Index(range.upperBound, within: text)
+    else {
+        return nil
+    }
+
+    let lowerOffset = text.distance(from: text.startIndex, to: lowerBound)
+    let upperOffset = text.distance(from: text.startIndex, to: upperBound)
+    return lowerOffset..<upperOffset
+}
+
 private func textFieldOverflowInput() -> String {
     "https://example.com/" + String(repeating: "abcdefghijklmnopqrstuvwxyz0123456789", count: 8)
 }
@@ -13500,6 +13786,62 @@ private struct TextFieldEditingView: View {
     }
 }
 
+private struct SelectionTextFieldView: View {
+
+    @State var text: String
+
+    @State var selection: TextSelection?
+
+    @FocusState var isFocused = true
+
+    let textProbe: BindingProbe<String>
+
+    let selectionProbe: BindingProbe<TextSelection?>
+
+    var body: some View {
+        CapturedSelectionTextField(
+            text: $text,
+            selection: $selection,
+            isFocused: $isFocused,
+            textProbe: textProbe,
+            selectionProbe: selectionProbe
+        )
+    }
+}
+
+private struct CapturedSelectionTextField: View {
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>
+
+    let isFocused: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        selection: Binding<TextSelection?>,
+        isFocused: FocusState<Bool>.Binding,
+        textProbe: BindingProbe<String>,
+        selectionProbe: BindingProbe<TextSelection?>
+    ) {
+        self.text = text
+        self.selection = selection
+        self.isFocused = isFocused
+        textProbe.capture(text)
+        selectionProbe.capture(selection)
+    }
+
+    var body: some View {
+        TextField(
+            "Name",
+            text: text,
+            selection: selection,
+            prompt: Text("Enter a name")
+        )
+        .focused(isFocused)
+    }
+}
+
 private struct OverlayPlaceholderTextFieldView: View {
 
     @State var text = ""
@@ -13657,6 +13999,57 @@ private struct TextEditorEditingView: View {
     var body: some View {
         TextEditor(text: $text)
             .focused($isFocused)
+    }
+}
+
+private struct SelectionTextEditorView: View {
+
+    @State var text: String
+
+    @State var selection: TextSelection?
+
+    @FocusState var isFocused = true
+
+    let textProbe: BindingProbe<String>
+
+    let selectionProbe: BindingProbe<TextSelection?>
+
+    var body: some View {
+        CapturedSelectionTextEditor(
+            text: $text,
+            selection: $selection,
+            isFocused: $isFocused,
+            textProbe: textProbe,
+            selectionProbe: selectionProbe
+        )
+    }
+}
+
+private struct CapturedSelectionTextEditor: View {
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>
+
+    let isFocused: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        selection: Binding<TextSelection?>,
+        isFocused: FocusState<Bool>.Binding,
+        textProbe: BindingProbe<String>,
+        selectionProbe: BindingProbe<TextSelection?>
+    ) {
+        self.text = text
+        self.selection = selection
+        self.isFocused = isFocused
+        textProbe.capture(text)
+        selectionProbe.capture(selection)
+    }
+
+    var body: some View {
+        TextEditor(text: text, selection: selection)
+            .focused(isFocused)
     }
 }
 

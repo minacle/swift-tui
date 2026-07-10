@@ -1,5 +1,43 @@
 import Terminal
 
+/// A value that represents a selection of text.
+public nonisolated struct TextSelection: Equatable, Hashable {
+
+    /// The indices of the current selection.
+    public nonisolated enum Indices: Equatable, Hashable {
+
+        /// The range of a single selection.
+        ///
+        /// An empty range represents an insertion point.
+        case selection(Range<String.Index>)
+    }
+
+    /// The indices of the current selection.
+    public var indices: Indices
+
+    /// Creates a selection at an insertion point.
+    ///
+    /// - Parameter insertionPoint: The index where text is inserted.
+    public init(insertionPoint: String.Index) {
+        self.init(range: insertionPoint..<insertionPoint)
+    }
+
+    /// Creates a selection over a range of text.
+    ///
+    /// - Parameter range: The range of selected text.
+    public init(range: Range<String.Index>) {
+        self.indices = .selection(range)
+    }
+
+    /// Whether the selection represents an insertion point.
+    public var isInsertion: Bool {
+        switch indices {
+        case .selection(let range):
+            range.isEmpty
+        }
+    }
+}
+
 /// A behavior that determines how keyboard navigation continues a pointer selection.
 public nonisolated enum TextSelectionNavigationBehavior: Equatable, Hashable, Sendable {
 
@@ -186,6 +224,10 @@ final class TextSelectionState {
 
     private var awaitsNavigationEndpoint = false
 
+    private var lastObservedBindingSelection: TextSelection??
+
+    private var wasBoundControlFocused = false
+
     var range: Range<Int>? {
         guard let anchor, anchor != offset else {
             return nil
@@ -267,6 +309,67 @@ final class TextSelectionState {
         }
     }
 
+    func synchronize(
+        with binding: Binding<TextSelection?>?,
+        in text: String,
+        force: Bool = false
+    ) {
+        guard let binding else {
+            lastObservedBindingSelection = nil
+            wasBoundControlFocused = false
+            return
+        }
+
+        let boundSelection = binding.wrappedValue
+        guard force || lastObservedBindingSelection != .some(boundSelection) else {
+            return
+        }
+
+        lastObservedBindingSelection = .some(boundSelection)
+        awaitsNavigationEndpoint = false
+        guard
+            let boundSelection,
+            let range = boundSelection.characterOffsets(in: text)
+        else {
+            update(anchor: nil, offset: offset, upperBound: text.count)
+            return
+        }
+
+        update(
+            anchor: range.isEmpty ? nil : range.lowerBound,
+            offset: range.upperBound,
+            upperBound: text.count
+        )
+    }
+
+    func publish(
+        to binding: Binding<TextSelection?>?,
+        in text: String
+    ) {
+        guard let binding else {
+            return
+        }
+
+        binding.wrappedValue = textSelection(in: text)
+        lastObservedBindingSelection = .some(binding.wrappedValue)
+    }
+
+    func publishOnFocus(
+        _ isFocused: Bool,
+        to binding: Binding<TextSelection?>?,
+        in text: String
+    ) {
+        guard let binding else {
+            wasBoundControlFocused = false
+            return
+        }
+
+        if isFocused && !wasBoundControlFocused {
+            publish(to: binding, in: text)
+        }
+        wasBoundControlFocused = isFocused
+    }
+
     private func update(anchor: Int?, offset: Int, upperBound: Int) {
         let oldAnchor = self.anchor
         let oldOffset = self.offset
@@ -279,6 +382,40 @@ final class TextSelectionState {
 
     private func clamped(_ offset: Int, upperBound: Int) -> Int {
         min(max(offset, 0), max(upperBound, 0))
+    }
+
+    private func textSelection(in text: String) -> TextSelection {
+        let lowerOffset = range?.lowerBound ?? offset
+        let upperOffset = range?.upperBound ?? offset
+        let lowerBound = text.index(text.startIndex, offsetBy: lowerOffset)
+        let upperBound = text.index(text.startIndex, offsetBy: upperOffset)
+        return TextSelection(range: lowerBound..<upperBound)
+    }
+}
+
+private extension TextSelection {
+
+    func characterOffsets(in text: String) -> Range<Int>? {
+        let range: Range<String.Index>
+        switch indices {
+        case .selection(let selection):
+            range = selection
+        }
+
+        guard
+            let lowerBound = String.Index(range.lowerBound, within: text),
+            let upperBound = String.Index(range.upperBound, within: text)
+        else {
+            return nil
+        }
+
+        let lowerOffset = text.distance(from: text.startIndex, to: lowerBound)
+        let upperOffset = text.distance(from: text.startIndex, to: upperBound)
+        guard lowerOffset <= upperOffset else {
+            return nil
+        }
+
+        return lowerOffset..<upperOffset
     }
 }
 

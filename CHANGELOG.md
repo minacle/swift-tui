@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EnvironmentValues.textSelectionNavigationBehavior`,
   `View.textSelectionNavigationBehavior(_:)`, and drag-based range selection
   for static `Text` and editable text controls.
+- Added SwiftUI-shaped single-range `TextSelection`,
+  `TextField.init(_:text:selection:prompt:)`, and
+  `TextEditor.init(text:selection:)` for binding editable text selections.
 - Added `AnyShapeStyle`, optional
   `EnvironmentValues.textSelectionForegroundStyle`, and
   `View.textSelectionForegroundStyle(_:)` for overriding selected text while

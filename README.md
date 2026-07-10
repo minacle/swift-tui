@@ -149,6 +149,23 @@ TextField("Name", text: $name)
     .environment(\.textSelectionNavigationBehavior, .navigationDirection)
 ```
 
+Use a `TextSelection` binding to read or set the insertion point or selected
+range of a `TextField` or `TextEditor`:
+
+```swift
+@State var text = "Edit this text"
+@State var selection: TextSelection?
+
+TextEditor(text: $text, selection: $selection)
+
+if let selection, case .selection(let range) = selection.indices {
+    let selectedText = text[range]
+}
+```
+
+SwiftTUI currently supports one selection. Create an insertion point with
+`TextSelection(insertionPoint:)` or a range with `TextSelection(range:)`.
+
 ## Validation
 
 Use these commands from the package root:
