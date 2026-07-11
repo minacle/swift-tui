@@ -83,6 +83,23 @@ struct GridLayoutTests {
     }
 
     @Test
+    func `gridColumnAlignment reads explicit custom guides from every cell`() {
+        let view = Grid {
+            GridRow {
+                Text("A")
+                    .alignmentGuide(.gridMarker) { _ in 0 }
+                    .gridColumnAlignment(.gridMarker)
+            }
+            GridRow {
+                Text("BBB")
+                    .alignmentGuide(.gridMarker) { _ in 2 }
+            }
+        }
+
+        #expect(ViewResolver.block(from: view)?.lines == ["  A", "BBB"])
+    }
+
+    @Test
     func `a GridRow alignment overrides the Grid's vertical alignment`() {
         let view = Grid(alignment: .topLeading) {
             GridRow(alignment: .bottom) {
@@ -91,6 +108,23 @@ struct GridLayoutTests {
                     Text("B")
                     Text("C")
                 }
+            }
+        }
+
+        #expect(ViewResolver.block(from: view)?.lines == [" B", "AC"])
+    }
+
+    @Test
+    func `a GridRow custom alignment reads each cell's explicit vertical guide`() {
+        let view = Grid(alignment: .topLeading) {
+            GridRow(alignment: .gridRowMarker) {
+                Text("A")
+                    .alignmentGuide(.gridRowMarker) { _ in 0 }
+                VStack {
+                    Text("B")
+                    Text("C")
+                }
+                .alignmentGuide(.gridRowMarker) { _ in 1 }
             }
         }
 
@@ -354,6 +388,26 @@ struct GridLayoutTests {
 
         #expect(block?.caret == RenderedCaret(row: 0, column: 3))
     }
+}
+
+private nonisolated enum GridMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        max(context.columns - 1, 0)
+    }
+}
+
+private extension HorizontalAlignment {
+    nonisolated static let gridMarker = HorizontalAlignment(GridMarkerAlignment.self)
+}
+
+private nonisolated enum GridRowMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        max(context.rows - 1, 0)
+    }
+}
+
+private extension VerticalAlignment {
+    nonisolated static let gridRowMarker = VerticalAlignment(GridRowMarkerAlignment.self)
 }
 
 private struct GridCaretOffsetTextFieldView: View {

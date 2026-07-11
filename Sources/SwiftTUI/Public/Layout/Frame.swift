@@ -109,49 +109,6 @@ public nonisolated struct EdgeInsets: Equatable, Sendable {
     }
 }
 
-/// An alignment in both terminal axes.
-public nonisolated struct Alignment: Equatable, Sendable {
-
-    /// The horizontal alignment component.
-    public let horizontal: HorizontalAlignment
-
-    /// The vertical alignment component.
-    public let vertical: VerticalAlignment
-
-    /// Creates an alignment from horizontal and vertical components.
-    public init(horizontal: HorizontalAlignment, vertical: VerticalAlignment) {
-        self.horizontal = horizontal
-        self.vertical = vertical
-    }
-
-    /// Top-leading alignment.
-    public static let topLeading = Alignment(horizontal: .leading, vertical: .top)
-
-    /// Top-center alignment.
-    public static let top = Alignment(horizontal: .center, vertical: .top)
-
-    /// Top-trailing alignment.
-    public static let topTrailing = Alignment(horizontal: .trailing, vertical: .top)
-
-    /// Center-leading alignment.
-    public static let leading = Alignment(horizontal: .leading, vertical: .center)
-
-    /// Center alignment in both axes.
-    public static let center = Alignment(horizontal: .center, vertical: .center)
-
-    /// Center-trailing alignment.
-    public static let trailing = Alignment(horizontal: .trailing, vertical: .center)
-
-    /// Bottom-leading alignment.
-    public static let bottomLeading = Alignment(horizontal: .leading, vertical: .bottom)
-
-    /// Bottom-center alignment.
-    public static let bottom = Alignment(horizontal: .center, vertical: .bottom)
-
-    /// Bottom-trailing alignment.
-    public static let bottomTrailing = Alignment(horizontal: .trailing, vertical: .bottom)
-}
-
 /// A transparent modifier that proposes a fixed terminal size to its content.
 struct FrameView<Content: View>: View, LayoutModifierRenderable, LayoutTraitRenderable {
 

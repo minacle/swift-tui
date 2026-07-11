@@ -49,6 +49,22 @@ struct LayeredViewTests {
     }
 
     @Test
+    func `an out-of-bounds custom guide expands a ZStack without clipping`() {
+        let block = ViewResolver.block(
+            from: ZStack(
+                alignment: Alignment(horizontal: .layerMarker, vertical: .top)
+            ) {
+                Text("A")
+                    .alignmentGuide(.layerMarker) { _ in -2 }
+                Text("BBB")
+                    .alignmentGuide(.layerMarker) { _ in 2 }
+            }
+        )
+
+        #expect(block?.lines == ["BBB A"])
+    }
+
+    @Test
     func `ZStack propagates flexible axes from layered content`() {
         let runtime = StateRuntime()
         let view = ZStackTextEditorLayoutView()
@@ -357,6 +373,16 @@ struct LayeredViewTests {
 
         #expect(block?.lines == ["A"])
     }
+}
+
+private nonisolated enum LayerMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        0
+    }
+}
+
+private extension HorizontalAlignment {
+    nonisolated static let layerMarker = HorizontalAlignment(LayerMarkerAlignment.self)
 }
 
 private struct OverlappingLayout: Layout {

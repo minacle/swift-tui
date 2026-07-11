@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added terminal-native `ViewDimensions` with `columns` and `rows`,
+  `AlignmentID`, custom horizontal and vertical alignments, and
+  `View.alignmentGuide(_:computeValue:)`, including
+  explicit-guide propagation through custom layouts, stacks, grids, frames,
+  layered views, padding, scrolling, and placement.
 - Added terminal-native `ProposedViewSize.max`, `ProposedViewSize.init(_:)`,
   and `replacingUnspecifiedDimensions(by:)`, including allocation-safe maximum
   measurement for fixed, constrained, and flexible custom-layout subviews.
@@ -35,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** Changed `LayoutSubview.dimensions(in:)` to return
+  `ViewDimensions`, removed `LayoutSubviewDimensions`, and changed
+  `HorizontalAlignment` and `VerticalAlignment` from closed enums to
+  identifier-backed structures that support custom terminal-cell guides.
 - **Breaking:** Changed `ProposedViewSize.init(columns:rows:)` to require both
   arguments explicitly and preserve negative dimensions instead of clamping
   them to zero.

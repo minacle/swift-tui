@@ -51,37 +51,41 @@ public nonisolated struct ProposedViewSize: Equatable, Sendable {
     }
 }
 
-/// The measured dimensions of a layout subview.
-public nonisolated struct LayoutSubviewDimensions: Equatable, Sendable {
+/// A view's size and alignment guides in its own terminal-cell coordinate space.
+public nonisolated struct ViewDimensions: Equatable, Sendable {
 
-    /// The measured size of the subview.
-    public let size: Size
+    /// The measured number of terminal columns.
+    public let columns: Int
 
-    /// The measured width in terminal columns.
-    public var columns: Int {
-        size.columns
+    /// The measured number of terminal rows.
+    public let rows: Int
+
+    let explicitAlignments: [AlignmentKey: Int]
+
+    init(columns: Int, rows: Int, explicitAlignments: [AlignmentKey: Int] = [:]) {
+        self.columns = columns
+        self.rows = rows
+        self.explicitAlignments = explicitAlignments
     }
 
-    /// The measured height in terminal rows.
-    public var rows: Int {
-        size.rows
+    /// Gets an explicit horizontal guide or its default value.
+    public subscript(guide: HorizontalAlignment) -> Int {
+        self[explicit: guide] ?? guide.key.value(in: self)
     }
 
-    /// The measured width in terminal columns.
-    public var width: Int {
-        size.columns
+    /// Gets an explicit vertical guide or its default value.
+    public subscript(guide: VerticalAlignment) -> Int {
+        self[explicit: guide] ?? guide.key.value(in: self)
     }
 
-    /// The measured height in terminal rows.
-    public var height: Int {
-        size.rows
+    /// Gets an explicitly assigned horizontal guide.
+    public subscript(explicit guide: HorizontalAlignment) -> Int? {
+        explicitAlignments[guide.key]
     }
 
-    /// Creates measured dimensions from a geometry size.
-    ///
-    /// - Parameter size: The measured terminal-cell size.
-    public init(size: Size) {
-        self.size = size
+    /// Gets an explicitly assigned vertical guide.
+    public subscript(explicit guide: VerticalAlignment) -> Int? {
+        explicitAlignments[guide.key]
     }
 }
 
@@ -119,27 +123,38 @@ public nonisolated struct LayoutSubview: Equatable {
     /// - Parameter proposal: The size proposal to pass to the subview.
     /// - Returns: The subview's measured terminal-cell size.
     public func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+        measurement(in: proposal).size
+    }
+
+    private func measurement(
+        in proposal: ProposedViewSize
+    ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
         let renderProposal = proposal.renderProposal
         let measurementProposal = renderProposal.replacingMaximumDimensionsWithUnspecified
-        let intrinsicSize = child.render(measurementProposal, true)?.layoutSize(
-            proposal: measurementProposal
-        ) ?? Size()
+        let element = child.render(measurementProposal, true)
+        let intrinsicSize = element?.layoutSize(proposal: measurementProposal) ?? Size()
+        let explicitAlignments = element?
+            .renderedBlock(proposal: measurementProposal)?
+            .explicitAlignments ?? [:]
 
-        return Size(
-            columns: measuredLength(
-                proposal: proposal.columns,
-                intrinsic: intrinsicSize.columns,
-                maximum: child.traits.maximumColumns,
-                isFlexible: child.isSpacer
-                    || child.traits.flexibleAxes.contains(.horizontal)
+        return (
+            Size(
+                columns: measuredLength(
+                    proposal: proposal.columns,
+                    intrinsic: intrinsicSize.columns,
+                    maximum: child.traits.maximumColumns,
+                    isFlexible: child.isSpacer
+                        || child.traits.flexibleAxes.contains(.horizontal)
+                ),
+                rows: measuredLength(
+                    proposal: proposal.rows,
+                    intrinsic: intrinsicSize.rows,
+                    maximum: child.traits.maximumRows,
+                    isFlexible: child.isSpacer
+                        || child.traits.flexibleAxes.contains(.vertical)
+                )
             ),
-            rows: measuredLength(
-                proposal: proposal.rows,
-                intrinsic: intrinsicSize.rows,
-                maximum: child.traits.maximumRows,
-                isFlexible: child.isSpacer
-                    || child.traits.flexibleAxes.contains(.vertical)
-            )
+            explicitAlignments
         )
     }
 
@@ -162,8 +177,13 @@ public nonisolated struct LayoutSubview: Equatable {
     ///
     /// - Parameter proposal: The size proposal to pass to the subview.
     /// - Returns: The subview's measured dimensions.
-    public func dimensions(in proposal: ProposedViewSize) -> LayoutSubviewDimensions {
-        LayoutSubviewDimensions(size: sizeThatFits(proposal))
+    public func dimensions(in proposal: ProposedViewSize) -> ViewDimensions {
+        let measurement = measurement(in: proposal)
+        return ViewDimensions(
+            columns: measurement.size.columns,
+            rows: measurement.size.rows,
+            explicitAlignments: measurement.explicitAlignments
+        )
     }
 
     /// Places this subview within the layout's bounds.
@@ -552,25 +572,11 @@ extension LayoutContainer: LayoutRenderable {
     }
 
     private func xOffset(for block: RenderedBlock, placement: LayoutPlacement) -> Int {
-        switch placement.anchor.horizontal {
-        case .leading:
-            placement.point.column
-        case .center:
-            placement.point.column - (block.width / 2)
-        case .trailing:
-            placement.point.column - block.width
-        }
+        placement.point.column - block.viewDimensions[placement.anchor.horizontal]
     }
 
     private func yOffset(for block: RenderedBlock, placement: LayoutPlacement) -> Int {
-        switch placement.anchor.vertical {
-        case .top:
-            placement.point.row
-        case .center:
-            placement.point.row - (block.height / 2)
-        case .bottom:
-            placement.point.row - block.height
-        }
+        placement.point.row - block.viewDimensions[placement.anchor.vertical]
     }
 }
 
@@ -632,7 +638,7 @@ private extension RenderedElement {
         }
     }
 
-    func renderedBlock(proposal: RenderProposal) -> RenderedBlock? {
+    nonisolated func renderedBlock(proposal: RenderProposal) -> RenderedBlock? {
         switch self {
         case .block(let block):
             return block

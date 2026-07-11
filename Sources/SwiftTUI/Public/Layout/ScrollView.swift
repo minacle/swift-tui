@@ -665,6 +665,10 @@ enum ScrollViewRenderer {
                     y: clampedY,
                     width: width,
                     height: height
+                ),
+                explicitAlignments: content.offsetExplicitAlignments(
+                    x: -clampedX,
+                    y: -clampedY
                 )
             ),
             point: ScrollPoint(x: clampedX, y: clampedY),

@@ -350,7 +350,8 @@ enum BoxRenderer {
             hitRegions: clippedContent?.hitRegions ?? [],
             scrollRegions: clippedContent?.scrollRegions ?? [],
             focusRegions: clippedContent?.focusRegions ?? [],
-            coordinateSpaceRegions: clippedContent?.coordinateSpaceRegions ?? []
+            coordinateSpaceRegions: clippedContent?.coordinateSpaceRegions ?? [],
+            explicitAlignments: clippedContent?.explicitAlignments ?? [:]
         )
     }
 

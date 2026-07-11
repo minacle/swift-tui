@@ -151,7 +151,8 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
                 block.coordinateSpaceRegions,
                 width: targetWidth,
                 height: targetHeight
-            )
+            ),
+            explicitAlignments: block.explicitAlignments
         )
     }
 

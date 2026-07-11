@@ -152,6 +152,62 @@ struct StackLayoutTests {
     }
 
     @Test
+    func `VStack aligns explicit custom horizontal guides`() {
+        let stack = VStack(alignment: .marker) {
+            Text("A")
+                .alignmentGuide(HorizontalAlignment.marker) { _ in 0 }
+            Text("BBB")
+                .alignmentGuide(HorizontalAlignment.marker) { _ in 2 }
+        }
+
+        #expect(ViewResolver.block(from: stack)?.lines == ["  A", "BBB"])
+    }
+
+    @Test
+    func `an out-of-bounds custom guide expands a VStack without clipping`() {
+        let stack = VStack(alignment: .marker) {
+            Text("A")
+                .alignmentGuide(HorizontalAlignment.marker) { _ in -2 }
+            Text("BBB")
+                .alignmentGuide(HorizontalAlignment.marker) { _ in 2 }
+        }
+
+        #expect(ViewResolver.block(from: stack)?.lines == ["    A", "BBB  "])
+    }
+
+    @Test
+    func `HStack aligns explicit custom vertical guides`() {
+        let stack = HStack(alignment: .marker) {
+            VStack {
+                Text("A")
+                Text("B")
+                Text("C")
+            }
+            .alignmentGuide(VerticalAlignment.marker) { _ in 2 }
+            Text("X")
+                .alignmentGuide(VerticalAlignment.marker) { _ in 0 }
+        }
+
+        #expect(ViewResolver.block(from: stack)?.lines == ["A ", "B ", "CX"])
+    }
+
+    @Test
+    func `a nested VStack propagates its descendants' explicit custom guide`() {
+        let stack = VStack(alignment: .marker) {
+            VStack(alignment: .marker) {
+                Text("A")
+                    .alignmentGuide(HorizontalAlignment.marker) { _ in 0 }
+                Text("BBB")
+                    .alignmentGuide(HorizontalAlignment.marker) { _ in 2 }
+            }
+            Text("Z")
+                .alignmentGuide(HorizontalAlignment.marker) { _ in 0 }
+        }
+
+        #expect(ViewResolver.block(from: stack)?.lines == ["  A", "BBB", "  Z"])
+    }
+
+    @Test
     func `a spacer stores normalized minimum length`() {
         #expect(Spacer().minLength == nil)
         #expect(Spacer(minLength: 2).minLength == 2)
@@ -222,4 +278,24 @@ struct StackLayoutTests {
         #expect(block?.height == 2)
         #expect(block?.lines == ["A", "B"])
     }
+}
+
+private nonisolated enum StackMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        0
+    }
+}
+
+private extension HorizontalAlignment {
+    nonisolated static let marker = HorizontalAlignment(StackMarkerAlignment.self)
+}
+
+private nonisolated enum StackVerticalMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        0
+    }
+}
+
+private extension VerticalAlignment {
+    nonisolated static let marker = VerticalAlignment(StackVerticalMarkerAlignment.self)
 }

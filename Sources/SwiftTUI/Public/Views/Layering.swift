@@ -166,7 +166,8 @@ private extension RenderedBlock {
             scrollRegions: scrollRegions,
             focusRegions: focusRegions,
             identifiedRegions: identifiedRegions,
-            coordinateSpaceRegions: coordinateSpaceRegions
+            coordinateSpaceRegions: coordinateSpaceRegions,
+            explicitAlignments: explicitAlignments
         )
     }
 

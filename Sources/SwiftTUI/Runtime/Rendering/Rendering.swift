@@ -323,6 +323,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var coordinateSpaceRegions: [RenderedCoordinateSpaceRegion]
 
+    var explicitAlignments: [AlignmentKey: Int]
+
     init(
         lines: [String],
         style: TextStyle = .plain,
@@ -331,7 +333,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
         identifiedRegions: [RenderedIdentifiedRegion] = [],
-        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
+        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = [],
+        explicitAlignments: [AlignmentKey: Int] = [:]
     ) {
         let minimumWidth = lines.map(TerminalText.columnWidth).max() ?? 0
         self.runs = lines.enumerated().compactMap { row, line in
@@ -350,6 +353,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.focusRegions = focusRegions
         self.identifiedRegions = identifiedRegions
         self.coordinateSpaceRegions = coordinateSpaceRegions
+        self.explicitAlignments = explicitAlignments
     }
 
     init(
@@ -362,7 +366,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
         identifiedRegions: [RenderedIdentifiedRegion] = [],
-        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
+        coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = [],
+        explicitAlignments: [AlignmentKey: Int] = [:]
     ) {
         self.runs = runs.filter { !$0.isEmpty }
         self.minimumWidth = max(width ?? 0, 0)
@@ -374,6 +379,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.focusRegions = focusRegions
         self.identifiedRegions = identifiedRegions
         self.coordinateSpaceRegions = coordinateSpaceRegions
+        self.explicitAlignments = explicitAlignments
     }
 
     var lines: [String] {
@@ -429,6 +435,37 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         RenderedRect(width: width, height: height)
     }
 
+    var viewDimensions: ViewDimensions {
+        ViewDimensions(
+            columns: width,
+            rows: height,
+            explicitAlignments: explicitAlignments
+        )
+    }
+
+    func settingExplicitAlignment(
+        _ guide: HorizontalAlignment,
+        computeValue: @Sendable (ViewDimensions) -> Int
+    ) -> RenderedBlock {
+        settingExplicitAlignment(guide.key, computeValue: computeValue)
+    }
+
+    func settingExplicitAlignment(
+        _ guide: VerticalAlignment,
+        computeValue: @Sendable (ViewDimensions) -> Int
+    ) -> RenderedBlock {
+        settingExplicitAlignment(guide.key, computeValue: computeValue)
+    }
+
+    private func settingExplicitAlignment(
+        _ key: AlignmentKey,
+        computeValue: @Sendable (ViewDimensions) -> Int
+    ) -> RenderedBlock {
+        var block = self
+        block.explicitAlignments[key] = computeValue(viewDimensions)
+        return block
+    }
+
     func framed(width targetWidth: Int, height targetHeight: Int, alignment: Alignment) -> RenderedBlock {
         let targetWidth = max(targetWidth, 0)
         let targetHeight = max(targetHeight, 0)
@@ -471,7 +508,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 y: y,
                 width: targetWidth,
                 height: targetHeight
-            )
+            ),
+            explicitAlignments: offsetExplicitAlignments(x: x, y: y)
         )
     }
 
@@ -503,7 +541,11 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             },
             coordinateSpaceRegions: coordinateSpaceRegions.map {
                 $0.offsetBy(x: insets.leading, y: insets.top)
-            }
+            },
+            explicitAlignments: offsetExplicitAlignments(
+                x: insets.leading,
+                y: insets.top
+            )
         )
     }
 
@@ -534,7 +576,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             },
             coordinateSpaceRegions: coordinateSpaceRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
-            }
+            },
+            explicitAlignments: offsetExplicitAlignments(x: x, y: y)
         )
     }
 
@@ -579,8 +622,28 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
             focusRegions: blocks.reversed().flatMap(\.focusRegions),
             identifiedRegions: blocks.reversed().flatMap(\.identifiedRegions),
-            coordinateSpaceRegions: blocks.reversed().flatMap(\.coordinateSpaceRegions)
+            coordinateSpaceRegions: blocks.reversed().flatMap(\.coordinateSpaceRegions),
+            explicitAlignments: combinedExplicitAlignments(from: blocks)
         )
+    }
+
+    static func combinedExplicitAlignments(
+        from blocks: [RenderedBlock]
+    ) -> [AlignmentKey: Int] {
+        let keys = Set(blocks.flatMap { $0.explicitAlignments.keys })
+        return Dictionary(uniqueKeysWithValues: keys.compactMap { key in
+            let values = blocks.compactMap { $0.explicitAlignments[key] }
+            guard !values.isEmpty else {
+                return nil
+            }
+            return (key, values.reduce(0, +) / values.count)
+        })
+    }
+
+    func offsetExplicitAlignments(x: Int, y: Int) -> [AlignmentKey: Int] {
+        Dictionary(uniqueKeysWithValues: explicitAlignments.map { key, value in
+            (key, value + (key.axis == .horizontal ? x : y))
+        })
     }
 
     private func framedCaret(
@@ -691,14 +754,21 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         alignment: HorizontalAlignment
     ) -> Int {
         let padding = containerWidth - contentWidth
-        switch alignment {
-        case .leading:
+        if viewDimensions[explicit: alignment] != nil {
+            let container = ViewDimensions(columns: containerWidth, rows: height)
+            return container[alignment] - viewDimensions[alignment]
+        }
+        if alignment == .leading {
             return 0
-        case .center:
+        }
+        if alignment == .center {
             return padding / 2
-        case .trailing:
+        }
+        if alignment == .trailing {
             return padding
         }
+        let container = ViewDimensions(columns: containerWidth, rows: height)
+        return container[alignment] - viewDimensions[alignment]
     }
 
     private func verticalOffset(
@@ -707,14 +777,21 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         alignment: VerticalAlignment
     ) -> Int {
         let padding = containerHeight - contentHeight
-        switch alignment {
-        case .top:
+        if viewDimensions[explicit: alignment] != nil {
+            let container = ViewDimensions(columns: width, rows: containerHeight)
+            return container[alignment] - viewDimensions[alignment]
+        }
+        if alignment == .top {
             return 0
-        case .center:
+        }
+        if alignment == .center {
             return padding / 2
-        case .bottom:
+        }
+        if alignment == .bottom {
             return padding
         }
+        let container = ViewDimensions(columns: width, rows: containerHeight)
+        return container[alignment] - viewDimensions[alignment]
     }
 }
 
@@ -3262,8 +3339,25 @@ enum ZStackRenderer {
             return nil
         }
 
-        let width = proposal?.columns ?? (measuredChildren.map(\.block.width).max() ?? 0)
-        let height = proposal?.rows ?? (measuredChildren.map(\.block.height).max() ?? 0)
+        let measuredBlocks = measuredChildren.map(\.block)
+        let horizontalLine = naturalHorizontalLine(
+            for: measuredBlocks,
+            alignment: alignment.horizontal
+        )
+        let verticalLine = naturalVerticalLine(
+            for: measuredBlocks,
+            alignment: alignment.vertical
+        )
+        let width = proposal?.columns ?? naturalWidth(
+            for: measuredBlocks,
+            alignment: alignment.horizontal,
+            line: horizontalLine
+        )
+        let height = proposal?.rows ?? naturalHeight(
+            for: measuredBlocks,
+            alignment: alignment.vertical,
+            line: verticalLine
+        )
         let bounds = RenderedRect(width: width, height: height)
         let blocks = measuredChildren
             .sorted {
@@ -3279,7 +3373,25 @@ enum ZStackRenderer {
                     return nil
                 }
 
-                return block.aligned(in: bounds, alignment: alignment)
+                let x = proposal?.columns == nil
+                    ? horizontalLine.map { $0 - block.viewDimensions[alignment.horizontal] }
+                    : nil
+                let y = proposal?.rows == nil
+                    ? verticalLine.map { $0 - block.viewDimensions[alignment.vertical] }
+                    : nil
+                return block.offsetBy(
+                    x: x ?? horizontalOffset(
+                        for: block,
+                        containerWidth: width,
+                        alignment: alignment.horizontal
+                    ),
+                    y: y ?? verticalOffset(
+                        for: block,
+                        containerHeight: height,
+                        alignment: alignment.vertical
+                    ),
+                    clippedTo: bounds
+                )
             }
 
         return RenderedBlock.composited(
@@ -3329,6 +3441,98 @@ enum ZStackRenderer {
     ) -> Set<Int> {
         proposal?.rows == nil ? [] : Set(0..<height)
     }
+
+    private static func naturalHorizontalLine(
+        for blocks: [RenderedBlock],
+        alignment: HorizontalAlignment
+    ) -> Int? {
+        let usesGuides = alignment != .leading
+            && alignment != .center
+            && alignment != .trailing
+            || blocks.contains { $0.viewDimensions[explicit: alignment] != nil }
+        guard usesGuides else {
+            return nil
+        }
+        return blocks.map { $0.viewDimensions[alignment] }.max()
+    }
+
+    private static func naturalVerticalLine(
+        for blocks: [RenderedBlock],
+        alignment: VerticalAlignment
+    ) -> Int? {
+        let usesGuides = alignment != .top
+            && alignment != .center
+            && alignment != .bottom
+            || blocks.contains { $0.viewDimensions[explicit: alignment] != nil }
+        guard usesGuides else {
+            return nil
+        }
+        return blocks.map { $0.viewDimensions[alignment] }.max()
+    }
+
+    private static func naturalWidth(
+        for blocks: [RenderedBlock],
+        alignment: HorizontalAlignment,
+        line: Int?
+    ) -> Int {
+        guard let line else {
+            return blocks.map(\.width).max() ?? 0
+        }
+        return blocks.map {
+            line - $0.viewDimensions[alignment] + $0.width
+        }.max() ?? 0
+    }
+
+    private static func naturalHeight(
+        for blocks: [RenderedBlock],
+        alignment: VerticalAlignment,
+        line: Int?
+    ) -> Int {
+        guard let line else {
+            return blocks.map(\.height).max() ?? 0
+        }
+        return blocks.map {
+            line - $0.viewDimensions[alignment] + $0.height
+        }.max() ?? 0
+    }
+
+    private static func horizontalOffset(
+        for block: RenderedBlock,
+        containerWidth: Int,
+        alignment: HorizontalAlignment
+    ) -> Int {
+        let padding = containerWidth - block.width
+        if alignment == .leading, block.viewDimensions[explicit: alignment] == nil {
+            return 0
+        }
+        if alignment == .center, block.viewDimensions[explicit: alignment] == nil {
+            return padding / 2
+        }
+        if alignment == .trailing, block.viewDimensions[explicit: alignment] == nil {
+            return padding
+        }
+        let container = ViewDimensions(columns: containerWidth, rows: block.height)
+        return container[alignment] - block.viewDimensions[alignment]
+    }
+
+    private static func verticalOffset(
+        for block: RenderedBlock,
+        containerHeight: Int,
+        alignment: VerticalAlignment
+    ) -> Int {
+        let padding = containerHeight - block.height
+        if alignment == .top, block.viewDimensions[explicit: alignment] == nil {
+            return 0
+        }
+        if alignment == .center, block.viewDimensions[explicit: alignment] == nil {
+            return padding / 2
+        }
+        if alignment == .bottom, block.viewDimensions[explicit: alignment] == nil {
+            return padding
+        }
+        let container = ViewDimensions(columns: block.width, rows: containerHeight)
+        return container[alignment] - block.viewDimensions[alignment]
+    }
 }
 
 private extension RenderedElement {
@@ -3355,7 +3559,7 @@ enum StackRenderer {
             return nil
         }
 
-        let height = layout.items.compactMap(\.block?.height).max() ?? 1
+        let height = horizontalHeight(for: layout.items, alignment: alignment)
         let items = layout.items.map {
             $0.fillingMinorAxis(height)
         }
@@ -3367,7 +3571,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -3381,7 +3586,8 @@ enum StackRenderer {
             switch item.content {
             case .block(let block):
                 let y = verticalOffset(
-                    contentHeight: block.height,
+                    for: block,
+                    in: items,
                     containerHeight: height,
                     alignment: alignment
                 )
@@ -3414,7 +3620,12 @@ enum StackRenderer {
                 height: height,
                 alignment: alignment
             )
-                .compactMap { $0.clipped(to: bounds) }
+                .compactMap { $0.clipped(to: bounds) },
+            explicitAlignments: horizontalExplicitAlignments(
+                from: items,
+                height: height,
+                alignment: alignment
+            )
         )
     }
 
@@ -3429,7 +3640,7 @@ enum StackRenderer {
             return nil
         }
 
-        let width = layout.items.compactMap(\.block?.width).max() ?? 0
+        let width = verticalWidth(for: layout.items, alignment: alignment)
         let items = layout.items.map {
             $0.fillingMinorAxis(width)
         }
@@ -3441,7 +3652,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -3483,8 +3695,97 @@ enum StackRenderer {
                 width: width,
                 alignment: alignment
             )
-                .compactMap { $0.clipped(to: bounds) }
+                .compactMap { $0.clipped(to: bounds) },
+            explicitAlignments: verticalExplicitAlignments(
+                from: items,
+                width: width,
+                alignment: alignment
+            )
         )
+    }
+
+    private static func horizontalHeight(
+        for items: [HorizontalItem],
+        alignment: VerticalAlignment
+    ) -> Int {
+        let blocks = items.compactMap(\.block)
+        guard !blocks.isEmpty else {
+            return 1
+        }
+        let hasExplicitValue = blocks.contains {
+            $0.viewDimensions[explicit: alignment] != nil
+        }
+        guard hasExplicitValue
+            || (alignment != .top && alignment != .center && alignment != .bottom) else {
+            return blocks.map(\.height).max() ?? 1
+        }
+        let line = blocks.map { $0.viewDimensions[alignment] }.max() ?? 0
+        return blocks.map {
+            line - $0.viewDimensions[alignment] + $0.height
+        }.max() ?? 1
+    }
+
+    private static func verticalWidth(
+        for items: [VerticalItem],
+        alignment: HorizontalAlignment
+    ) -> Int {
+        let blocks = items.compactMap(\.block)
+        guard !blocks.isEmpty else {
+            return 0
+        }
+        let hasExplicitValue = blocks.contains {
+            $0.viewDimensions[explicit: alignment] != nil
+        }
+        guard hasExplicitValue
+            || (alignment != .leading && alignment != .center && alignment != .trailing) else {
+            return blocks.map(\.width).max() ?? 0
+        }
+        let line = blocks.map { $0.viewDimensions[alignment] }.max() ?? 0
+        return blocks.map {
+            line - $0.viewDimensions[alignment] + $0.width
+        }.max() ?? 0
+    }
+
+    private static func horizontalExplicitAlignments(
+        from items: [HorizontalItem],
+        height: Int,
+        alignment: VerticalAlignment
+    ) -> [AlignmentKey: Int] {
+        let blocks = items.compactMap { item -> RenderedBlock? in
+            guard var block = item.block else {
+                return nil
+            }
+            let y = verticalOffset(
+                for: block,
+                in: items,
+                containerHeight: height,
+                alignment: alignment
+            )
+            block.explicitAlignments = block.offsetExplicitAlignments(x: item.x, y: y)
+            return block
+        }
+        return RenderedBlock.combinedExplicitAlignments(from: blocks)
+    }
+
+    private static func verticalExplicitAlignments(
+        from items: [VerticalItem],
+        width: Int,
+        alignment: HorizontalAlignment
+    ) -> [AlignmentKey: Int] {
+        let blocks = items.compactMap { item -> RenderedBlock? in
+            guard var block = item.block else {
+                return nil
+            }
+            let x = horizontalOffset(
+                for: block,
+                in: items,
+                containerWidth: width,
+                alignment: alignment
+            )
+            block.explicitAlignments = block.offsetExplicitAlignments(x: x, y: item.y)
+            return block
+        }
+        return RenderedBlock.combinedExplicitAlignments(from: blocks)
     }
 
     private struct HorizontalLayout {
@@ -3890,7 +4191,8 @@ enum StackRenderer {
 
             return RenderedCaret(
                 row: verticalOffset(
-                    contentHeight: block.height,
+                    for: block,
+                    in: items,
                     containerHeight: height,
                     alignment: alignment
                 ) + caret.row,
@@ -3912,7 +4214,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -3933,7 +4236,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -3954,7 +4258,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -3975,7 +4280,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -3996,7 +4302,8 @@ enum StackRenderer {
             }
 
             let y = verticalOffset(
-                contentHeight: block.height,
+                for: block,
+                in: items,
                 containerHeight: height,
                 alignment: alignment
             )
@@ -4019,7 +4326,8 @@ enum StackRenderer {
             return RenderedCaret(
                 row: item.y + caret.row,
                 column: horizontalOffset(
-                    contentWidth: block.width,
+                    for: block,
+                    in: items,
                     containerWidth: width,
                     alignment: alignment
                 ) + caret.column
@@ -4040,7 +4348,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -4061,7 +4370,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -4082,7 +4392,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -4103,7 +4414,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -4124,7 +4436,8 @@ enum StackRenderer {
             }
 
             let x = horizontalOffset(
-                contentWidth: block.width,
+                for: block,
+                in: items,
                 containerWidth: width,
                 alignment: alignment
             )
@@ -4155,19 +4468,69 @@ enum StackRenderer {
     }
 
     private static func horizontalOffset(
+        for block: RenderedBlock,
+        in items: [VerticalItem],
+        containerWidth: Int,
+        alignment: HorizontalAlignment
+    ) -> Int {
+        let hasExplicitValue = items.compactMap(\.block).contains {
+            $0.viewDimensions[explicit: alignment] != nil
+        }
+        guard hasExplicitValue
+            || (alignment != .leading && alignment != .center && alignment != .trailing) else {
+            return horizontalOffset(
+                contentWidth: block.width,
+                containerWidth: containerWidth,
+                alignment: alignment
+            )
+        }
+        let line = items.compactMap(\.block).map {
+            $0.viewDimensions[alignment]
+        }.max() ?? 0
+        return line - block.viewDimensions[alignment]
+    }
+
+    private static func verticalOffset(
+        for block: RenderedBlock,
+        in items: [HorizontalItem],
+        containerHeight: Int,
+        alignment: VerticalAlignment
+    ) -> Int {
+        let hasExplicitValue = items.compactMap(\.block).contains {
+            $0.viewDimensions[explicit: alignment] != nil
+        }
+        guard hasExplicitValue
+            || (alignment != .top && alignment != .center && alignment != .bottom) else {
+            return verticalOffset(
+                contentHeight: block.height,
+                containerHeight: containerHeight,
+                alignment: alignment
+            )
+        }
+        let line = items.compactMap(\.block).map {
+            $0.viewDimensions[alignment]
+        }.max() ?? 0
+        return line - block.viewDimensions[alignment]
+    }
+
+    private static func horizontalOffset(
         contentWidth: Int,
         containerWidth: Int,
         alignment: HorizontalAlignment
     ) -> Int {
         let padding = max(containerWidth - contentWidth, 0)
-        switch alignment {
-        case .leading:
+        if alignment == .leading {
             return 0
-        case .center:
+        }
+        if alignment == .center {
             return padding / 2
-        case .trailing:
+        }
+        if alignment == .trailing {
             return padding
         }
+        let content = ViewDimensions(columns: contentWidth, rows: 0)
+        let container = ViewDimensions(columns: containerWidth, rows: 0)
+        return container[alignment] - content[alignment]
     }
 
     private static func verticalOffset(
@@ -4176,14 +4539,18 @@ enum StackRenderer {
         alignment: VerticalAlignment
     ) -> Int {
         let padding = max(containerHeight - contentHeight, 0)
-        switch alignment {
-        case .top:
+        if alignment == .top {
             return 0
-        case .center:
+        }
+        if alignment == .center {
             return padding / 2
-        case .bottom:
+        }
+        if alignment == .bottom {
             return padding
         }
+        let content = ViewDimensions(columns: 0, rows: contentHeight)
+        let container = ViewDimensions(columns: 0, rows: containerHeight)
+        return container[alignment] - content[alignment]
     }
 }
 

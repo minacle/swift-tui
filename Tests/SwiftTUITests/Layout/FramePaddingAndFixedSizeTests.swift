@@ -123,6 +123,20 @@ struct FramePaddingAndFixedSizeTests {
     }
 
     @Test
+    func `a frame aligns content by its explicit custom guide`() {
+        let block = ViewResolver.block(
+            from: Text("A")
+                .alignmentGuide(.frameMarker) { _ in 0 }
+                .frame(
+                    width: 3,
+                    alignment: Alignment(horizontal: .frameMarker, vertical: .top)
+                )
+        )
+
+        #expect(block?.lines == ["  A"])
+    }
+
+    @Test
     func `a frame alignment controls clipping origin`() {
         let center = ViewResolver.block(
             from: Text("ABCDE")
@@ -224,4 +238,14 @@ struct FramePaddingAndFixedSizeTests {
                 == ["0x0"]
         )
     }
+}
+
+private nonisolated enum FrameMarkerAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> Int {
+        max(context.columns - 1, 0)
+    }
+}
+
+private extension HorizontalAlignment {
+    nonisolated static let frameMarker = HorizontalAlignment(FrameMarkerAlignment.self)
 }

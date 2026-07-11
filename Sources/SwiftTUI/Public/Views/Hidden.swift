@@ -83,7 +83,8 @@ private extension RenderedBlock {
         RenderedBlock(
             runs: [],
             width: width,
-            height: height
+            height: height,
+            explicitAlignments: explicitAlignments
         )
     }
 }

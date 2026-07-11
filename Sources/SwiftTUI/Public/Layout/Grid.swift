@@ -494,16 +494,35 @@ enum GridRenderer {
                     continue
                 }
 
-                let anchor = traits.gridCellAnchor ?? defaultAnchor(
-                    for: cell,
-                    row: row,
-                    gridAlignment: alignment,
-                    columnAlignments: columnAlignments
-                )
-                let x = columnOrigins[cell.column]
-                    + Int(Double(cellWidth - block.width) * anchor.x)
-                let y = rowOrigins[rowIndex]
-                    + Int(Double(cellHeight - block.height) * anchor.y)
+                let offset: (x: Int, y: Int)
+                if let anchor = traits.gridCellAnchor {
+                    offset = (
+                        Int(Double(cellWidth - block.width) * anchor.x),
+                        Int(Double(cellHeight - block.height) * anchor.y)
+                    )
+                }
+                else {
+                    let alignment = defaultAlignment(
+                        for: cell,
+                        row: row,
+                        gridAlignment: alignment,
+                        columnAlignments: columnAlignments
+                    )
+                    offset = (
+                        alignmentOffset(
+                            for: block,
+                            containerWidth: cellWidth,
+                            alignment: alignment.horizontal
+                        ),
+                        alignmentOffset(
+                            for: block,
+                            containerHeight: cellHeight,
+                            alignment: alignment.vertical
+                        )
+                    )
+                }
+                let x = columnOrigins[cell.column] + offset.x
+                let y = rowOrigins[rowIndex] + offset.y
                 placedBlocks.append(
                     (
                         zIndex: traits.zIndex,
@@ -683,42 +702,55 @@ enum GridRenderer {
         return alignments
     }
 
-    private static func defaultAnchor(
+    private static func defaultAlignment(
         for cell: Cell,
         row: Row,
         gridAlignment: Alignment,
         columnAlignments: [HorizontalAlignment?]
-    ) -> UnitPoint {
+    ) -> Alignment {
         let horizontal = cell.isFullWidth
             ? gridAlignment.horizontal
             : columnAlignments[cell.column] ?? gridAlignment.horizontal
         let vertical = row.alignment ?? gridAlignment.vertical
-        return UnitPoint(
-            x: unitCoordinate(for: horizontal),
-            y: unitCoordinate(for: vertical)
-        )
+        return Alignment(horizontal: horizontal, vertical: vertical)
     }
 
-    private static func unitCoordinate(for alignment: HorizontalAlignment) -> Double {
-        switch alignment {
-        case .leading:
-            0
-        case .center:
-            0.5
-        case .trailing:
-            1
+    private static func alignmentOffset(
+        for block: RenderedBlock,
+        containerWidth: Int,
+        alignment: HorizontalAlignment
+    ) -> Int {
+        let padding = containerWidth - block.width
+        if alignment == .leading, block.viewDimensions[explicit: alignment] == nil {
+            return 0
         }
+        if alignment == .center, block.viewDimensions[explicit: alignment] == nil {
+            return padding / 2
+        }
+        if alignment == .trailing, block.viewDimensions[explicit: alignment] == nil {
+            return padding
+        }
+        let container = ViewDimensions(columns: containerWidth, rows: block.height)
+        return container[alignment] - block.viewDimensions[alignment]
     }
 
-    private static func unitCoordinate(for alignment: VerticalAlignment) -> Double {
-        switch alignment {
-        case .top:
-            0
-        case .center:
-            0.5
-        case .bottom:
-            1
+    private static func alignmentOffset(
+        for block: RenderedBlock,
+        containerHeight: Int,
+        alignment: VerticalAlignment
+    ) -> Int {
+        let padding = containerHeight - block.height
+        if alignment == .top, block.viewDimensions[explicit: alignment] == nil {
+            return 0
         }
+        if alignment == .center, block.viewDimensions[explicit: alignment] == nil {
+            return padding / 2
+        }
+        if alignment == .bottom, block.viewDimensions[explicit: alignment] == nil {
+            return padding
+        }
+        let container = ViewDimensions(columns: block.width, rows: containerHeight)
+        return container[alignment] - block.viewDimensions[alignment]
     }
 
     private static func renderedBlock(

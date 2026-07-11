@@ -1,29 +1,3 @@
-/// Horizontal alignment for views arranged in a ``VStack``.
-public nonisolated enum HorizontalAlignment: Equatable, Sendable {
-
-    /// Align children to the leading terminal column.
-    case leading
-
-    /// Center children horizontally.
-    case center
-
-    /// Align children to the trailing terminal column.
-    case trailing
-}
-
-/// Vertical alignment for views arranged in an ``HStack``.
-public nonisolated enum VerticalAlignment: Equatable, Sendable {
-
-    /// Align children to the top terminal row.
-    case top
-
-    /// Center children vertically.
-    case center
-
-    /// Align children to the bottom terminal row.
-    case bottom
-}
-
 /// A view that arranges its children from left to right.
 ///
 /// `HStack` measures its children in terminal cells and inserts a fixed number
