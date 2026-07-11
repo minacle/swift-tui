@@ -397,6 +397,17 @@ struct TerminalScreenRenderingTests {
     }
 
     @Test
+    func `screen output diff clears an emoji ZWJ continuation when replacing with narrow text`() {
+        let output = TextRenderer.diff(
+            from: RenderedBlock(lines: ["👨‍👩‍👧‍👦"]),
+            to: RenderedBlock(lines: ["A"]),
+            in: TerminalViewportSize(columns: 2, rows: 1)
+        )
+
+        #expect(output == "\u{001B}[1;1HA \u{001B}[?25l")
+    }
+
+    @Test
     func `a differential render overwrites both cells when narrow text becomes a wide character`() {
         let output = TextRenderer.diff(
             from: RenderedBlock(lines: ["AB"]),

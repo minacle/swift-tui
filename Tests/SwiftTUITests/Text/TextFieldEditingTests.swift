@@ -90,6 +90,27 @@ struct TextFieldEditingTests {
     }
 
     @Test
+    func `typing an emoji ZWJ sequence inserts one grapheme and advances the text field caret two columns`() {
+        let runtime = StateRuntime()
+        let view = TextFieldEditingView()
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: "👨‍👩‍👧‍👦", characters: "👨‍👩‍👧‍👦")
+            ) == .handled
+        )
+        #expect(runtime.dispatch(KeyPress(key: "A", characters: "A")) == .handled)
+        #expect(runtime.consumeInvalidation())
+        let block = runtime.block(from: view)
+        #expect(block?.text == "👨‍👩‍👧‍👦A ")
+        #expect(block?.caret == RenderedCaret(column: 3))
+    }
+
+    @Test
     func `horizontal scrolling follows the text field caret in both directions`() {
         let runtime = StateRuntime()
         let view = TextFieldEditingView().frame(width: 3)

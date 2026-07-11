@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scrollDisabled(_:)`, `truncationMode(_:)`, and
   `multilineTextAlignment(_:)` view modifiers.
 
+### Fixed
+
+- Fixed emoji-presentation and ZWJ sequences to occupy one two-column terminal
+  grapheme across layout and differential rendering.
+- Fixed text insertion filtering so `TextField` and `TextEditor` accept emoji
+  ZWJ sequences instead of rejecting Unicode joiners as control input.
+
 ## [0.7.0] - 2026-07-10
 
 ### Added

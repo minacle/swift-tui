@@ -3,8 +3,8 @@ import Foundation
 nonisolated enum TerminalText {
 
     static func columnWidth(_ text: String) -> Int {
-        text.unicodeScalars.reduce(into: 0) { width, scalar in
-            width += columnWidth(of: scalar)
+        text.reduce(into: 0) { width, character in
+            width += columnWidth(of: character)
         }
     }
 
@@ -91,6 +91,23 @@ nonisolated enum TerminalText {
         }
 
         return true
+    }
+
+    private static func columnWidth(of character: Character) -> Int {
+        let scalars = character.unicodeScalars
+        let usesTextPresentation = scalars.contains {
+            $0.value == 0xFE0E
+        }
+        let usesEmojiPresentation = scalars.contains {
+            $0.value == 0xFE0F || $0.properties.isEmojiPresentation
+        }
+        if !usesTextPresentation && usesEmojiPresentation {
+            return 2
+        }
+
+        return scalars.reduce(into: 0) { width, scalar in
+            width += columnWidth(of: scalar)
+        }
     }
 
     private static func columnWidth(of scalar: Unicode.Scalar) -> Int {
@@ -198,7 +215,7 @@ extension KeyPress {
         }
 
         return characters.unicodeScalars.allSatisfy {
-            !CharacterSet.controlCharacters.contains($0)
+            $0.properties.generalCategory != .control
         }
     }
 }

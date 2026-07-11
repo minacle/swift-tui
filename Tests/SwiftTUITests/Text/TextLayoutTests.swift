@@ -6,6 +6,11 @@ import Testing
 @Suite("Text Layout and Wrapping")
 struct TextLayoutTests {
 
+    private let emojiZWJSequences = [
+        "👩‍❤️‍💋‍👨",
+        "👨‍👩‍👧‍👦",
+    ]
+
     @Test
     func `a proposed width wraps text at word boundaries`() {
         let block = ViewResolver.block(
@@ -237,6 +242,42 @@ struct TextLayoutTests {
         )
 
         #expect(block?.lines == ["한글", "AB  "])
+    }
+
+    @Test
+    func `emoji ZWJ sequences remain intact immediately before automatic wrapping`() {
+        for emoji in emojiZWJSequences {
+            let block = ViewResolver.block(
+                from: Text("A\(emoji)BC"),
+                in: RenderProposal(columns: 4)
+            )
+
+            #expect(block?.lines == ["A\(emoji)", "BC "])
+        }
+    }
+
+    @Test
+    func `emoji ZWJ sequences remain intact at the automatic wrapping boundary`() {
+        for emoji in emojiZWJSequences {
+            let block = ViewResolver.block(
+                from: Text("AB\(emoji)C"),
+                in: RenderProposal(columns: 4)
+            )
+
+            #expect(block?.lines == ["AB\(emoji)", "C   "])
+        }
+    }
+
+    @Test
+    func `emoji ZWJ sequences move intact past the automatic wrapping boundary`() {
+        for emoji in emojiZWJSequences {
+            let block = ViewResolver.block(
+                from: Text("ABC\(emoji)D"),
+                in: RenderProposal(columns: 4)
+            )
+
+            #expect(block?.lines == ["ABC", "\(emoji)D"])
+        }
     }
 
     @Test

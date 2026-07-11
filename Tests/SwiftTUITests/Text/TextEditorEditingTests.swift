@@ -170,6 +170,28 @@ struct TextEditorEditingTests {
     }
 
     @Test
+    func `typing an emoji ZWJ sequence inserts one grapheme and advances the editor caret two columns`() {
+        let runtime = StateRuntime()
+        let view = TextEditorEditingView()
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: "👩‍❤️‍💋‍👨", characters: "👩‍❤️‍💋‍👨")
+            ) == .handled
+        )
+        #expect(runtime.dispatch(KeyPress(key: "A", characters: "A")) == .handled)
+        #expect(runtime.consumeInvalidation())
+        let block = runtime.block(from: view)
+
+        #expect(block?.lines == ["👩‍❤️‍💋‍👨A"])
+        #expect(block?.caret == RenderedCaret(row: 0, column: 3))
+    }
+
+    @Test
     func `initial multiline content scrolls vertically to reveal the caret at the end`() {
         let runtime = StateRuntime()
         let view = TextEditorInitialTextView(text: "a\nb\nc\nd")
