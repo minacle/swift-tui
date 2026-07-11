@@ -55,6 +55,58 @@ struct BoxRenderingTests {
     }
 
     @Test
+    func `a RoundedBox adds rounded corners and offsets its content into the interior`() {
+        let block = ViewResolver.block(
+            from: RoundedBox {
+                Text("A")
+            }
+        )
+
+        #expect(block?.width == 3)
+        #expect(block?.height == 3)
+        #expect(block?.lines == [
+            "╭─╮",
+            "│A│",
+            "╰─╯",
+        ])
+        #expect(block?.runs.contains(RenderedRun(text: "A", row: 1, column: 1)) == true)
+    }
+
+    @Test
+    func `an empty RoundedBox fills its proposed size with a rounded border`() {
+        let block = ViewResolver.block(
+            from: RoundedBox()
+                .frame(width: 4, height: 3)
+        )
+
+        #expect(block?.lines == [
+            "╭──╮",
+            "│  │",
+            "╰──╯",
+        ])
+    }
+
+    @Test
+    func `a collapsed RoundedBox uses regular tees and a cross`() {
+        let cell = ViewResolver.block(
+            from: RoundedBox()
+                .frame(width: 1, height: 1)
+        )
+        let row = ViewResolver.block(
+            from: RoundedBox()
+                .frame(width: 3, height: 1)
+        )
+        let column = ViewResolver.block(
+            from: RoundedBox()
+                .frame(width: 1, height: 3)
+        )
+
+        #expect(cell?.lines == ["┼"])
+        #expect(row?.lines == ["├─┤"])
+        #expect(column?.lines == ["┬", "│", "┴"])
+    }
+
+    @Test
     func `a frame-constrained box clips content to its interior`() {
         let block = ViewResolver.block(
             from: Box {

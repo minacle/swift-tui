@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `RoundedBox` for drawing regular-line borders with rounded box-drawing
+  corners around terminal-cell content.
 - Added SwiftUI-compatible `Divider` and terminal-native `HeavyDivider` and
   `DoubleDivider`, which draw matching box-style lines across a stack's minor
   axis and default to horizontal lines outside `HStack` and `VStack`.

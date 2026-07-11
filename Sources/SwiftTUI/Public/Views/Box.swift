@@ -34,6 +34,42 @@ public extension Box where Content == EmptyView {
     }
 }
 
+/// A view that draws a rounded box around its content using box drawing characters.
+public nonisolated struct RoundedBox<Content: View>: View, BoxRenderable,
+    LayoutTraitRenderable
+{
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let content: Content
+
+    var boxDrawingSet: BoxDrawingSet {
+        .rounded
+    }
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    /// Creates a rounded-corner box around view-builder content.
+    ///
+    /// - Parameter content: The content to render inside the box border.
+    public init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+}
+
+public extension RoundedBox where Content == EmptyView {
+
+    /// Creates an empty rounded-corner box.
+    init() {
+        self.init {
+            EmptyView()
+        }
+    }
+}
+
 /// A view that draws a heavy box around its content using box drawing characters.
 public nonisolated struct HeavyBox<Content: View>: View, BoxRenderable,
     LayoutTraitRenderable
@@ -132,6 +168,23 @@ extension Box {
     }
 }
 
+extension RoundedBox {
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        BoxRenderer.renderedBlock(
+            content: content,
+            drawingSet: boxDrawingSet,
+            proposal: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
 extension HeavyBox {
 
     func renderedBlock(
@@ -195,6 +248,20 @@ nonisolated struct BoxDrawingSet: Sendable {
         topRight: "┐",
         bottomLeft: "└",
         bottomRight: "┘",
+        horizontal: "─",
+        vertical: "│",
+        topTee: "┬",
+        bottomTee: "┴",
+        leftTee: "├",
+        rightTee: "┤",
+        cross: "┼"
+    )
+
+    static let rounded = BoxDrawingSet(
+        topLeft: "╭",
+        topRight: "╮",
+        bottomLeft: "╰",
+        bottomRight: "╯",
         horizontal: "─",
         vertical: "│",
         topTee: "┬",
