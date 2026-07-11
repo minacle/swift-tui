@@ -337,20 +337,14 @@ extension Grid: LayoutTraitRenderable, StackRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(nil) {
-            GridRenderer.block(
-                items: ViewResolver.gridItems(
-                    from: content,
-                    in: proposal,
-                    path: path + [0],
-                    runtime: runtime
-                ),
+        LayoutContainer(
+            layout: GridLayout(
                 alignment: alignment,
                 horizontalSpacing: horizontalSpacing,
-                verticalSpacing: verticalSpacing,
-                proposal: proposal
-            )
-        }
+                verticalSpacing: verticalSpacing
+            ),
+            content: content
+        ).renderedBlock(in: proposal, path: path, runtime: runtime)
     }
 }
 

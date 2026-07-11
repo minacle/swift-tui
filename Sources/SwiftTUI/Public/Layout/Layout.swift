@@ -636,7 +636,53 @@ extension LayoutContainer: LayoutRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(L.layoutProperties.stackOrientation) {
+        let adapter = layout as? any BuiltInLayoutAdapter
+        let properties = adapter?.resolvedLayoutProperties ?? L.layoutProperties
+        return StackAxisContext.withAxis(properties.stackOrientation) {
+            if let adapter, let kind = adapter.builtInLayoutKind {
+                let children: [StackChild]
+                let gridItems: [GridItem]
+                switch kind {
+                case .horizontal:
+                    children = ViewResolver.stackChildren(
+                        from: content,
+                        in: RenderProposal(rows: proposal?.rows),
+                        path: path + [0],
+                        runtime: runtime
+                    )
+                    gridItems = []
+                case .vertical:
+                    children = ViewResolver.stackChildren(
+                        from: content,
+                        in: RenderProposal(columns: proposal?.columns),
+                        path: path + [0],
+                        runtime: runtime
+                    )
+                    gridItems = []
+                case .overlay:
+                    children = ViewResolver.stackChildren(
+                        from: content,
+                        in: proposal,
+                        path: path + [0],
+                        runtime: runtime
+                    )
+                    gridItems = []
+                case .grid:
+                    children = []
+                    gridItems = ViewResolver.gridItems(
+                        from: content,
+                        in: proposal,
+                        path: path + [0],
+                        runtime: runtime
+                    )
+                }
+                return adapter.renderedBlock(
+                    children: children,
+                    gridItems: gridItems,
+                    proposal: proposal
+                )
+            }
+
             let proposedSize = ProposedViewSize(proposal)
             let placements = LayoutPlacementStore()
             let measurements = runtime?.layoutMeasurementStore(at: path)
@@ -653,7 +699,7 @@ extension LayoutContainer: LayoutRenderable {
                         child: child,
                         placements: placements,
                         measurements: measurements,
-                        stackOrientation: L.layoutProperties.stackOrientation
+                        stackOrientation: properties.stackOrientation
                     )
                 }
             )
@@ -802,6 +848,60 @@ extension LayoutContainer: LayoutRenderable {
 
     private func yOffset(for block: RenderedBlock, placement: LayoutPlacement) -> Int {
         placement.point.row - block.viewDimensions[placement.anchor.vertical]
+    }
+}
+
+extension LayoutContainer: LayoutTraitRenderable {
+
+    var layoutTraits: LayoutTraits {
+        guard let adapter = layout as? any BuiltInLayoutAdapter,
+              let kind = adapter.builtInLayoutKind else {
+            return LayoutTraits()
+        }
+
+        switch kind {
+        case .horizontal:
+            return StackAxisContext.withAxis(.horizontal) {
+                ViewResolver.stackLayoutTraits(
+                    from: content,
+                    propagatedAxes: [.horizontal, .vertical],
+                    spacerAxis: .horizontal
+                )
+            }
+        case .vertical:
+            return StackAxisContext.withAxis(.vertical) {
+                ViewResolver.stackLayoutTraits(
+                    from: content,
+                    propagatedAxes: [.horizontal, .vertical],
+                    spacerAxis: .vertical
+                )
+            }
+        case .overlay:
+            return StackAxisContext.withAxis(nil) {
+                ViewResolver.stackLayoutTraits(
+                    from: content,
+                    propagatedAxes: [.horizontal, .vertical],
+                    spacerAxis: nil
+                )
+            }
+        case .grid:
+            let axes = ViewResolver.gridItems(
+                from: content,
+                in: nil,
+                path: [],
+                runtime: nil
+            ).reduce(into: Axis.Set()) { axes, item in
+                switch item {
+                case .row(_, let cells):
+                    for cell in cells {
+                        axes.formUnion(GridRenderer.flexibleAxes(for: cell))
+                    }
+                case .fullWidth(let cell):
+                    axes.formUnion(GridRenderer.flexibleAxes(for: cell))
+                }
+            }
+            return LayoutTraits(flexibleAxes: axes)
+        }
     }
 }
 

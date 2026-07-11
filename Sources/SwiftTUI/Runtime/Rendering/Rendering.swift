@@ -3065,19 +3065,10 @@ extension HStack: LayoutTraitRenderable, StackRenderable, VerticalStackFlexSuppr
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(.horizontal) {
-            StackRenderer.horizontal(
-                ViewResolver.stackChildren(
-                    from: content,
-                    in: RenderProposal(rows: proposal?.rows),
-                    path: path + [0],
-                    runtime: runtime
-                ),
-                alignment: alignment,
-                spacing: spacing,
-                proposal: proposal
-            )
-        }
+        LayoutContainer(
+            layout: HStackLayout(alignment: alignment, spacing: spacing),
+            content: content
+        ).renderedBlock(in: proposal, path: path, runtime: runtime)
     }
 }
 
@@ -3098,19 +3089,10 @@ extension VStack: LayoutTraitRenderable, StackRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(.vertical) {
-            StackRenderer.vertical(
-                ViewResolver.stackChildren(
-                    from: content,
-                    in: RenderProposal(columns: proposal?.columns),
-                    path: path + [0],
-                    runtime: runtime
-                ),
-                alignment: alignment,
-                spacing: spacing,
-                proposal: proposal
-            )
-        }
+        LayoutContainer(
+            layout: VStackLayout(alignment: alignment, spacing: spacing),
+            content: content
+        ).renderedBlock(in: proposal, path: path, runtime: runtime)
     }
 }
 
@@ -3131,18 +3113,10 @@ extension ZStack: LayoutTraitRenderable, StackRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(nil) {
-            ZStackRenderer.block(
-                ViewResolver.stackChildren(
-                    from: content,
-                    in: proposal,
-                    path: path + [0],
-                    runtime: runtime
-                ),
-                alignment: alignment,
-                proposal: proposal
-            )
-        }
+        LayoutContainer(
+            layout: ZStackLayout(alignment: alignment),
+            content: content
+        ).renderedBlock(in: proposal, path: path, runtime: runtime)
     }
 }
 
