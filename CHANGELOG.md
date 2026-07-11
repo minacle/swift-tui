@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `Grid`, `GridRow`, `gridCellColumns(_:)`,
+  `gridCellAnchor(_:)`, `gridCellUnsizedAxes(_:)`, and
+  `gridColumnAlignment(_:)` for eager two-dimensional terminal-cell layout,
+  including dynamic rows, merged and full-width cells, flexible sizing, and
+  row, column, and cell alignment overrides.
 - Added `RoundedBox` for drawing regular-line borders with rounded box-drawing
   corners around terminal-cell content.
 - Added SwiftUI-compatible `Divider` and terminal-native `HeavyDivider` and

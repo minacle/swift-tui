@@ -543,6 +543,70 @@ struct PaddingView<Content: View>: View, LayoutModifierRenderable, LayoutTraitRe
 
         return block.padded(by: insets)
     }
+
+    private func paddedChild(_ child: StackChild) -> StackChild {
+        var paddedChild = child
+        paddedChild.render = { proposal, suppressRegistrations in
+            let proposal = RenderProposal(
+                columns: proposal?.columns.map {
+                    max($0 - insets.horizontal, 0)
+                },
+                rows: proposal?.rows.map {
+                    max($0 - insets.vertical, 0)
+                }
+            )
+            guard let element = child.render(proposal, suppressRegistrations) else {
+                return nil
+            }
+            switch element {
+            case .block(let block):
+                return .block(block.padded(by: insets))
+            case .spacer:
+                return element
+            }
+        }
+        return paddedChild
+    }
+}
+
+extension PaddingView: FlattenableViewContent where Content: FlattenableViewContent {
+
+    func renderedElements(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [RenderedElement] {
+        stackChildren(
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ).compactMap { $0.render(proposal, false) }
+    }
+
+    func stackChildren(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [StackChild] {
+        content.stackChildren(
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ).map(paddedChild)
+    }
+}
+
+extension PaddingView: GridContentRenderable where Content: GridContentRenderable {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        content.gridItems(in: proposal, path: path, runtime: runtime).map {
+            $0.mappingCells(paddedChild)
+        }
+    }
 }
 
 protocol LayoutModifierRenderable {

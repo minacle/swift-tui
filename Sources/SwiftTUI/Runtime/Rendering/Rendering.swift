@@ -908,6 +908,14 @@ nonisolated struct LayoutTraits: Sendable {
 
     var zIndex: Double = 0
 
+    var gridCellColumns = 1
+
+    var gridCellAnchor: UnitPoint?
+
+    var gridCellUnsizedAxes: Axis.Set = []
+
+    var gridColumnAlignment: HorizontalAlignment?
+
     private var layoutValues = LayoutValueStorage()
 
     init(
@@ -937,6 +945,30 @@ nonisolated struct LayoutTraits: Sendable {
     func settingZIndex(_ value: Double) -> LayoutTraits {
         var traits = self
         traits.zIndex = value
+        return traits
+    }
+
+    func settingGridCellColumns(_ count: Int) -> LayoutTraits {
+        var traits = self
+        traits.gridCellColumns = max(count, 1)
+        return traits
+    }
+
+    func settingGridCellAnchor(_ anchor: UnitPoint) -> LayoutTraits {
+        var traits = self
+        traits.gridCellAnchor = anchor
+        return traits
+    }
+
+    func settingGridCellUnsizedAxes(_ axes: Axis.Set) -> LayoutTraits {
+        var traits = self
+        traits.gridCellUnsizedAxes = axes
+        return traits
+    }
+
+    func settingGridColumnAlignment(_ alignment: HorizontalAlignment) -> LayoutTraits {
+        var traits = self
+        traits.gridColumnAlignment = alignment
         return traits
     }
 
@@ -977,6 +1009,8 @@ nonisolated struct StackChild {
     var traits: LayoutTraits
 
     var isSpacer: Bool = false
+
+    var isEmptyView: Bool = false
 
     var suppressesVerticalFlexInParentStack: Bool = false
 
@@ -1050,7 +1084,7 @@ extension FlattenableViewContent {
     }
 }
 
-extension AnyView: FlattenableViewContent, LayoutTraitRenderable {
+extension AnyView: FlattenableViewContent, GridContentRenderable, LayoutTraitRenderable {
 
     var layoutTraits: LayoutTraits {
         storage.layoutTraits
@@ -1070,6 +1104,51 @@ extension AnyView: FlattenableViewContent, LayoutTraitRenderable {
         runtime: StateRuntime?
     ) -> [StackChild] {
         storage.stackChildren(in: proposal, path: path, runtime: runtime)
+    }
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        storage.gridItems(in: proposal, path: path, runtime: runtime)
+    }
+}
+
+extension GridRow: FlattenableViewContent, LayoutTraitRenderable {
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.stackLayoutTraits(
+            from: content,
+            propagatedAxes: [.horizontal, .vertical],
+            spacerAxis: nil
+        )
+    }
+
+    func renderedElements(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [RenderedElement] {
+        ViewResolver.elements(
+            from: content,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        )
+    }
+
+    func stackChildren(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [StackChild] {
+        ViewResolver.stackChildren(
+            from: content,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        )
     }
 }
 
@@ -1296,6 +1375,115 @@ extension ForEach: FlattenableViewContent where Content: View {
         return runtime.withView(at: contextPath, mode: .render) {
             content(element)
         }
+    }
+}
+
+extension Group: GridContentRenderable {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        ViewResolver.gridItems(
+            from: content,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        )
+    }
+}
+
+extension OptionalViewContent: GridContentRenderable {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        guard let content else {
+            return []
+        }
+        return ViewResolver.gridItems(
+            from: content,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        )
+    }
+}
+
+extension ConditionalViewContent: GridContentRenderable {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        switch storage {
+        case .trueContent(let content):
+            ViewResolver.gridItems(
+                from: content,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            )
+        case .falseContent(let content):
+            ViewResolver.gridItems(
+                from: content,
+                in: proposal,
+                path: path + [1],
+                runtime: runtime
+            )
+        }
+    }
+}
+
+extension LimitedAvailabilityViewContent: GridContentRenderable {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        ViewResolver.gridItems(
+            from: content,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        )
+    }
+}
+
+extension ForEach: GridContentRenderable where Content: View {
+
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        var seenIDs: Set<AnyHashable> = []
+        var activeIDs: [AnyHashable] = []
+        let items = data.enumerated().flatMap { offset, element in
+            let elementID = AnyHashable(element[keyPath: id])
+            precondition(
+                seenIDs.insert(elementID).inserted,
+                "ForEach data IDs must be unique."
+            )
+
+            activeIDs.append(elementID)
+            let childIndex = runtime?.forEachChildIndex(at: path, id: elementID) ?? offset
+            let child = contentElement(element, runtime: runtime)
+            return ViewResolver.gridItems(
+                from: child,
+                in: proposal,
+                path: path + [childIndex],
+                runtime: runtime
+            )
+        }
+
+        runtime?.finishForEachRender(at: path, activeIDs: activeIDs)
+        return items
     }
 }
 
@@ -2873,6 +3061,47 @@ extension ViewResolver {
         ).map { [$0] } ?? []
     }
 
+    static func gridItems<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        if let group = view as? ViewGroup {
+            return group.elements.enumerated().flatMap { index, element in
+                element.gridItems(
+                    in: proposal,
+                    path: path + [index],
+                    runtime: runtime
+                )
+            }
+        }
+
+        if let content = view as? any GridContentRenderable {
+            return content.gridItems(in: proposal, path: path, runtime: runtime)
+        }
+
+        if view is EmptyView {
+            return []
+        }
+
+        if Content.Body.self != Never.self {
+            return gridItems(
+                from: body(from: view, path: path, runtime: runtime),
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            )
+        }
+
+        return stackChildren(
+            from: view,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ).map(GridItem.fullWidth)
+    }
+
     static func stackChildren<Content: View>(
         from view: Content,
         in proposal: RenderProposal?,
@@ -2898,6 +3127,7 @@ extension ViewResolver {
             StackChild(
                 traits: traits,
                 isSpacer: view is Spacer,
+                isEmptyView: view is EmptyView,
                 suppressesVerticalFlexInParentStack: view is any VerticalStackFlexSuppressing,
                 render: { childProposal, suppressRegistrations in
                     let render = {

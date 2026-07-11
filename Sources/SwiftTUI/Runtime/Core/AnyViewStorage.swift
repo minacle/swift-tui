@@ -17,6 +17,8 @@ nonisolated struct AnyViewStorage {
 
     private let stackChildElements: @MainActor (RenderProposal?, [Int], StateRuntime?) -> [StackChild]
 
+    private let gridItemElements: @MainActor (RenderProposal?, [Int], StateRuntime?) -> [GridItem]
+
     private let traits: @MainActor () -> LayoutTraits
 
     nonisolated init<Content: View>(_ content: Content) {
@@ -31,6 +33,14 @@ nonisolated struct AnyViewStorage {
         }
         self.stackChildElements = { proposal, path, runtime in
             ViewResolver.stackChildren(
+                from: box.content,
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+        self.gridItemElements = { proposal, path, runtime in
+            ViewResolver.gridItems(
                 from: box.content,
                 in: proposal,
                 path: path,
@@ -80,6 +90,15 @@ nonisolated struct AnyViewStorage {
         runtime: StateRuntime?
     ) -> [StackChild] {
         stackChildElements(proposal, path, runtime)
+    }
+
+    @MainActor
+    func gridItems(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [GridItem] {
+        gridItemElements(proposal, path, runtime)
     }
 
     @MainActor
