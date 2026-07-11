@@ -8,9 +8,11 @@ struct FocusedDirectNavigationLinkView: View {
 
     @FocusState var isFocused: Bool = true
 
+    private let title: String = "Open"
+
     var body: some View {
         NavigationStack {
-            NavigationLink("Open") {
+            NavigationLink(title) {
                 Text("Detail")
             }
             .focused($isFocused)
@@ -24,9 +26,11 @@ struct FocusedValueNavigationLinkView: View {
 
     let path: Binding<[Int]>
 
+    private let title: String = "One"
+
     var body: some View {
         NavigationStack(path: path) {
-            NavigationLink("One", value: 1)
+            NavigationLink(title, value: 1)
                 .focused($isFocused)
                 .navigationDestination(for: Int.self) { value in
                     Text("Value \(value)")

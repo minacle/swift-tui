@@ -275,7 +275,12 @@ public nonisolated struct Text: View, Equatable, Sendable {
     ///
     /// - Parameter content: The string to render in the terminal.
     public init<S>(_ content: S) where S: StringProtocol {
-        self.runs = [TextRun(text: String(content))]
+        self.init(content: String(content))
+    }
+
+    /// Stores plain string content for the public plain-text initializers.
+    internal init(content: String) {
+        self.runs = [TextRun(text: content)]
     }
 
     /// Creates text that renders a `String` verbatim.
@@ -287,8 +292,9 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// sequences remain unchanged, so sanitize untrusted `content` first.
     ///
     /// - Parameter content: The string to render in the terminal.
+    @available(*, deprecated, message: "Use init(_:) instead.")
     public init(verbatim content: String) {
-        self.init(content)
+        self.init(content: content)
     }
 
     /// Creates text from Foundation attributed-string content.

@@ -15,8 +15,8 @@ struct TextContentAndLinkTests {
     }
 
     @Test
-    func `Text initializers preserve content from StringProtocol values, verbatim strings, LocalizedStringKey, and AttributedString values`() {
-        let string = "Hello"
+    func `Text initializers preserve content from StringProtocol and AttributedString values`() {
+        let string = ["Hel", "lo"].joined()
         let substring = string[string.startIndex..<string.index(string.startIndex, offsetBy: 4)]
         var attributed = AttributedString("Styled")
 #if canImport(Darwin)
@@ -25,8 +25,6 @@ struct TextContentAndLinkTests {
 
         #expect(Text(string).content == "Hello")
         #expect(Text(substring).content == "Hell")
-        #expect(Text(verbatim: "Literal").content == "Literal")
-        #expect(Text(LocalizedStringKey("Key")).content == "Key")
         #expect(Text(attributed).content == "Styled")
     }
 

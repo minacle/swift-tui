@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only public `SwiftTUIEssentials` APIs instead of using control-specific
   renderer and runtime state branches.
 
+### Deprecated
+
+- Deprecated `LocalizedStringKey`, its `Text`, `Button`, and `NavigationLink`
+  initializers, and `Text.init(verbatim:)`. Localize strings with
+  `String.init(localized:...)` before passing them to SwiftTUI, and use the
+  ordinary `Text.init(_:)` initializer for nonlocalized text.
+
 ## [0.8.0] - 2026-07-11
 
 ### Added

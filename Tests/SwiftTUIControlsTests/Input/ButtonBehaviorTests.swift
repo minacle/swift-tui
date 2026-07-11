@@ -10,10 +10,11 @@ struct ButtonBehaviorTests {
     @Test
     func `rendering a button label does not perform its action`() {
         var didRun = false
+        let title = ["Sa", "ve"].joined()
         let custom = Button(action: { didRun = true }) {
             Text("Run")
         }
-        let titled = Button("Save") {
+        let titled = Button(title) {
             didRun = true
         }
 

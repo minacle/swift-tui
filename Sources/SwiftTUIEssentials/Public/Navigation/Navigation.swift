@@ -5,6 +5,11 @@ import Foundation
 /// SwiftTUI stores the key as a plain string and renders it verbatim. This type
 /// doesn't perform table lookup, locale selection, interpolation, or fallback
 /// localization.
+@available(
+    *,
+    deprecated,
+    message: "Localize with String.init(localized:...) and pass the resulting String."
+)
 public nonisolated struct LocalizedStringKey: Equatable, Hashable, Sendable,
     ExpressibleByStringLiteral
 {
@@ -32,8 +37,13 @@ public extension Text {
     /// Creates text from a localized string key.
     ///
     /// - Parameter key: The localized string key whose stored string is rendered.
+    @available(
+        *,
+        deprecated,
+        message: "Localize with String.init(localized:...) and pass the resulting String."
+    )
     init(_ key: LocalizedStringKey) {
-        self.init(key.key)
+        self.init(content: key.key)
     }
 }
 
@@ -332,18 +342,48 @@ public struct NavigationLink<Label: View, Destination: View>: View {
 
 public extension NavigationLink where Label == Text {
 
+    /// Creates a navigation link with a plain string label.
+    ///
+    /// SwiftTUI renders `title` unchanged and doesn't perform localization.
+    /// Localize it with `String.init(localized:...)` before calling this
+    /// initializer when needed. Sanitize untrusted strings before rendering
+    /// them because terminal control characters remain unchanged.
+    ///
+    /// - Parameters:
+    ///   - title: The string to render as the link label.
+    ///   - destination: A view builder that creates the destination to push.
+    init(
+        _ title: String,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) {
+        self.init(title: title, destination: destination)
+    }
+
+    /// Builds the text-label form shared by plain and deprecated initializers.
+    internal init(
+        title: String,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) {
+        self.init(destination: destination) {
+            Text(title)
+        }
+    }
+
     /// Creates a navigation link that presents a destination view, with a text label.
     ///
     /// - Parameters:
     ///   - titleKey: The text used as the link label.
     ///   - destination: A view builder that creates the destination to push.
+    @available(
+        *,
+        deprecated,
+        message: "Localize with String.init(localized:...) and pass the resulting String."
+    )
     init(
         _ titleKey: LocalizedStringKey,
         @ViewBuilder destination: @escaping () -> Destination
     ) {
-        self.init(destination: destination) {
-            Text(titleKey)
-        }
+        self.init(title: titleKey.key, destination: destination)
     }
 }
 
@@ -366,6 +406,34 @@ public extension NavigationLink where Destination == Never {
 
 public extension NavigationLink where Label == Text, Destination == Never {
 
+    /// Creates a value link with a plain string label.
+    ///
+    /// SwiftTUI renders `title` unchanged and doesn't perform localization.
+    /// Localize it with `String.init(localized:...)` before calling this
+    /// initializer when needed. Sanitize untrusted strings before rendering
+    /// them because terminal control characters remain unchanged.
+    ///
+    /// - Parameters:
+    ///   - title: The string to render as the link label.
+    ///   - value: The value to append to the navigation path, or `nil` to make
+    ///     the link inactive.
+    init<Value>(
+        _ title: String,
+        value: Value?
+    ) where Value: Decodable, Value: Encodable, Value: Hashable {
+        self.init(title: title, value: value)
+    }
+
+    /// Builds the value-link form shared by plain and deprecated initializers.
+    internal init<Value>(
+        title: String,
+        value: Value?
+    ) where Value: Decodable, Value: Encodable, Value: Hashable {
+        self.init(value: value) {
+            Text(title)
+        }
+    }
+
     /// Creates a navigation link that presents the view corresponding to a
     /// value, with a text label.
     ///
@@ -373,13 +441,16 @@ public extension NavigationLink where Label == Text, Destination == Never {
     ///   - titleKey: The text used as the link label.
     ///   - value: The value to append to the navigation path, or `nil` to make
     ///     the link inactive.
+    @available(
+        *,
+        deprecated,
+        message: "Localize with String.init(localized:...) and pass the resulting String."
+    )
     init<Value>(
         _ titleKey: LocalizedStringKey,
         value: Value?
     ) where Value: Decodable, Value: Encodable, Value: Hashable {
-        self.init(value: value) {
-            Text(titleKey)
-        }
+        self.init(title: titleKey.key, value: value)
     }
 }
 

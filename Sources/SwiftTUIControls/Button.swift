@@ -151,6 +151,26 @@ private struct ButtonBody<Label: View>: View {
 
 public extension Button where Label == Text {
 
+    /// Creates a button with a plain string label.
+    ///
+    /// SwiftTUI renders `title` unchanged. Sanitize untrusted strings before
+    /// rendering them because terminal control characters remain unchanged.
+    ///
+    /// - Parameters:
+    ///   - title: The string to render as the button label.
+    ///   - action: The synchronous action to run each time the button is
+    ///     activated.
+    init(_ title: String, action: @escaping () -> Void) {
+        self.init(title: title, action: action)
+    }
+
+    /// Builds the text-label form shared by plain and deprecated initializers.
+    internal init(title: String, action: @escaping () -> Void) {
+        self.init(action: action) {
+            Text(title)
+        }
+    }
+
     /// Creates a button that generates its label from a localized string key.
     ///
     /// - Parameters:
@@ -158,10 +178,13 @@ public extension Button where Label == Text {
     ///     label.
     ///   - action: The synchronous action to run each time the button is
     ///     activated.
+    @available(
+        *,
+        deprecated,
+        message: "Localize with String.init(localized:...) and pass the resulting String."
+    )
     init(_ titleKey: LocalizedStringKey, action: @escaping () -> Void) {
-        self.init(action: action) {
-            Text(titleKey)
-        }
+        self.init(title: titleKey.key, action: action)
     }
 }
 
