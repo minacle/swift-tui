@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `ContainerValueKey`, `ContainerValues`,
+  `View.containerValue(_:_:)`, `View.tag(_:includeOptional:)`, and
+  `LayoutSubview.containerValues` for direct-child metadata that remains
+  scoped to its nearest layout container.
 - Added SwiftUI-compatible `HStackLayout`, `VStackLayout`, `ZStackLayout`,
   `GridLayout`, and `AnyLayout`, including type-erased custom-layout caches,
   conditional layout switching that preserves descendant state, and full

@@ -144,6 +144,48 @@ public protocol LayoutValueKey {
     nonisolated static var defaultValue: Value { get }
 }
 
+/// A key for accessing a value associated with a container's subview.
+public protocol ContainerValueKey {
+
+    /// The type of value associated with this key.
+    associatedtype Value
+
+    /// The value returned for subviews that do not set this key.
+    nonisolated static var defaultValue: Value { get }
+}
+
+/// A collection of container values associated with a view.
+public nonisolated struct ContainerValues {
+
+    var storage = ContainerValueStorage()
+
+    /// Accesses the container value associated with the specified key.
+    public subscript<Key: ContainerValueKey>(key: Key.Type) -> Key.Value {
+        get {
+            storage.value(for: key)
+        }
+        set {
+            storage.set(newValue, for: key)
+        }
+    }
+
+    /// Returns the tag for the specified type, if one is present.
+    ///
+    /// - Parameter type: The type of tag to retrieve.
+    /// - Returns: The tag for `type`, or `nil` when the view has no matching tag.
+    public func tag<Value: Hashable>(for type: Value.Type) -> Value? {
+        storage.tag(for: type)
+    }
+
+    /// Returns whether the values contain the specified tag.
+    ///
+    /// - Parameter tag: The tag to find.
+    /// - Returns: `true` when a matching tag of the same type is present.
+    public func hasTag<Value: Hashable>(_ tag: Value) -> Bool {
+        storage.hasTag(tag)
+    }
+}
+
 /// A proxy that represents one subview of a layout.
 public nonisolated struct LayoutSubview: Equatable {
 
@@ -165,6 +207,11 @@ public nonisolated struct LayoutSubview: Equatable {
     /// The preferred spacing around this subview.
     public var spacing: ViewSpacing {
         measurement(in: .unspecified).spacing
+    }
+
+    /// The container values associated with this subview.
+    public var containerValues: ContainerValues {
+        child.traits.containerValues
     }
 
     /// Gets the layout value associated with the specified key.
@@ -566,6 +613,70 @@ struct LayoutValueView<Content: View, K: LayoutValueKey>: View,
     }
 }
 
+nonisolated struct ContainerValueView<Content: View, Value>: View,
+    LayoutModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let keyPath: WritableKeyPath<ContainerValues, Value>
+
+    let value: Value
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+            .settingContainerValue(keyPath, value: value)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
+nonisolated struct TagValueView<Content: View, Value: Hashable>: View,
+    LayoutModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let tag: Value
+
+    let includeOptional: Bool
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+            .settingTag(tag, includeOptional: includeOptional)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        )
+    }
+}
+
 public extension View {
 
     /// Sets the priority that custom layouts can read for this child.
@@ -602,6 +713,39 @@ public extension View {
         value: K.Value
     ) -> some View {
         LayoutValueView(content: self, key: key, value: value)
+    }
+
+    /// Sets a container value for this view.
+    ///
+    /// The view's nearest layout container can read the value through
+    /// ``LayoutSubview/containerValues``.
+    ///
+    /// - Parameters:
+    ///   - keyPath: A writable key path to the container value to update.
+    ///   - value: The value to associate with this view.
+    /// - Returns: A view with the specified container value.
+    nonisolated func containerValue<Value>(
+        _ keyPath: WritableKeyPath<ContainerValues, Value>,
+        _ value: Value
+    ) -> some View {
+        ContainerValueView(content: self, keyPath: keyPath, value: value)
+    }
+
+    /// Sets a tag value for this view.
+    ///
+    /// - Parameters:
+    ///   - tag: A hashable value that identifies the view to its container.
+    ///   - includeOptional: Whether to also expose the tag as `Optional<Value>`.
+    /// - Returns: A view with the specified tag.
+    nonisolated func tag<Value: Hashable>(
+        _ tag: Value,
+        includeOptional: Bool = true
+    ) -> some View {
+        TagValueView(
+            content: self,
+            tag: tag,
+            includeOptional: includeOptional
+        )
     }
 }
 

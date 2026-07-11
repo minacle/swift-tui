@@ -1026,6 +1026,8 @@ nonisolated struct LayoutTraits: Sendable {
 
     private var layoutValues = LayoutValueStorage()
 
+    private var containerValueStorage = ContainerValueStorage()
+
     init(
         flexibleAxes: Axis.Set = [],
         fillsStackMinorAxis: Bool = false,
@@ -1103,6 +1105,33 @@ nonisolated struct LayoutTraits: Sendable {
     func layoutValue<K: LayoutValueKey>(for key: K.Type) -> K.Value {
         layoutValues.value(for: key)
     }
+
+    var containerValues: ContainerValues {
+        ContainerValues(storage: containerValueStorage)
+    }
+
+    func settingContainerValue<Value>(
+        _ keyPath: WritableKeyPath<ContainerValues, Value>,
+        value: Value
+    ) -> LayoutTraits {
+        var traits = self
+        var values = traits.containerValues
+        values[keyPath: keyPath] = value
+        traits.containerValueStorage = values.storage
+        return traits
+    }
+
+    func settingTag<Value: Hashable>(
+        _ tag: Value,
+        includeOptional: Bool
+    ) -> LayoutTraits {
+        var traits = self
+        traits.containerValueStorage.setTag(
+            tag,
+            includeOptional: includeOptional
+        )
+        return traits
+    }
 }
 
 private nonisolated struct LayoutValueStorage: @unchecked Sendable {
@@ -1115,6 +1144,66 @@ private nonisolated struct LayoutValueStorage: @unchecked Sendable {
 
     mutating func set<K: LayoutValueKey>(_ value: K.Value, for key: K.Type) {
         values[ObjectIdentifier(key)] = value
+    }
+}
+
+nonisolated struct ContainerValueStorage: @unchecked Sendable {
+
+    private var values: [ObjectIdentifier: StoredContainerValue] = [:]
+
+    private var tags: [ObjectIdentifier: StoredContainerValue] = [:]
+
+    func value<Key: ContainerValueKey>(for key: Key.Type) -> Key.Value {
+        guard let stored = values[ObjectIdentifier(key)],
+              let value = stored.value as? Key.Value else {
+            return Key.defaultValue
+        }
+        return value
+    }
+
+    mutating func set<Key: ContainerValueKey>(
+        _ value: Key.Value,
+        for key: Key.Type
+    ) {
+        values[ObjectIdentifier(key)] = StoredContainerValue(value)
+    }
+
+    func tag<Value: Hashable>(for type: Value.Type) -> Value? {
+        guard let stored = tags[ObjectIdentifier(type)] else {
+            return nil
+        }
+        return stored.value as? Value
+    }
+
+    func hasTag<Value: Hashable>(_ tag: Value) -> Bool {
+        self.tag(for: Value.self).map { $0 == tag } ?? false
+    }
+
+    mutating func setTag<Value: Hashable>(
+        _ tag: Value,
+        includeOptional: Bool
+    ) {
+        setTag(tag, for: Value.self)
+        if includeOptional {
+            let optionalTag: Value? = tag
+            setTag(optionalTag, for: Optional<Value>.self)
+        }
+    }
+
+    private mutating func setTag<Value: Hashable>(
+        _ tag: Value,
+        for type: Value.Type
+    ) {
+        tags[ObjectIdentifier(type)] = StoredContainerValue(tag)
+    }
+}
+
+private nonisolated struct StoredContainerValue {
+
+    let value: Any
+
+    init<Value>(_ value: Value) {
+        self.value = value
     }
 }
 
