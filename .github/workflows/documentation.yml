@@ -55,7 +55,7 @@ jobs:
           site_dir="$GITHUB_WORKSPACE/_site"
           worktree_root="$RUNNER_TEMP/swifttui-doc-worktrees"
           built_versions=()
-          built_modular_versions=()
+          declare -A built_modular_versions=()
           built_terminal_versions=()
           full_build=false
           mkdir -p "$site_dir" "$worktree_root"
@@ -82,6 +82,7 @@ jobs:
             local worktree="$worktree_root/$version"
             local output="$site_dir/$version"
             local documentation_targets=(--target SwiftTUI)
+            local includes_runs=false
             local includes_modular_libraries=false
             local includes_terminal=false
             local package_description
@@ -98,6 +99,13 @@ jobs:
                 --target SwiftTUIControls
               )
               includes_modular_libraries=true
+
+              if grep '"name"[[:space:]]*:[[:space:]]*"SwiftTUIRuns"' <<< "$package_description" > /dev/null; then
+                documentation_targets+=(
+                  --target SwiftTUIRuns
+                )
+                includes_runs=true
+              fi
             fi
 
             if grep '"identity"[[:space:]]*:[[:space:]]*"swift-terminal"' <<< "$package_description" > /dev/null; then
@@ -107,7 +115,8 @@ jobs:
               includes_terminal=true
             fi
 
-            if [[ "$includes_modular_libraries" == "true" || "$includes_terminal" == "true" ]]; then
+            if [[ "$includes_modular_libraries" == "true" ||
+                  "$includes_terminal" == "true" ]]; then
               documentation_targets+=(--enable-experimental-combined-documentation)
             fi
 
@@ -136,7 +145,7 @@ jobs:
 
             built_versions+=("$version")
             if [[ "$includes_modular_libraries" == "true" ]]; then
-              built_modular_versions+=("$version")
+              built_modular_versions["$version"]="$includes_runs"
             fi
             if [[ "$includes_terminal" == "true" ]]; then
               built_terminal_versions+=("$version")
@@ -201,9 +210,12 @@ jobs:
           for version in "${built_versions[@]}"; do
             test -f "$site_dir/$version/documentation/swifttui/index.html"
           done
-          for version in "${built_modular_versions[@]}"; do
+          for version in "${!built_modular_versions[@]}"; do
             test -f "$site_dir/$version/documentation/swifttuiessentials/index.html"
             test -f "$site_dir/$version/documentation/swifttuicontrols/index.html"
+            if [[ "${built_modular_versions[$version]}" == "true" ]]; then
+              test -f "$site_dir/$version/documentation/swifttuiruns/index.html"
+            fi
           done
           for version in "${built_terminal_versions[@]}"; do
             test -f "$site_dir/$version/documentation/terminal/index.html"
