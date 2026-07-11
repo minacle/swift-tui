@@ -7,13 +7,39 @@ import Testing
 struct StackLayoutTests {
 
     @Test
-    func `an HStack places children side by side with no spacing by default`() {
-        let stack = HStack {
+    func `an HStack places children side by side with explicit zero spacing`() {
+        let stack = HStack(spacing: 0) {
             Text("A")
             Text("B")
         }
 
         #expect(ViewResolver.text(from: stack) == "AB")
+    }
+
+    @Test
+    func `an HStack inserts two automatic spacing columns by default`() {
+        let stack = HStack {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "A  B")
+    }
+
+    @Test
+    func `automatic spacing is reserved before flexible HStack allocation`() {
+        let stack = HStack {
+            Text("A")
+            Spacer(minLength: 0)
+            Text("B")
+        }
+
+        let block = ViewResolver.block(
+            from: stack,
+            in: RenderProposal(columns: 8, rows: 1)
+        )
+
+        #expect(block?.lines == ["A      B"])
     }
 
     @Test
@@ -50,13 +76,23 @@ struct StackLayoutTests {
     }
 
     @Test
-    func `a VStack places children on adjacent rows with no spacing by default`() {
-        let stack = VStack {
+    func `a VStack places children on adjacent rows with explicit zero spacing`() {
+        let stack = VStack(spacing: 0) {
             Text("A")
             Text("B")
         }
 
         #expect(ViewResolver.text(from: stack) == "A\nB")
+    }
+
+    @Test
+    func `a VStack inserts one automatic spacing row by default`() {
+        let stack = VStack {
+            Text("A")
+            Text("B")
+        }
+
+        #expect(ViewResolver.text(from: stack) == "A\n\nB")
     }
 
     @Test
@@ -85,7 +121,7 @@ struct StackLayoutTests {
     @Test
     func `HStack aligns children vertically`() {
         let top = HStack(alignment: .top, spacing: 1) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -93,7 +129,7 @@ struct StackLayoutTests {
             Text("X")
         }
         let center = HStack(alignment: .center, spacing: 1) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -101,7 +137,7 @@ struct StackLayoutTests {
             Text("X")
         }
         let bottom = HStack(alignment: .bottom, spacing: 1) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -123,15 +159,15 @@ struct StackLayoutTests {
 
     @Test
     func `VStack aligns children horizontally`() {
-        let leading = VStack(alignment: .leading) {
+        let leading = VStack(alignment: .leading, spacing: 0) {
             Text("A")
             Text("BBB")
         }
-        let center = VStack(alignment: .center) {
+        let center = VStack(alignment: .center, spacing: 0) {
             Text("A")
             Text("BBB")
         }
-        let trailing = VStack(alignment: .trailing) {
+        let trailing = VStack(alignment: .trailing, spacing: 0) {
             Text("A")
             Text("BBB")
         }
@@ -143,7 +179,7 @@ struct StackLayoutTests {
 
     @Test
     func `VStack aligns wide text by terminal columns`() {
-        let stack = VStack(alignment: .trailing) {
+        let stack = VStack(alignment: .trailing, spacing: 0) {
             Text("한")
             Text("ABC")
         }
@@ -153,7 +189,7 @@ struct StackLayoutTests {
 
     @Test
     func `VStack aligns explicit custom horizontal guides`() {
-        let stack = VStack(alignment: .marker) {
+        let stack = VStack(alignment: .marker, spacing: 0) {
             Text("A")
                 .alignmentGuide(HorizontalAlignment.marker) { _ in 0 }
             Text("BBB")
@@ -165,7 +201,7 @@ struct StackLayoutTests {
 
     @Test
     func `an out-of-bounds custom guide expands a VStack without clipping`() {
-        let stack = VStack(alignment: .marker) {
+        let stack = VStack(alignment: .marker, spacing: 0) {
             Text("A")
                 .alignmentGuide(HorizontalAlignment.marker) { _ in -2 }
             Text("BBB")
@@ -177,8 +213,8 @@ struct StackLayoutTests {
 
     @Test
     func `HStack aligns explicit custom vertical guides`() {
-        let stack = HStack(alignment: .marker) {
-            VStack {
+        let stack = HStack(alignment: .marker, spacing: 0) {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -193,8 +229,8 @@ struct StackLayoutTests {
 
     @Test
     func `a nested VStack propagates its descendants' explicit custom guide`() {
-        let stack = VStack(alignment: .marker) {
-            VStack(alignment: .marker) {
+        let stack = VStack(alignment: .marker, spacing: 0) {
+            VStack(alignment: .marker, spacing: 0) {
                 Text("A")
                     .alignmentGuide(HorizontalAlignment.marker) { _ in 0 }
                 Text("BBB")
@@ -216,7 +252,7 @@ struct StackLayoutTests {
 
     @Test
     func `an HStack Spacer collapses to zero width without a proposal`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             Text("A")
             Spacer()
             Text("B")
@@ -227,7 +263,7 @@ struct StackLayoutTests {
 
     @Test
     func `HStack spacer fills proposed columns`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             Text("A")
             Spacer()
             Text("B")
@@ -240,7 +276,7 @@ struct StackLayoutTests {
 
     @Test
     func `HStack spacers share remaining columns`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             Text("A")
             Spacer()
             Text("B")
@@ -255,7 +291,7 @@ struct StackLayoutTests {
 
     @Test
     func `VStack spacer fills proposed rows`() {
-        let stack = VStack {
+        let stack = VStack(spacing: 0) {
             Text("A")
             Spacer()
             Text("B")
@@ -268,7 +304,7 @@ struct StackLayoutTests {
 
     @Test
     func `a VStack without flexible children keeps its natural height under a taller proposal`() {
-        let stack = VStack {
+        let stack = VStack(spacing: 0) {
             Text("A")
             Text("B")
         }

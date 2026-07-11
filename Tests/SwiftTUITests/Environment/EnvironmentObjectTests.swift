@@ -21,7 +21,7 @@ struct EnvironmentObjectTests {
     func `the nearest typed environment object overrides an ancestor object`() {
         let parent = TestObservableModel(count: 1)
         let child = TestObservableModel(count: 2)
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             TypedEnvironmentObjectMarkerText()
             TypedEnvironmentObjectMarkerText()
                 .environment(child)
@@ -35,7 +35,7 @@ struct EnvironmentObjectTests {
     func `a typed environment object applies only to the modified subtree`() {
         let parent = TestObservableModel(count: 1)
         let child = TestObservableModel(count: 2)
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             TypedEnvironmentObjectMarkerText()
                 .environment(child)
             TypedEnvironmentObjectMarkerText()

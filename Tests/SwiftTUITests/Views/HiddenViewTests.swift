@@ -26,7 +26,7 @@ struct HiddenViewTests {
 
     @Test
     func `a hidden stack child preserves its spacing footprint`() {
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             Text("A")
             Text("B")
                 .hidden()

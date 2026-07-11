@@ -51,7 +51,7 @@ struct NestedFocusableEnvironmentMarkerView: View {
     @FocusState private var isFocused = true
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             IsFocusedEnvironmentMarkerText()
                 .focusable()
         }
@@ -124,13 +124,13 @@ struct RetortFediLikeConfigurationScreen: View {
     @State private var text = ""
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
                 Text("Title")
                 Spacer()
             }
             ScrollView {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     TextField("Name", text: $text)
                     Text("Row2")
                     Text("Row3")
@@ -141,7 +141,7 @@ struct RetortFediLikeConfigurationScreen: View {
             Text("Desc")
                 .lineLimit(3)
             Spacer()
-            HStack {
+            HStack(spacing: 0) {
                 Text("Footer")
                 Spacer()
             }
@@ -188,10 +188,10 @@ struct GeometryReaderRouteConfigurationScreen: View {
         GeometryReader { proxy in
             let listRows = max(proxy.rows - 3, 1)
 
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("Size \(proxy.columns)x\(proxy.rows)")
                 ScrollView {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         ForEach(0..<6) { row in
                             GeometryReaderRouteRow(
                                 row: row,
@@ -359,7 +359,7 @@ struct FocusedScrollWheelView: View {
                 .focusable()
                 .focused($isFocused)
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("A")
                     Text("B")
                     Text("C")

@@ -14,7 +14,7 @@ struct ParentKeyPressView: View {
     let childResult: KeyPress.Result
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             CapturedParentChildKeyPressText(
                 focusBinding: $isFocused,
                 focusProbe: focusProbe,
@@ -125,8 +125,8 @@ struct NestedGlobalKeyPressView: View {
     let innerResult: KeyPress.Result
 
     var body: some View {
-        VStack {
-            VStack {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
                 Text("C")
                     .onGlobalKeyPress("a") {
                         keyProbe.record("inner")
@@ -390,7 +390,7 @@ struct OptionalFocusView: View {
     let probe: FocusBindingProbe<FocusField?>
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             CapturedOptionalFocusedText(
                 "First",
                 binding: $field,
@@ -449,7 +449,7 @@ struct DuplicateFocusValueView: View {
     let secondProbe: FocusBindingProbe<Bool>
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             DuplicateFocusedText(
                 "First",
                 fieldBinding: $field,

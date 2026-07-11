@@ -211,7 +211,7 @@ struct TextLayoutTests {
 
     @Test
     func `an ancestor lineLimit truncates text inside its descendant view tree`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             Text("Alpha beta gamma")
         }
         .lineLimit(2)
@@ -223,7 +223,7 @@ struct TextLayoutTests {
 
     @Test
     func `a descendant nil lineLimit removes its ancestor's limit`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             Text("Alpha beta gamma")
                 .lineLimit(nil)
         }

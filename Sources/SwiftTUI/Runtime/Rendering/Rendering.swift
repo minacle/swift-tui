@@ -325,6 +325,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var explicitAlignments: [AlignmentKey: Int]
 
+    var spacing: ViewSpacing
+
     init(
         lines: [String],
         style: TextStyle = .plain,
@@ -334,7 +336,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         focusRegions: [RenderedFocusRegion] = [],
         identifiedRegions: [RenderedIdentifiedRegion] = [],
         coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = [],
-        explicitAlignments: [AlignmentKey: Int] = [:]
+        explicitAlignments: [AlignmentKey: Int] = [:],
+        spacing: ViewSpacing = ViewSpacing()
     ) {
         let minimumWidth = lines.map(TerminalText.columnWidth).max() ?? 0
         self.runs = lines.enumerated().compactMap { row, line in
@@ -354,6 +357,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.identifiedRegions = identifiedRegions
         self.coordinateSpaceRegions = coordinateSpaceRegions
         self.explicitAlignments = explicitAlignments
+        self.spacing = spacing
     }
 
     init(
@@ -367,7 +371,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         focusRegions: [RenderedFocusRegion] = [],
         identifiedRegions: [RenderedIdentifiedRegion] = [],
         coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = [],
-        explicitAlignments: [AlignmentKey: Int] = [:]
+        explicitAlignments: [AlignmentKey: Int] = [:],
+        spacing: ViewSpacing = ViewSpacing()
     ) {
         self.runs = runs.filter { !$0.isEmpty }
         self.minimumWidth = max(width ?? 0, 0)
@@ -380,6 +385,22 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.identifiedRegions = identifiedRegions
         self.coordinateSpaceRegions = coordinateSpaceRegions
         self.explicitAlignments = explicitAlignments
+        self.spacing = spacing
+    }
+
+    static func == (lhs: RenderedBlock, rhs: RenderedBlock) -> Bool {
+        lhs.runs == rhs.runs
+            && lhs.minimumWidth == rhs.minimumWidth
+            && lhs.minimumHeight == rhs.minimumHeight
+            && lhs.paddedRows == rhs.paddedRows
+            && lhs.caret == rhs.caret
+            && lhs.hitRegions == rhs.hitRegions
+            && lhs.scrollRegions == rhs.scrollRegions
+            && lhs.focusRegions == rhs.focusRegions
+            && lhs.identifiedRegions == rhs.identifiedRegions
+            && lhs.coordinateSpaceRegions == rhs.coordinateSpaceRegions
+            && lhs.explicitAlignments == rhs.explicitAlignments
+            && lhs.spacing.isEqual(to: rhs.spacing)
     }
 
     var lines: [String] {
@@ -509,7 +530,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 width: targetWidth,
                 height: targetHeight
             ),
-            explicitAlignments: offsetExplicitAlignments(x: x, y: y)
+            explicitAlignments: offsetExplicitAlignments(x: x, y: y),
+            spacing: spacing
         )
     }
 
@@ -545,7 +567,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             explicitAlignments: offsetExplicitAlignments(
                 x: insets.leading,
                 y: insets.top
-            )
+            ),
+            spacing: spacing
         )
     }
 
@@ -577,7 +600,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             coordinateSpaceRegions: coordinateSpaceRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             },
-            explicitAlignments: offsetExplicitAlignments(x: x, y: y)
+            explicitAlignments: offsetExplicitAlignments(x: x, y: y),
+            spacing: spacing
         )
     }
 
@@ -623,7 +647,10 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             focusRegions: blocks.reversed().flatMap(\.focusRegions),
             identifiedRegions: blocks.reversed().flatMap(\.identifiedRegions),
             coordinateSpaceRegions: blocks.reversed().flatMap(\.coordinateSpaceRegions),
-            explicitAlignments: combinedExplicitAlignments(from: blocks)
+            explicitAlignments: combinedExplicitAlignments(from: blocks),
+            spacing: blocks.reduce(ViewSpacing()) {
+                $0.union($1.spacing)
+            }
         )
     }
 
@@ -3577,7 +3604,7 @@ enum StackRenderer {
     static func horizontal(
         _ children: [StackChild],
         alignment: VerticalAlignment,
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
         ExplicitAlignmentQueryContext.withKeys([alignment.key]) {
@@ -3593,7 +3620,7 @@ enum StackRenderer {
     private static func unqueriedHorizontal(
         _ children: [StackChild],
         alignment: VerticalAlignment,
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal?
     ) -> RenderedBlock? {
         let layout = horizontalLayout(from: children, spacing: spacing, proposal: proposal)
@@ -3667,14 +3694,15 @@ enum StackRenderer {
                 from: items,
                 height: height,
                 alignment: alignment
-            )
+            ),
+            spacing: horizontalSpacing(from: items)
         )
     }
 
     static func vertical(
         _ children: [StackChild],
         alignment: HorizontalAlignment,
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
         ExplicitAlignmentQueryContext.withKeys([alignment.key]) {
@@ -3690,7 +3718,7 @@ enum StackRenderer {
     private static func unqueriedVertical(
         _ children: [StackChild],
         alignment: HorizontalAlignment,
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal?
     ) -> RenderedBlock? {
         let layout = verticalLayout(from: children, spacing: spacing, proposal: proposal)
@@ -3758,7 +3786,8 @@ enum StackRenderer {
                 from: items,
                 width: width,
                 alignment: alignment
-            )
+            ),
+            spacing: verticalSpacing(from: items)
         )
     }
 
@@ -3945,7 +3974,7 @@ enum StackRenderer {
 
     private static func horizontalLayout(
         from children: [StackChild],
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal?
     ) -> HorizontalLayout {
         let children = measuredChildren(
@@ -3954,11 +3983,12 @@ enum StackRenderer {
             stackAxis: .horizontal,
             childProposal: horizontalChildProposal
         )
+        let gaps = spacingGaps(between: children, spacing: spacing, axis: .horizontal)
         let usesContentFlex = children.contains { $0.isHorizontallyContentFlexible }
         let flexibleCount = children.filter {
             $0.isHorizontallyFlexible(usingContentFlex: usesContentFlex)
         }.count
-        let spacingWidth = spacingWidth(for: children.count, spacing: spacing)
+        let spacingWidth = gaps.reduce(0, +)
         let minimums = children.compactMap {
             $0.horizontalMinimum(usingContentFlex: usesContentFlex)
         }
@@ -3987,7 +4017,8 @@ enum StackRenderer {
         )
         var flexibleIndex = 0
         var x = 0
-        let items: [HorizontalItem] = children.compactMap { child -> HorizontalItem? in
+        let items: [HorizontalItem] = children.enumerated().compactMap {
+            index, child -> HorizontalItem? in
             let element: RenderedElement
             let itemWidth: Int
             switch child.content {
@@ -4030,7 +4061,7 @@ enum StackRenderer {
                 traits: child.traits,
                 render: child.render
             )
-            x += item.width + max(spacing, 0)
+            x += item.width + (gaps.indices.contains(index) ? gaps[index] : 0)
             return item
         }
 
@@ -4044,7 +4075,7 @@ enum StackRenderer {
 
     private static func verticalLayout(
         from children: [StackChild],
-        spacing: Int,
+        spacing: Int?,
         proposal: RenderProposal?
     ) -> VerticalLayout {
         let children = measuredChildren(
@@ -4053,11 +4084,12 @@ enum StackRenderer {
             stackAxis: .vertical,
             childProposal: verticalChildProposal
         )
+        let gaps = spacingGaps(between: children, spacing: spacing, axis: .vertical)
         let usesContentFlex = children.contains { $0.isVerticallyContentFlexible }
         let flexibleCount = children.filter {
             $0.isVerticallyFlexible(usingContentFlex: usesContentFlex)
         }.count
-        let spacingHeight = spacingWidth(for: children.count, spacing: spacing)
+        let spacingHeight = gaps.reduce(0, +)
         let minimums = children.compactMap {
             $0.verticalMinimum(usingContentFlex: usesContentFlex)
         }
@@ -4086,7 +4118,8 @@ enum StackRenderer {
         )
         var flexibleIndex = 0
         var y = 0
-        let items: [VerticalItem] = children.compactMap { child -> VerticalItem? in
+        let items: [VerticalItem] = children.enumerated().compactMap {
+            index, child -> VerticalItem? in
             let element: RenderedElement
             let itemHeight: Int
             switch child.content {
@@ -4129,7 +4162,7 @@ enum StackRenderer {
                 traits: child.traits,
                 render: child.render
             )
-            y += item.height + max(spacing, 0)
+            y += item.height + (gaps.indices.contains(index) ? gaps[index] : 0)
             return item
         }
 
@@ -4521,8 +4554,52 @@ enum StackRenderer {
         }
     }
 
-    private static func spacingWidth(for count: Int, spacing: Int) -> Int {
-        max(count - 1, 0) * max(spacing, 0)
+    private static func spacingGaps(
+        between children: [MeasuredChild],
+        spacing: Int?,
+        axis: Axis
+    ) -> [Int] {
+        guard children.count > 1 else {
+            return []
+        }
+        if let spacing {
+            return Array(repeating: max(spacing, 0), count: children.count - 1)
+        }
+        return zip(children, children.dropFirst()).map {
+            $0.content.spacing.distance(to: $1.content.spacing, along: axis)
+        }
+    }
+
+    private static func horizontalSpacing(
+        from items: [HorizontalItem]
+    ) -> ViewSpacing {
+        items.enumerated().reduce(ViewSpacing()) { result, element in
+            let (index, item) = element
+            var edges: Edge.Set = .vertical
+            if index == items.startIndex {
+                edges.formUnion(.leading)
+            }
+            if index == items.index(before: items.endIndex) {
+                edges.formUnion(.trailing)
+            }
+            return result.union(item.content.spacing, edges: edges)
+        }
+    }
+
+    private static func verticalSpacing(
+        from items: [VerticalItem]
+    ) -> ViewSpacing {
+        items.enumerated().reduce(ViewSpacing()) { result, element in
+            let (index, item) = element
+            var edges: Edge.Set = .horizontal
+            if index == items.startIndex {
+                edges.formUnion(.top)
+            }
+            if index == items.index(before: items.endIndex) {
+                edges.formUnion(.bottom)
+            }
+            return result.union(item.content.spacing, edges: edges)
+        }
     }
 
     private static func horizontalOffset(
@@ -4671,6 +4748,15 @@ private extension StackRenderer.MeasuredChild {
 }
 
 private extension RenderedElement {
+
+    var spacing: ViewSpacing {
+        switch self {
+        case .block(let block):
+            return block.spacing
+        case .spacer:
+            return ViewSpacing()
+        }
+    }
 
     var isSpacer: Bool {
         guard case .spacer = self else {

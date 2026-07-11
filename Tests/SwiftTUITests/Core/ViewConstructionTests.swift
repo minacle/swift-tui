@@ -45,7 +45,7 @@ struct ViewConstructionTests {
             let isVisible: Bool
 
             var body: some View {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text("A")
                     if isVisible {
                         Text("B")
@@ -86,7 +86,7 @@ struct ViewConstructionTests {
             let usesFirstBranch: Bool
 
             var body: some View {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     if usesFirstBranch {
                         Text("A")
                         Text("B")
@@ -105,7 +105,7 @@ struct ViewConstructionTests {
 
     @Test
     func `limited-availability view-builder content renders normally`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             ViewBuilder.buildLimitedAvailability(Text("limited"))
         }
 
@@ -114,7 +114,7 @@ struct ViewConstructionTests {
 
     @Test
     func `a group flattens its children into a vertical stack`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             Group {
                 Text("A")
                 Text("B")
@@ -137,7 +137,7 @@ struct ViewConstructionTests {
 
     @Test
     func `nested groups flatten without introducing layout`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             Text("A")
             Group {
                 Group {

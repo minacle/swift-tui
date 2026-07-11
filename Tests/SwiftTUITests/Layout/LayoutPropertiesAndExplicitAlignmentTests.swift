@@ -59,7 +59,7 @@ struct LayoutPropertiesAndExplicitAlignmentTests {
     @Test
     func `a custom layout reports an arbitrary horizontal guide to its parent VStack`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .layoutMarker) {
+            from: VStack(alignment: .layoutMarker, spacing: 0) {
                 HorizontalExplicitAlignmentLayout() {
                     Text("A")
                 }
@@ -74,7 +74,7 @@ struct LayoutPropertiesAndExplicitAlignmentTests {
     @Test
     func `a custom layout reports a built-in leading guide to its parent VStack`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 HorizontalExplicitAlignmentLayout() {
                     Text("A")
                 }
@@ -88,7 +88,7 @@ struct LayoutPropertiesAndExplicitAlignmentTests {
     @Test
     func `a custom layout reports an arbitrary vertical guide to its parent HStack`() {
         let block = ViewResolver.block(
-            from: HStack(alignment: .layoutMarker) {
+            from: HStack(alignment: .layoutMarker, spacing: 0) {
                 VerticalExplicitAlignmentLayout() {
                     Text("A")
                 }
@@ -103,7 +103,7 @@ struct LayoutPropertiesAndExplicitAlignmentTests {
     @Test
     func `the default custom layout alignment merges placed subview guides`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .layoutMarker) {
+            from: VStack(alignment: .layoutMarker, spacing: 0) {
                 OffsetGuideLayout() {
                     Text("A")
                         .alignmentGuide(HorizontalAlignment.layoutMarker) { _ in 0 }
@@ -133,7 +133,7 @@ struct LayoutPropertiesAndExplicitAlignmentTests {
     @Test
     func `explicit alignment receives the layout bounds proposal subviews and cache`() {
         let probe = ExplicitAlignmentContextProbe()
-        let view = VStack(alignment: .layoutMarker) {
+        let view = VStack(alignment: .layoutMarker, spacing: 0) {
             ExplicitAlignmentContextLayout(probe: probe) {
                 Text("A")
             }

@@ -98,12 +98,12 @@ struct NestedOverlaidURLTextFieldEditingView: View {
     var body: some View {
         VStack(spacing: 1) {
             HStack(spacing: 2) {
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: 0) {
                     Text("App Title")
                         .bold()
                     Spacer()
                 }
-                HStack {
+                HStack(spacing: 0) {
                     Text("[")
                         .dim()
                     ZStack {
@@ -148,7 +148,7 @@ struct NestedHStackTextFieldEditingView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 0) {
                 TextField("URL", text: $text)
                     .focused($isFocused)
             }
@@ -165,7 +165,7 @@ struct NestedSecureFieldEditingView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 0) {
                 SecureField("Password", text: $text)
                     .focused($isFocused)
             }
@@ -468,7 +468,7 @@ struct TextFieldSubmitView: View {
     @FocusState var isFocused = true
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             TextField("Name", text: $text)
                 .focused($isFocused)
                 .onSubmit {
@@ -488,7 +488,7 @@ struct SecureFieldSubmitView: View {
     @FocusState var isFocused = true
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             SecureField("Password", text: $text)
                 .focused($isFocused)
                 .onSubmit {

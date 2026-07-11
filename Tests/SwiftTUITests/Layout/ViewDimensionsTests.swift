@@ -112,7 +112,7 @@ struct ViewDimensionsTests {
 
     @Test
     func `alignmentGuide preserves flexible layout traits`() {
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             Text("[")
             TextField("Name", text: .constant(""))
                 .alignmentGuide(HorizontalAlignment.oneThird) { _ in 0 }

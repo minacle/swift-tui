@@ -55,11 +55,11 @@ struct ProposedViewSizeTests {
                 .frame(maxWidth: 7, maxHeight: 4)
             Spacer()
             Divider()
-            HStack {
+            HStack(spacing: 0) {
                 Text("A")
                 Spacer()
             }
-            Grid {
+            Grid(horizontalSpacing: 0, verticalSpacing: 0) {
                 GridRow {
                     Text("A")
                     Spacer()

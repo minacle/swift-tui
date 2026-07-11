@@ -162,6 +162,11 @@ public nonisolated struct LayoutSubview: Equatable {
         child.traits.priority
     }
 
+    /// The preferred spacing around this subview.
+    public var spacing: ViewSpacing {
+        measurement(in: .unspecified).spacing
+    }
+
     /// Gets the layout value associated with the specified key.
     public subscript<K: LayoutValueKey>(key: K.Type) -> K.Value {
         child.traits.layoutValue(for: key)
@@ -178,7 +183,11 @@ public nonisolated struct LayoutSubview: Equatable {
     private func measurement(
         in proposal: ProposedViewSize,
         requesting guide: AlignmentKey? = nil
-    ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
+    ) -> (
+        size: Size,
+        explicitAlignments: [AlignmentKey: Int],
+        spacing: ViewSpacing
+    ) {
         var alignmentKeys = ExplicitAlignmentQueryContext.keys
         if let guide {
             alignmentKeys.insert(guide)
@@ -196,14 +205,17 @@ public nonisolated struct LayoutSubview: Equatable {
 
     private func uncachedMeasurement(
         in proposal: ProposedViewSize
-    ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
+    ) -> (
+        size: Size,
+        explicitAlignments: [AlignmentKey: Int],
+        spacing: ViewSpacing
+    ) {
         let renderProposal = proposal.renderProposal
         let measurementProposal = renderProposal.replacingMaximumDimensionsWithUnspecified
         let element = child.render(measurementProposal, true)
         let intrinsicSize = element?.layoutSize(proposal: measurementProposal) ?? Size()
-        let explicitAlignments = element?
-            .renderedBlock(proposal: measurementProposal)?
-            .explicitAlignments ?? [:]
+        let block = element?.renderedBlock(proposal: measurementProposal)
+        let explicitAlignments = block?.explicitAlignments ?? [:]
 
         return (
             Size(
@@ -222,7 +234,8 @@ public nonisolated struct LayoutSubview: Equatable {
                         || child.traits.flexibleAxes.contains(.vertical)
                 )
             ),
-            explicitAlignments
+            explicitAlignments,
+            block?.spacing ?? ViewSpacing()
         )
     }
 
@@ -350,6 +363,12 @@ public nonisolated protocol Layout: Sendable {
         cache: inout Cache
     ) -> Size
 
+    /// Returns the preferred spacing around the composite view.
+    func spacing(
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> ViewSpacing
+
     /// Places child subviews within the resolved layout bounds.
     ///
     /// - Parameters:
@@ -407,6 +426,16 @@ public extension Layout {
     /// The default layout properties, with no stack orientation.
     nonisolated static var layoutProperties: LayoutProperties {
         LayoutProperties()
+    }
+
+    /// Returns the union of all subview spacing preferences.
+    nonisolated func spacing(
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> ViewSpacing {
+        subviews.reduce(ViewSpacing()) {
+            $0.union($1.spacing)
+        }
     }
 
     /// Uses the explicit horizontal guides supplied by placed subviews.
@@ -668,6 +697,10 @@ extension LayoutContainer: LayoutRenderable {
         subviews: LayoutSubviews,
         cache: inout L.Cache
     ) -> RenderedBlock {
+        let spacing = layout.spacing(
+            subviews: subviews,
+            cache: &cache
+        )
         let size = layout.sizeThatFits(
             proposal: proposedSize,
             subviews: subviews,
@@ -686,6 +719,7 @@ extension LayoutContainer: LayoutRenderable {
             placements: placements.placements,
             subviews: subviews
         )
+        block.spacing = spacing
         for key in ExplicitAlignmentQueryContext.keys {
             let value: Int?
             switch key.axis {
@@ -808,7 +842,8 @@ nonisolated final class LayoutMeasurementStore {
 
     typealias Measurement = (
         size: Size,
-        explicitAlignments: [AlignmentKey: Int]
+        explicitAlignments: [AlignmentKey: Int],
+        spacing: ViewSpacing
     )
 
     private var measurements: [Key: Measurement] = [:]

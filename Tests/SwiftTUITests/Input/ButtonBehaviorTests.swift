@@ -128,11 +128,11 @@ struct ButtonBehaviorTests {
 
     @Test
     func `automatic and fitted buttons keep their intrinsic width in a horizontal stack`() {
-        let automatic = HStack {
+        let automatic = HStack(spacing: 0) {
             Button("A") {}
             Text("B")
         }
-        let fitted = HStack {
+        let fitted = HStack(spacing: 0) {
             Button("A") {}
                 .buttonSizing(.fitted)
             Text("B")
@@ -152,7 +152,7 @@ struct ButtonBehaviorTests {
 
     @Test
     func `a flexible button receives the remaining width in a horizontal stack`() {
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             Button("A") {}
                 .buttonSizing(.flexible)
             Text("B")

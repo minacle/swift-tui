@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `ViewSpacing`, `LayoutSubview.spacing`, and
+  `Layout.spacing(subviews:cache:)` with terminal-native spacing preferences
+  and propagation through custom and built-in layouts.
 - Added SwiftUI-compatible `LayoutProperties.stackOrientation` and custom
   `Layout.explicitAlignment(of:in:proposal:subviews:cache:)` reporting for
   horizontal, vertical, built-in, and custom alignment guides.
@@ -43,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** Changed `HStack`, `VStack`, and `Grid` to use automatic terminal
+  spacing when their spacing arguments are `nil`, with defaults of two columns
+  horizontally and one row vertically.
 - **Breaking:** Changed `LayoutSubview.dimensions(in:)` to return
   `ViewDimensions`, removed `LayoutSubviewDimensions`, and changed
   `HorizontalAlignment` and `VerticalAlignment` from closed enums to

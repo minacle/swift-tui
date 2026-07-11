@@ -115,7 +115,7 @@ struct TextSelectionTests {
         #expect(environment.textSelectionForegroundStyle == nil)
 
         let runtime = StateRuntime()
-        let view = VStack {
+        let view = VStack(spacing: 0) {
             Text("ab")
                 .foregroundStyle(.yellow)
                 .textSelection(.enabled)

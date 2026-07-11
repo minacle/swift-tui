@@ -172,7 +172,7 @@ struct PointerPressTests {
     func `an ignored child pointer press propagates to a handling parent`() {
         let runtime = StateRuntime()
         let pointerProbe = PointerPressProbe()
-        let view = VStack {
+        let view = VStack(spacing: 0) {
             Text("A")
                 .onPointerPress {
                     pointerProbe.record("child")
@@ -198,7 +198,7 @@ struct PointerPressTests {
     func `a handled child pointer press prevents parent propagation`() {
         let runtime = StateRuntime()
         let pointerProbe = PointerPressProbe()
-        let view = VStack {
+        let view = VStack(spacing: 0) {
             Text("A")
                 .onPointerPress {
                     pointerProbe.record("child")

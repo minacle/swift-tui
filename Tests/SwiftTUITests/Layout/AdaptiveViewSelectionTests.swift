@@ -21,7 +21,7 @@ struct AdaptiveViewSelectionTests {
     @Test
     func `a horizontally constrained ViewThatFits ignores vertical overflow`() {
         let view = ViewThatFits(in: .horizontal) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
             }
@@ -36,7 +36,7 @@ struct AdaptiveViewSelectionTests {
     @Test
     func `a vertically constrained ViewThatFits selects a child by height`() {
         let view = ViewThatFits(in: .vertical) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
             }
@@ -87,7 +87,7 @@ struct AdaptiveViewSelectionTests {
 
     @Test
     func `an HStack proposes its remaining width to ViewThatFits`() {
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             Text("A")
             ViewThatFits(in: .horizontal) {
                 Text("Long")

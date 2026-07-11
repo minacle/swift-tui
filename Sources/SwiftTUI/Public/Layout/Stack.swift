@@ -1,7 +1,7 @@
 /// A view that arranges its children from left to right.
 ///
-/// `HStack` measures its children in terminal cells and inserts a fixed number
-/// of blank columns between adjacent children.
+/// `HStack` measures its children in terminal cells and inserts automatic or
+/// explicit blank columns between adjacent children.
 public nonisolated struct HStack<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -9,7 +9,7 @@ public nonisolated struct HStack<Content: View>: View {
 
     let alignment: VerticalAlignment
 
-    let spacing: Int
+    let spacing: Int?
 
     let content: Content
 
@@ -17,23 +17,24 @@ public nonisolated struct HStack<Content: View>: View {
     ///
     /// - Parameters:
     ///   - alignment: The vertical alignment used for children with different heights.
-    ///   - spacing: The number of blank terminal columns between children.
+    ///   - spacing: The number of blank terminal columns between children, or
+    ///     `nil` to use each adjacent pair's preferred spacing.
     ///   - content: A view builder that creates the stack's children.
     public init(
         alignment: VerticalAlignment = .center,
-        spacing: Int = 0,
+        spacing: Int? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.alignment = alignment
-        self.spacing = max(spacing, 0)
+        self.spacing = spacing.map { max($0, 0) }
         self.content = content()
     }
 }
 
 /// A view that arranges its children from top to bottom.
 ///
-/// `VStack` measures its children in terminal cells and inserts a fixed number
-/// of blank rows between adjacent children.
+/// `VStack` measures its children in terminal cells and inserts automatic or
+/// explicit blank rows between adjacent children.
 public nonisolated struct VStack<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -41,7 +42,7 @@ public nonisolated struct VStack<Content: View>: View {
 
     let alignment: HorizontalAlignment
 
-    let spacing: Int
+    let spacing: Int?
 
     let content: Content
 
@@ -49,15 +50,16 @@ public nonisolated struct VStack<Content: View>: View {
     ///
     /// - Parameters:
     ///   - alignment: The horizontal alignment used for children with different widths.
-    ///   - spacing: The number of blank terminal rows between children.
+    ///   - spacing: The number of blank terminal rows between children, or
+    ///     `nil` to use each adjacent pair's preferred spacing.
     ///   - content: A view builder that creates the stack's children.
     public init(
         alignment: HorizontalAlignment = .center,
-        spacing: Int = 0,
+        spacing: Int? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.alignment = alignment
-        self.spacing = max(spacing, 0)
+        self.spacing = spacing.map { max($0, 0) }
         self.content = content()
     }
 }

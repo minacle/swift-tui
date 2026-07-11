@@ -88,7 +88,7 @@ struct NavigationStateMutationView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 NavigationLink("Open") {
                     NavigationStateMutationDestination(status: $status)
                 }

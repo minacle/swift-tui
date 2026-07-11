@@ -151,7 +151,7 @@ struct TerminalScreenRenderingTests {
     func `an explicit default background overrides an inherited background with reset SGR sequences`() {
         let output = TextRenderer.screen(
             for: ViewResolver.block(
-                from: VStack(alignment: .leading) {
+                from: VStack(alignment: .leading, spacing: 0) {
                     Text("A")
                     Text("B")
                         ._backgroundStyle(.default)
@@ -250,7 +250,7 @@ struct TerminalScreenRenderingTests {
     func `explicit default foreground and disabled styles override inherited text styling`() {
         let output = TextRenderer.screen(
             for: ViewResolver.block(
-                from: VStack(alignment: .leading) {
+                from: VStack(alignment: .leading, spacing: 0) {
                     Text("A")
                     Text("B")
                         .foregroundStyle(.default)

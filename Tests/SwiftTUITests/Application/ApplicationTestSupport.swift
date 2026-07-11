@@ -119,7 +119,7 @@ struct ForEachTapView: View {
     let tapProbe: TapGestureProbe
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(items, id: \.id) { item in
                 Text(item.label)
                     .onTapGesture {
@@ -137,7 +137,7 @@ struct ForEachButtonView: View {
     let tapProbe: TapGestureProbe
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(items, id: \.id) { item in
                 Button(action: {
                     tapProbe.record(item.id)

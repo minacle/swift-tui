@@ -212,7 +212,7 @@ struct SecureTextEntryTests {
 
     @Test
     func `a flexible secure field claims the remaining HStack width ahead of a spacer`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             SecureField("Password", text: .constant(""))
             Spacer()
         }

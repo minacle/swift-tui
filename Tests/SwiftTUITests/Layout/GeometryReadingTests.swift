@@ -59,12 +59,12 @@ struct GeometryReadingTests {
 
     @Test
     func `GeometryReader receives both proposed axes inside HStack and VStack`() {
-        let vertical = VStack {
+        let vertical = VStack(spacing: 0) {
             GeometryReader { proxy in
                 Text("\(proxy.columns)x\(proxy.rows)")
             }
         }
-        let horizontal = HStack {
+        let horizontal = HStack(spacing: 0) {
             GeometryReader { proxy in
                 Text("\(proxy.columns)x\(proxy.rows)")
             }

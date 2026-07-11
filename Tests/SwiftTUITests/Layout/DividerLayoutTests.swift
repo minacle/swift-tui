@@ -45,7 +45,7 @@ struct DividerLayoutTests {
     @Test
     func `divider variants fill a VStack minor axis with horizontal lines`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("ABCDE")
                 Divider()
                 HeavyDivider()
@@ -64,8 +64,8 @@ struct DividerLayoutTests {
     @Test
     func `divider variants fill an HStack minor axis with vertical lines`() {
         let block = ViewResolver.block(
-            from: HStack(alignment: .top) {
-                VStack {
+            from: HStack(alignment: .top, spacing: 0) {
+                VStack(spacing: 0) {
                     Text("A")
                     Text("B")
                     Text("C")
@@ -87,13 +87,13 @@ struct DividerLayoutTests {
     @Test
     func `stack proposals extend dividers only along their line axis`() {
         let horizontal = ViewResolver.block(
-            from: VStack {
+            from: VStack(spacing: 0) {
                 Divider()
             },
             in: RenderProposal(columns: 4, rows: 3)
         )
         let vertical = ViewResolver.block(
-            from: HStack {
+            from: HStack(spacing: 0) {
                 Divider()
             },
             in: RenderProposal(columns: 4, rows: 3)
@@ -110,9 +110,9 @@ struct DividerLayoutTests {
     @Test
     func `the nearest HStack or VStack determines a nested divider direction`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
-                HStack(alignment: .top) {
-                    VStack {
+            from: VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    VStack(spacing: 0) {
                         Text("A")
                         Text("B")
                     }
@@ -132,8 +132,8 @@ struct DividerLayoutTests {
     @Test
     func `ZStack and custom Layout reset an enclosing HStack divider direction`() {
         let block = ViewResolver.block(
-            from: HStack(alignment: .top) {
-                VStack {
+            from: HStack(alignment: .top, spacing: 0) {
+                VStack(spacing: 0) {
                     Text("A")
                     Text("B")
                 }
@@ -170,7 +170,7 @@ struct DividerLayoutTests {
     @Test
     func `AnyView and padding preserve divider minor-axis expansion`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("ABCDE")
                 AnyView(
                     Divider()
@@ -188,13 +188,13 @@ struct DividerLayoutTests {
     @Test
     func `a fixed divider width prevents VStack minor-axis expansion`() {
         let framed = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("ABCDE")
                 Divider().frame(width: 2, alignment: .leading)
             }
         )
         let fixedSize = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("ABCDE")
                 Divider().fixedSize(horizontal: true, vertical: false)
             }

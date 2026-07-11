@@ -6,16 +6,16 @@ public nonisolated struct Grid<Content: View>: View {
 
     let alignment: Alignment
 
-    let horizontalSpacing: Int
+    let horizontalSpacing: Int?
 
-    let verticalSpacing: Int
+    let verticalSpacing: Int?
 
     let content: Content
 
     /// Creates a grid with the specified alignment and terminal-cell spacing.
     ///
-    /// A `nil` spacing value uses zero terminal cells. Negative explicit values
-    /// are clamped to zero.
+    /// A `nil` spacing value uses the terminal default of two columns or one
+    /// row. Negative explicit values are clamped to zero.
     ///
     /// - Parameters:
     ///   - alignment: The default alignment for content in each cell.
@@ -29,8 +29,8 @@ public nonisolated struct Grid<Content: View>: View {
         @ViewBuilder content: () -> Content
     ) {
         self.alignment = alignment
-        self.horizontalSpacing = max(horizontalSpacing ?? 0, 0)
-        self.verticalSpacing = max(verticalSpacing ?? 0, 0)
+        self.horizontalSpacing = horizontalSpacing.map { max($0, 0) }
+        self.verticalSpacing = verticalSpacing.map { max($0, 0) }
         self.content = content()
     }
 }
@@ -388,10 +388,15 @@ enum GridRenderer {
     static func block(
         items: [GridItem],
         alignment: Alignment,
-        horizontalSpacing: Int,
-        verticalSpacing: Int,
+        horizontalSpacing: Int?,
+        verticalSpacing: Int?,
         proposal: RenderProposal?
     ) -> RenderedBlock? {
+        let defaultSpacing = ViewSpacing()
+        let horizontalSpacing = horizontalSpacing
+            ?? defaultSpacing.distance(to: defaultSpacing, along: .horizontal)
+        let verticalSpacing = verticalSpacing
+            ?? defaultSpacing.distance(to: defaultSpacing, along: .vertical)
         let columnCount = items.reduce(0) { count, item in
             switch item {
             case .row(_, let cells):
@@ -467,7 +472,12 @@ enum GridRenderer {
             columnCount: columnCount
         )
 
-        var placedBlocks: [(zIndex: Double, sourceOrder: Int, block: RenderedBlock)] = []
+        var placedBlocks: [(
+            zIndex: Double,
+            sourceOrder: Int,
+            edges: Edge.Set,
+            block: RenderedBlock
+        )] = []
         for rowIndex in rows.indices {
             let row = rows[rowIndex]
             for cell in row.cells {
@@ -523,27 +533,47 @@ enum GridRenderer {
                 }
                 let x = columnOrigins[cell.column] + offset.x
                 let y = rowOrigins[rowIndex] + offset.y
+                var edges: Edge.Set = []
+                if rowIndex == rows.startIndex {
+                    edges.formUnion(.top)
+                }
+                if rowIndex == rows.index(before: rows.endIndex) {
+                    edges.formUnion(.bottom)
+                }
+                if cell.column == 0 {
+                    edges.formUnion(.leading)
+                }
+                if cell.column + cell.span >= columnCount {
+                    edges.formUnion(.trailing)
+                }
                 placedBlocks.append(
                     (
                         zIndex: traits.zIndex,
                         sourceOrder: cell.sourceOrder,
+                        edges: edges,
                         block: block.offsetBy(x: x, y: y, clippedTo: bounds)
                     )
                 )
             }
         }
 
-        let blocks = placedBlocks.sorted { lhs, rhs in
+        let sortedPlacedBlocks = placedBlocks.sorted { lhs, rhs in
             lhs.zIndex == rhs.zIndex
                 ? lhs.sourceOrder < rhs.sourceOrder
                 : lhs.zIndex < rhs.zIndex
-        }.map(\.block)
-        return RenderedBlock.composited(
-            blocks,
+        }
+        var spacing = ViewSpacing()
+        for placedBlock in sortedPlacedBlocks {
+            spacing.formUnion(placedBlock.block.spacing, edges: placedBlock.edges)
+        }
+        var block = RenderedBlock.composited(
+            sortedPlacedBlocks.map(\.block),
             width: width,
             height: height,
             paddedRows: Set(0..<height)
         )
+        block.spacing = spacing
+        return block
     }
 
     private static func preparedRows(

@@ -74,7 +74,7 @@ struct SiblingCounterView: View {
     let probe: LabeledBindingProbe
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             LabeledChildCounterView(label: "first", probe: probe)
             LabeledChildCounterView(label: "second", probe: probe)
         }

@@ -9,7 +9,7 @@ struct ProgrammaticScrollingTests {
     @Test
     func `a frame exposes viewport to nested scroll view`() {
         let view = ScrollView([.horizontal, .vertical]) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABCDE")
                 Text("FGHIJ")
                 Text("KLMNO")
@@ -27,7 +27,7 @@ struct ProgrammaticScrollingTests {
     func `a scroll position binding clamps an oversized point to the maximum valid offset`() {
         var position = ScrollPosition(x: 99, y: 99)
         let scrollView = ScrollView([.horizontal, .vertical]) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABCDE")
                 Text("FGHIJ")
                 Text("KLMNO")
@@ -53,7 +53,7 @@ struct ProgrammaticScrollingTests {
     func `an edge-based scroll position resolves to its clamped point offset`() {
         var position = ScrollPosition(edge: .bottom)
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -160,9 +160,9 @@ struct ProgrammaticScrollingTests {
 
     @Test
     func `scrollPosition affects only a scrollable descendant within the modified subtree`() {
-        let scrolled = HStack {
+        let scrolled = HStack(spacing: 0) {
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("A")
                     Text("B")
                     Text("C")

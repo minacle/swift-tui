@@ -8,10 +8,10 @@ struct GridLayoutTests {
 
     @Test
     func `a Grid uses each column's widest cell and each row's tallest cell`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
-                VStack {
+                VStack(spacing: 0) {
                     Text("X")
                     Text("Y")
                 }
@@ -50,7 +50,27 @@ struct GridLayoutTests {
     }
 
     @Test
-    func `negative Grid spacing clamps to the zero-cell default`() {
+    func `a Grid inserts two automatic columns and one automatic row`() {
+        let view = Grid {
+            GridRow {
+                Text("A")
+                Text("B")
+            }
+            GridRow {
+                Text("C")
+                Text("D")
+            }
+        }
+
+        #expect(ViewResolver.block(from: view)?.lines == [
+            "A  B",
+            "    ",
+            "C  D",
+        ])
+    }
+
+    @Test
+    func `negative Grid spacing clamps to zero cells`() {
         let view = Grid(horizontalSpacing: -2, verticalSpacing: -3) {
             GridRow {
                 Text("A")
@@ -67,7 +87,7 @@ struct GridLayoutTests {
 
     @Test
     func `gridColumnAlignment aligns every cell in its column`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                     .gridColumnAlignment(.trailing)
@@ -84,7 +104,7 @@ struct GridLayoutTests {
 
     @Test
     func `gridColumnAlignment reads explicit custom guides from every cell`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                     .alignmentGuide(.gridMarker) { _ in 0 }
@@ -101,10 +121,14 @@ struct GridLayoutTests {
 
     @Test
     func `a GridRow alignment overrides the Grid's vertical alignment`() {
-        let view = Grid(alignment: .topLeading) {
+        let view = Grid(
+            alignment: .topLeading,
+            horizontalSpacing: 0,
+            verticalSpacing: 0
+        ) {
             GridRow(alignment: .bottom) {
                 Text("A")
-                VStack {
+                VStack(spacing: 0) {
                     Text("B")
                     Text("C")
                 }
@@ -116,11 +140,15 @@ struct GridLayoutTests {
 
     @Test
     func `a GridRow custom alignment reads each cell's explicit vertical guide`() {
-        let view = Grid(alignment: .topLeading) {
+        let view = Grid(
+            alignment: .topLeading,
+            horizontalSpacing: 0,
+            verticalSpacing: 0
+        ) {
             GridRow(alignment: .gridRowMarker) {
                 Text("A")
                     .alignmentGuide(.gridRowMarker) { _ in 0 }
-                VStack {
+                VStack(spacing: 0) {
                     Text("B")
                     Text("C")
                 }
@@ -133,11 +161,15 @@ struct GridLayoutTests {
 
     @Test
     func `gridCellAnchor overrides row and column alignment`() {
-        let view = Grid(alignment: .topLeading) {
+        let view = Grid(
+            alignment: .topLeading,
+            horizontalSpacing: 0,
+            verticalSpacing: 0
+        ) {
             GridRow {
                 Text("A")
                     .gridCellAnchor(.bottomTrailing)
-                VStack {
+                VStack(spacing: 0) {
                     Text("X")
                     Text("Y")
                 }
@@ -157,7 +189,11 @@ struct GridLayoutTests {
 
     @Test
     func `gridCellAnchor truncates fractional terminal-cell offsets`() {
-        let view = Grid(alignment: .topLeading) {
+        let view = Grid(
+            alignment: .topLeading,
+            horizontalSpacing: 0,
+            verticalSpacing: 0
+        ) {
             GridRow {
                 Text("A")
                     .gridCellAnchor(UnitPoint(x: 0.75, y: 0))
@@ -172,7 +208,7 @@ struct GridLayoutTests {
 
     @Test
     func `gridCellColumns merges columns and normalizes nonpositive spans`() {
-        let merged = Grid {
+        let merged = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("ABCDE")
                     .gridCellColumns(2)
@@ -182,7 +218,7 @@ struct GridLayoutTests {
                 Text("Y")
             }
         }
-        let normalized = Grid {
+        let normalized = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                     .gridCellColumns(0)
@@ -196,7 +232,7 @@ struct GridLayoutTests {
 
     @Test
     func `a view outside GridRow spans every Grid column`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                 Text("B")
@@ -217,14 +253,14 @@ struct GridLayoutTests {
 
     @Test
     func `gridCellUnsizedAxes prevents a Divider from widening its Grid`() {
-        let flexible = Grid {
+        let flexible = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                 Text("B")
             }
             Divider()
         }
-        let unsized = Grid {
+        let unsized = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                 Text("B")
@@ -249,7 +285,7 @@ struct GridLayoutTests {
 
     @Test
     func `flexible Grid rows share proposed height unless the axis is unsized`() {
-        let flexible = Grid {
+        let flexible = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Spacer()
                 Text("A")
@@ -259,7 +295,7 @@ struct GridLayoutTests {
                 Text("C")
             }
         }
-        let unsized = Grid {
+        let unsized = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Spacer()
                     .gridCellUnsizedAxes(.vertical)
@@ -287,7 +323,7 @@ struct GridLayoutTests {
 
     @Test
     func `ForEach conditional cells and AnyView preserve Grid row structure`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             ForEach(0..<2) { row in
                 AnyView(
                     GridRow {
@@ -305,7 +341,7 @@ struct GridLayoutTests {
 
     @Test
     func `EmptyView omits a Grid cell and a trailing cell remains empty`() {
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                 EmptyView()
@@ -322,7 +358,7 @@ struct GridLayoutTests {
 
     @Test
     func `GridRow behaves as transparent content outside a Grid`() {
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             Text("[")
             GridRow {
                 Text("A")
@@ -336,14 +372,14 @@ struct GridLayoutTests {
 
     @Test
     func `padding on GridRow applies independently to every cell`() {
-        let grid = Grid {
+        let grid = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("A")
                 Text("B")
             }
             .padding(.horizontal, 1)
         }
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             GridRow {
                 Text("A")
                 Text("B")
@@ -358,7 +394,7 @@ struct GridLayoutTests {
     @Test
     func `Grid placement translates one final set of hit and focus regions`() {
         let runtime = StateRuntime()
-        let view = Grid {
+        let view = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("AAA")
                 Text("B")
@@ -417,7 +453,7 @@ private struct GridCaretOffsetTextFieldView: View {
     @FocusState var isFocused = true
 
     var body: some View {
-        Grid {
+        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 Text("AAA")
                 TextField("Name", text: $text)

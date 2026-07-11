@@ -198,7 +198,7 @@ struct StackTapGestureView: View {
     let tapProbe: TapGestureProbe
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 1) {
                 Text("A")
                     .onTapGesture {
@@ -222,7 +222,7 @@ struct NestedTapGestureView: View {
     let tapProbe: TapGestureProbe
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             Text("A")
                 .onTapGesture {
                     tapProbe.record("child")

@@ -135,7 +135,7 @@ struct LongPressRecognitionTests {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
-        let view = VStack {
+        let view = VStack(spacing: 0) {
             Text("ABCD")
                 .frame(width: 2)
                 .onLongPressGesture(minimumDuration: 0.1) {

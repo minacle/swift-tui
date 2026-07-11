@@ -10,7 +10,7 @@ struct ConditionalLifecycleView: View {
     let probe: LifecycleProbe
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             if isVisible {
                 Text("A")
                     .onAppear {
@@ -44,7 +44,7 @@ struct LifecycleDisappearStateView: View {
     @State private var status = "visible"
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(status)
             if isVisible {
                 Text("child")
@@ -173,7 +173,7 @@ struct StackedLifecycleView: View {
     let probe: LifecycleProbe
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             if isVisible {
                 Text("A")
                     .onAppear {

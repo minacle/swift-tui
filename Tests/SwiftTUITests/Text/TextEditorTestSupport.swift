@@ -135,13 +135,13 @@ struct MaxHeightOnlyTextEditorClickFocusView: View {
 struct MaxHeightConstantTextEditorBelowScrollViewView: View {
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("")
                 }
             }
-            HStack {
+            HStack(spacing: 0) {
                 Box {
                     TextEditor(text: .constant(""))
                         .frame(maxHeight: 4)
@@ -172,9 +172,9 @@ struct TextEditorBelowScrollViewView: View {
     @FocusState var isFocused = true
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("")
                 }
             }

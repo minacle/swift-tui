@@ -60,7 +60,7 @@ struct TextStyleTests {
     @Test
     func `container text styles are inherited unless a child explicitly resets them`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("A")
                 Text("B")
                     .foregroundStyle(.default)

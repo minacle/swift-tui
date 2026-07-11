@@ -9,7 +9,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a scroll view clips vertically by default`() {
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -23,10 +23,10 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `vertical scroll view inside VStack receives remaining viewport`() {
-        let stack = VStack(alignment: .leading) {
+        let stack = VStack(alignment: .leading, spacing: 0) {
             Text("H")
             ScrollView {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text("A")
                     Text("B")
                     Text("C")
@@ -153,7 +153,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a scroll view applies point position on both axes`() {
         let scrollView = ScrollView([.horizontal, .vertical]) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABCDE")
                 Text("FGHIJ")
                 Text("KLMNO")
@@ -171,7 +171,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `a text field fills remaining columns in HStack`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             Text("[")
             TextField("Name", text: .constant(""))
             Text("]")
@@ -184,7 +184,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `a text field takes remaining columns before spacer`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             TextField("Text Field", text: .constant(""))
             Spacer()
         }
@@ -200,8 +200,8 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `a TextField fills the proposed VStack width through a nested HStack`() {
-        let stack = VStack {
-            HStack {
+        let stack = VStack(spacing: 0) {
+            HStack(spacing: 0) {
                 TextField("Text Field", text: .constant(""))
                 Spacer()
             }
@@ -216,9 +216,9 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `nested HStack text field receives parent proposal`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             Text("A")
-            HStack {
+            HStack(spacing: 0) {
                 TextField("Name", text: .constant(""))
             }
         }
@@ -234,8 +234,8 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `nested HStack spacer propagates horizontal flexibility`() {
-        let stack = HStack {
-            HStack {
+        let stack = HStack(spacing: 0) {
+            HStack(spacing: 0) {
                 Text("Title")
                 Spacer()
             }
@@ -250,9 +250,9 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `a TextField receives the parent width proposal through nested VStack and HStack containers`() {
-        let stack = HStack {
-            VStack {
-                HStack {
+        let stack = HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
                     TextField("Name", text: .constant(""))
                 }
             }
@@ -270,8 +270,8 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `VStack local spacer does not propagate horizontal flexibility`() {
-        let stack = HStack {
-            VStack {
+        let stack = HStack(spacing: 0) {
+            VStack(spacing: 0) {
                 Text("A")
                 Spacer()
             }
@@ -292,12 +292,12 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     func `an overlaid TextField in nested stacks receives all available width`() {
         let stack = VStack(spacing: 1) {
             HStack(spacing: 2) {
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: 0) {
                     Text("App Title")
                         .bold()
                     Spacer()
                 }
-                HStack {
+                HStack(spacing: 0) {
                     Text("[")
                         .dim()
                     ZStack {
@@ -324,8 +324,8 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `an oversized fixed-width sibling does not shift the leading edge of an earlier VStack row`() {
         let longText = String(repeating: "가나다라마바사아자차카타파하", count: 4)
-        let stack = VStack {
-            HStack {
+        let stack = VStack(spacing: 0) {
+            HStack(spacing: 0) {
                 Text("Settings")
                 Spacer()
             }
@@ -334,7 +334,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
                 TextField("Admin Token", text: .constant(longText))
                 Spacer()
             }
-            HStack {
+            HStack(spacing: 0) {
                 Text(longText)
                 Spacer()
             }
@@ -389,7 +389,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `vertical and horizontal ScrollViews apply axis-specific expansion to their TextField content`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             ScrollView {
                 TextField("Vertically expanded", text: .constant(""))
             }
@@ -478,7 +478,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `top-level scroll views expand along scrollable axes only`() {
         let vertical = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("V0")
                 Text("V1")
                 Text("V2")
@@ -488,7 +488,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
             Text("H012345")
         }
         let both = ScrollView([.horizontal, .vertical]) {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("B012345")
                 Text("B1")
             }
@@ -538,9 +538,9 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `scroll views expand along scrollable axes inside HStack`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("V0")
                     Text("V1")
                     Text("V2")
@@ -567,19 +567,19 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `scroll views expand along scrollable axes inside VStack`() {
-        let stack = VStack(alignment: .leading) {
+        let stack = VStack(alignment: .leading, spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
             ScrollView {
-                VStack {
+                VStack(spacing: 0) {
                     Text("V0")
                     Text("V1")
                     Text("V2")
                 }
             }
             ScrollView([.horizontal, .vertical]) {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text("B012345")
                     Text("B1")
                 }
@@ -600,7 +600,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `empty scroll view participates in VStack expansion`() {
-        let stack = VStack(alignment: .leading) {
+        let stack = VStack(alignment: .leading, spacing: 0) {
             Box {
                 TextEditor(text: .constant("TextEditor"))
             }
@@ -625,7 +625,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `a scroll view and spacer share stack remainder`() {
-        let stack = HStack {
+        let stack = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
@@ -640,14 +640,14 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
     @Test
     func `fixedSize and fixed frames prevent ScrollView expansion along constrained axes`() {
-        let fixedSize = HStack {
+        let fixedSize = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
             .fixedSize(horizontal: true, vertical: false)
             Text("Z")
         }
-        let fixedFrame = HStack {
+        let fixedFrame = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
@@ -663,7 +663,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     func `ScrollView expansion preserves scroll, hit, and focus regions through its wrappers`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
@@ -686,7 +686,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `stack measurement clamps a scroll position binding against the final viewport`() {
         var position = ScrollPosition(x: 99)
-        let view = HStack {
+        let view = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
             }
@@ -740,7 +740,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a scroll view resolves edge positions`() {
         let vertical = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -767,7 +767,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         .scrollPosition(.constant(ScrollPosition(x: 2, y: 0)))
         .frame(width: 3, height: 1, alignment: .leading)
         let horizontal = ScrollView(.horizontal) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABC")
                 Text("DEF")
             }
@@ -785,7 +785,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a scroll view clamps oversized positions`() {
         let scrollView = ScrollView([.horizontal, .vertical]) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABCDE")
                 Text("FGHIJ")
                 Text("KLMNO")
@@ -818,7 +818,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     func `wheel input updates a ScrollView's bound position`() {
         var position = ScrollPosition()
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -845,7 +845,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     func `a disabled ScrollView removes its wheel region and ignores wheel input`() {
         var position = ScrollPosition()
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -874,7 +874,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `scrollDisabled blocks wheel input without overriding a programmatic position`() {
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -896,7 +896,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `wheel input updates a ScrollView's stored position without a binding`() {
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -956,7 +956,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a two-axis ScrollView responds to horizontal wheel buttons and Shift-modified vertical wheel input`() {
         let scrollView = ScrollView([.horizontal, .vertical]) {
-            VStack {
+            VStack(spacing: 0) {
                 Text("ABCDE")
                 Text("FGHIJ")
             }
@@ -988,9 +988,9 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `wheel input bubbles to an outer ScrollView when the inner ScrollView cannot scroll`() {
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 ScrollView {
-                    VStack {
+                    VStack(spacing: 0) {
                         Text("A")
                         Text("B")
                     }
@@ -1015,7 +1015,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         var outerPosition = ScrollPosition()
         var innerPosition = ScrollPosition()
         let scrollView = ScrollView([.horizontal, .vertical]) {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("top")
                 ScrollView(.horizontal) {
                     Text("ABCDE")
@@ -1060,7 +1060,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     @Test
     func `a ScrollView ignores wheel input outside its rendered region`() {
         let scrollView = ScrollView {
-            VStack {
+            VStack(spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")

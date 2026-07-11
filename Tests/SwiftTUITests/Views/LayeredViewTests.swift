@@ -291,7 +291,7 @@ struct LayeredViewTests {
     @Test
     func `an internal background style propagates through the environment to descendant text`() {
         let block = ViewResolver.block(
-            from: VStack(alignment: .leading) {
+            from: VStack(alignment: .leading, spacing: 0) {
                 Text("A")
                 Text("B")
             }
@@ -412,14 +412,14 @@ private struct ZStackTextEditorLayoutView: View {
     @State var text = "Lorem ipsum dolor sit amet."
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             ZStack {
                 Box {
                     TextEditor(text: $text)
                         .padding(.horizontal, 1)
                 }
                 .background(.red)
-                VStack {
+                VStack(spacing: 0) {
                     Text(" Text Editor ")
                     Spacer()
                 }

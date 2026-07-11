@@ -72,7 +72,7 @@ struct TypeErasedViewTests {
 
     @Test
     func `AnyView preserves horizontal stack layout`() {
-        let view = AnyView(HStack {
+        let view = AnyView(HStack(spacing: 0) {
             Text("a")
             Text("b")
         })
@@ -87,7 +87,7 @@ struct TypeErasedViewTests {
             let marker: AnyView?
 
             var body: some View {
-                HStack {
+                HStack(spacing: 0) {
                     if let marker {
                         marker
                     }

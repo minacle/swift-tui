@@ -37,7 +37,7 @@ struct NavigationPushDirectStateMutationView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 NavigationPushDirectStateMutationButton(status: $status)
                 Text(status)
             }
@@ -101,7 +101,7 @@ struct NavigationPoppableStatefulDestination: View {
     @State var count = 0
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("Value count \(count)")
                 .onTapGesture {
                     count += 1

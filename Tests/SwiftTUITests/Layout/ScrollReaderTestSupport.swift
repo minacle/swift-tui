@@ -51,7 +51,7 @@ struct ExplicitIDScrollHost: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("A")
                 Text("B")
                 Text("C")
@@ -66,12 +66,12 @@ struct ReaderScrollToBottomView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("bottom")
                 }
                 ScrollView {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("A")
                             .id("top")
                         Text("B")
@@ -92,12 +92,12 @@ struct ReaderAnchorScrollView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("target", anchor: anchor)
                 }
                 ScrollView {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("A")
                         Text("B")
                         Text("C")
@@ -117,12 +117,12 @@ struct ReaderBindingScrollView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("target")
                 }
                 ScrollView {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("A")
                         Text("B")
                         Text("C")
@@ -141,12 +141,12 @@ struct ReaderHorizontalScrollView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("target")
                 }
                 ScrollView(.horizontal) {
-                    HStack {
+                    HStack(spacing: 0) {
                         Text("A")
                         Text("B")
                         Text("C")
@@ -164,12 +164,12 @@ struct ReaderTwoAxisScrollView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("target", anchor: .bottomTrailing)
                 }
                 ScrollView([.horizontal, .vertical]) {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("ABC")
                         Text("DEF")
                         Text("GHI")
@@ -186,12 +186,12 @@ struct ReaderMissingIDView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button("go") {
                     proxy.scrollTo("missing")
                 }
                 ScrollView {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("A")
                         Text("B")
                         Text("C")
@@ -206,7 +206,7 @@ struct ReaderMissingIDView: View {
 struct ReaderOutOfScopeView: View {
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             ScrollViewReader { proxy in
                 Button("go") {
                     proxy.scrollTo("target")
@@ -215,7 +215,7 @@ struct ReaderOutOfScopeView: View {
             Text("X")
                 .id("target")
             ScrollView {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text("A")
                     Text("B")
                     Text("C")

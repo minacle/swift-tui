@@ -48,7 +48,7 @@ struct EnvironmentValueTests {
 
     @Test
     func `the nearest environment value overrides an ancestor value`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             EnvironmentMarkerText()
             EnvironmentMarkerText()
                 .environment(\.testMarker, "child!")
@@ -71,7 +71,7 @@ struct EnvironmentValueTests {
 
     @Test
     func `an environment override applies only to the modified subtree`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             EnvironmentMarkerText()
                 .environment(\.testMarker, "changed")
             EnvironmentMarkerText()
@@ -109,7 +109,7 @@ struct EnvironmentValueTests {
 
     @Test
     func `the buttonSizing modifier propagates its value to descendants`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             ButtonSizingMarkerText()
         }
         .buttonSizing(.flexible)
@@ -131,7 +131,7 @@ struct EnvironmentValueTests {
 
     @Test
     func `an enabled descendant cannot override a disabled ancestor`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             IsEnabledMarkerText()
                 .disabled(false)
         }
@@ -142,7 +142,7 @@ struct EnvironmentValueTests {
 
     @Test
     func `disabled applies only to the modified subtree`() {
-        let view = VStack(alignment: .leading) {
+        let view = VStack(alignment: .leading, spacing: 0) {
             IsEnabledMarkerText()
                 .disabled(true)
             IsEnabledMarkerText()

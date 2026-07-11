@@ -356,7 +356,7 @@ struct InputEventSemanticsTests {
     func `hidden views omit rendering, hit regions, scrolling, focus, and all input handlers`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
-        let view = VStack {
+        let view = VStack(spacing: 0) {
             Button("Run") {
                 tapProbe.record("button")
             }
