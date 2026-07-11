@@ -9,14 +9,23 @@ import Foundation
 @preconcurrency
 public protocol App {
 
-    /// The scene type produced by this app.
+    /// The concrete scene hierarchy produced by this app.
+    ///
+    /// SwiftTUI resolves this value once when ``main()`` starts the app.
     associatedtype Body: Scene
 
-    /// The scene hierarchy that SwiftTUI renders into the terminal.
+    /// The root scene hierarchy for the terminal session.
+    ///
+    /// Return a ``WindowGroup`` directly or through ``SceneBuilder`` control
+    /// flow. SwiftTUI renders the resolved window group's root view into the
+    /// current terminal viewport.
     @SceneBuilder
     var body: Body { get }
 
-    /// Creates the app instance that `main()` runs.
+    /// Creates the app value used to start the terminal session.
+    ///
+    /// The synthesized `@main` entry point requires this initializer and calls
+    /// it once before resolving ``body``.
     init()
 }
 
@@ -27,7 +36,8 @@ public extension App {
     /// This method is normally invoked by Swift's `@main` entry point. It
     /// configures the terminal session, repeatedly renders the root scene into
     /// the current viewport, dispatches keyboard and pointer input, and prints a
-    /// startup error if the terminal session cannot be created.
+    /// startup error if the terminal session cannot be created. Startup errors
+    /// are reported to terminal output rather than propagated to the caller.
     static func main() {
         do {
             try AppRunner(app: Self()).run()

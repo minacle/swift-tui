@@ -94,7 +94,10 @@ public extension View {
     /// Hides this view while preserving its terminal-cell layout footprint.
     ///
     /// Hidden views remain in the view hierarchy and affect layout, but do not
-    /// render terminal output or register interactive regions.
+    /// render terminal output or register pointer, keyboard, focus, or scroll
+    /// interaction. SwiftTUI still resolves the hidden content, so state,
+    /// observation, and lifecycle callbacks remain active; `hidden()` is a
+    /// presentation modifier, not a security or work-suppression boundary.
     ///
     /// - Returns: A hidden view.
     func hidden() -> some View {

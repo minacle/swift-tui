@@ -1,39 +1,53 @@
 /// A visual element that separates other content with a regular line.
 ///
 /// A divider is vertical in an ``HStack`` and horizontal in a ``VStack``.
-/// Outside those stacks, a divider is horizontal.
+/// The nearest stack-like container determines the direction. Outside such a
+/// container, including in a ``ZStack`` or a custom layout without an explicit
+/// stack orientation, a divider is horizontal.
+///
+/// The divider occupies one cell on its thickness axis and expands across the
+/// stack's available minor axis. Without a proposal it renders one horizontal
+/// cell. Apply a foreground style to color the line glyph.
 public nonisolated struct Divider: View {
 
     /// The body type for this primitive view.
     public typealias Body = Never
 
-    /// Creates a regular-line divider.
+    /// Creates a divider that uses regular box-drawing glyphs.
     public init() {}
 }
 
 /// A visual element that separates other content with a heavy line.
 ///
 /// A heavy divider is vertical in an ``HStack`` and horizontal in a
-/// ``VStack``. Outside those stacks, a heavy divider is horizontal.
+/// ``VStack``. The nearest stack-like container determines the direction;
+/// outside one, the divider is horizontal.
+///
+/// The divider occupies one cell on its thickness axis and expands across the
+/// stack's available minor axis. Apply a foreground style to color the line.
 public nonisolated struct HeavyDivider: View {
 
     /// The body type for this primitive view.
     public typealias Body = Never
 
-    /// Creates a heavy-line divider.
+    /// Creates a divider that uses heavy box-drawing glyphs.
     public init() {}
 }
 
 /// A visual element that separates other content with a double line.
 ///
 /// A double divider is vertical in an ``HStack`` and horizontal in a
-/// ``VStack``. Outside those stacks, a double divider is horizontal.
+/// ``VStack``. The nearest stack-like container determines the direction;
+/// outside one, the divider is horizontal.
+///
+/// The divider occupies one cell on its thickness axis and expands across the
+/// stack's available minor axis. Apply a foreground style to color the line.
 public nonisolated struct DoubleDivider: View {
 
     /// The body type for this primitive view.
     public typealias Body = Never
 
-    /// Creates a double-line divider.
+    /// Creates a divider that uses double box-drawing glyphs.
     public init() {}
 }
 

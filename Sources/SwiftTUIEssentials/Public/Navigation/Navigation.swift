@@ -2,20 +2,26 @@ import Foundation
 
 /// A key used to create localized text.
 ///
-/// SwiftTUI stores the key as a plain string and uses it as rendered text.
+/// SwiftTUI stores the key as a plain string and renders it verbatim. This type
+/// doesn't perform table lookup, locale selection, interpolation, or fallback
+/// localization.
 public nonisolated struct LocalizedStringKey: Equatable, Hashable, Sendable,
     ExpressibleByStringLiteral
 {
 
-    /// The string key rendered by SwiftTUI.
+    /// The mutable, unlocalized string rendered by SwiftTUI.
     public var key: String
 
-    /// Creates a localized string key.
+    /// Creates a key from the unlocalized string SwiftTUI will render.
+    ///
+    /// - Parameter key: The string to store and render verbatim.
     public init(_ key: String) {
         self.key = key
     }
 
-    /// Creates a localized string key from a string literal.
+    /// Creates a key from a string literal that SwiftTUI renders verbatim.
+    ///
+    /// - Parameter value: The literal to store.
     public init(stringLiteral value: String) {
         self.init(value)
     }
@@ -33,19 +39,31 @@ public extension Text {
 
 /// An action that pops the current navigation stack.
 ///
-/// Read this action with `Environment(\.pop)` inside a navigation stack.
+/// Read this action with `Environment(\.pop)` inside a navigation stack. Each
+/// call removes at most one active presentation or path value. A stack-provided
+/// action is scoped by its rendered path, not by a permanent stack-instance
+/// token; retaining it can affect a stack later recreated at the same path.
+/// Prefer reading the current environment action where it is used.
 public nonisolated struct PopAction {
 
     private let action: @MainActor () -> Void
 
-    /// Creates a pop action.
+    /// Creates a pop action backed by a main-actor closure.
     ///
-    /// - Parameter action: The closure to invoke when the action is called.
+    /// The default closure is inert. The action retains the closure, but a
+    /// stack-provided closure doesn't keep its navigation runtime alive and is
+    /// inert after that runtime is deallocated.
+    ///
+    /// - Parameter action: The main-actor closure to invoke synchronously.
     public init(_ action: @escaping @MainActor () -> Void = {}) {
         self.action = action
     }
 
-    /// Pops the current navigation stack when a stack-provided action is installed.
+    /// Invokes the stored closure on the main actor.
+    ///
+    /// A stack-provided action removes the current top presentation or value
+    /// when its owning stack is still active. This method doesn't report
+    /// whether anything was removed.
     @MainActor public func callAsFunction() {
         action()
     }
@@ -53,7 +71,15 @@ public nonisolated struct PopAction {
 
 /// An action that dismisses the current presentation.
 ///
-/// Read this action with `Environment(\.dismiss)` inside a presented view.
+/// Read this action with `Environment(\.dismiss)` inside a presented view. A
+/// destination-provided action dismisses only the presentation scope from
+/// which it was captured. The default action, an action whose runtime was
+/// deallocated, and an action whose scope no longer matches the current
+/// destination do nothing.
+///
+/// The type uses unchecked sendability for a main-actor closure. That
+/// conformance doesn't make captured state safe for concurrent access; invoke
+/// the action through its main-actor call operation.
 public nonisolated struct DismissAction: @unchecked Sendable {
 
     private let action: @MainActor () -> Void
@@ -62,7 +88,10 @@ public nonisolated struct DismissAction: @unchecked Sendable {
         self.action = action
     }
 
-    /// Dismisses the current presentation when a presentation-provided action is installed.
+    /// Invokes the stored dismissal closure on the main actor.
+    ///
+    /// This method doesn't report whether the presentation still existed or
+    /// was dismissed.
     @MainActor public func callAsFunction() {
         action()
     }
@@ -70,14 +99,18 @@ public nonisolated struct DismissAction: @unchecked Sendable {
 
 /// An action that pushes a value or destination onto the current navigation stack.
 ///
-/// Read this action with `Environment(\.push)` inside a navigation stack.
+/// Read this action with `Environment(\.push)` inside a navigation stack. The
+/// default action and an action whose runtime was deallocated are inert. A
+/// stack-provided action is scoped by rendered path, so retaining it can affect
+/// a stack later recreated at the same path. Calls don't report whether a push
+/// succeeded; prefer reading the current environment action at the use site.
 public nonisolated struct PushAction {
 
     private let pushValue: @MainActor (AnyNavigationValue) -> Void
 
     private let pushDestination: @MainActor (NavigationDestination) -> Void
 
-    /// Creates an inert push action.
+    /// Creates a push action that ignores values and destination builders.
     public init() {
         self.pushValue = { _ in }
         self.pushDestination = { _ in }
@@ -91,19 +124,25 @@ public nonisolated struct PushAction {
         self.pushDestination = destination
     }
 
-    /// Pushes a hashable codable value onto the current navigation stack.
+    /// Requests that the owning stack append a hashable, codable value.
     ///
     /// The stack resolves the value through a matching `navigationDestination`
-    /// modifier.
+    /// modifier registered for the value's concrete type. `PushAction` doesn't
+    /// serialize or persist the value despite the `Codable` constraint.
     ///
-    /// - Parameter value: The value to append to the navigation path.
+    /// - Parameter value: The value to append when the action still belongs to
+    ///   an active navigation stack.
     @MainActor public func callAsFunction<Value>(_ value: Value)
         where Value: Decodable, Value: Encodable, Value: Hashable
     {
         pushValue(AnyNavigationValue(value))
     }
 
-    /// Pushes an explicit destination view onto the current navigation stack.
+    /// Requests that the owning stack present an explicitly built destination.
+    ///
+    /// SwiftTUI retains the escaping builder with the pushed destination and
+    /// evaluates it during rendering in the environment and state context
+    /// captured at the call site.
     ///
     /// - Parameter destination: A view builder that creates the destination.
     @MainActor public func callAsFunction<Destination>(
@@ -121,18 +160,20 @@ public nonisolated struct PushAction {
 
 /// A type-erased list of data representing the content of a navigation stack.
 ///
-/// Values appended to a `NavigationPath` must be hashable and codable so
-/// SwiftTUI can preserve identity and match destinations by concrete type.
+/// Values appended through this API must be hashable and codable. SwiftTUI
+/// keeps each value in memory and matches a destination by concrete type;
+/// `NavigationPath` doesn't encode, decode, save, or restore its elements
+/// automatically.
 public struct NavigationPath: Equatable {
 
     private var elements: [AnyNavigationValue]
 
-    /// Creates a new, empty navigation path.
+    /// Creates an in-memory path with no values.
     public init() {
         self.elements = []
     }
 
-    /// A Boolean value that indicates whether this path is empty.
+    /// Indicates whether the path contains no values.
     public var isEmpty: Bool {
         elements.isEmpty
     }
@@ -150,18 +191,24 @@ public struct NavigationPath: Equatable {
         elements
     }
 
-    /// Appends a new codable value to the end of this path.
+    /// Appends a hashable, codable value to the end of the path.
     ///
-    /// - Parameter value: The value to append.
+    /// SwiftTUI retains the value without serializing it.
+    ///
+    /// - Parameter value: The value whose concrete type and hashable value are
+    ///   used for destination matching and equality.
+    /// - Complexity: Amortized O(1).
     public mutating func append<Value>(_ value: Value)
         where Value: Decodable, Value: Encodable, Value: Hashable
     {
         elements.append(AnyNavigationValue(value))
     }
 
-    /// Removes values from the end of this path.
+    /// Removes a number of values from the end of the path.
     ///
-    /// - Parameter count: The number of values to remove.
+    /// - Parameter count: The number of values to remove. The default is `1`.
+    /// - Precondition: `count >= 0 && count <= self.count`.
+    /// - Complexity: O(`count`).
     public mutating func removeLast(_ count: Int = 1) {
         elements.removeLast(count)
     }
@@ -174,19 +221,25 @@ public struct NavigationPath: Equatable {
 /// A view that displays a root view and presents additional views over it.
 ///
 /// `NavigationStack` renders the root view and one active destination at a time.
-/// It can manage its own path or use a caller-provided path binding.
+/// It can manage its own path or use a caller-provided path binding. Return and
+/// tap activation push destinations, while Escape, ``PopAction``, and
+/// ``DismissAction`` remove the active layer when their captured scope permits.
 public struct NavigationStack<Data, Root: View>: View {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let root: Root
 
     let makePathAccessor: (StateRuntime?, [Int]) -> NavigationPathAccessor
 
-    /// Creates a navigation stack that manages its own navigation state.
+    /// Creates a navigation stack with path state owned by SwiftTUI.
     ///
-    /// - Parameter root: A view builder that creates the root view.
+    /// The managed path persists at the stack's rendered identity and isn't
+    /// exposed as a binding.
+    ///
+    /// - Parameter root: A view builder evaluated immediately to create the
+    ///   root hierarchy.
     public init(@ViewBuilder root: () -> Root) where Data == NavigationPath {
         self.root = root()
         self.makePathAccessor = { runtime, path in
@@ -194,11 +247,12 @@ public struct NavigationStack<Data, Root: View>: View {
         }
     }
 
-    /// Creates a navigation stack with heterogeneous navigation state that you can control.
+    /// Creates a navigation stack controlled by a heterogeneous path binding.
     ///
     /// - Parameters:
-    ///   - path: A binding to the stack's type-erased navigation path.
-    ///   - root: A view builder that creates the root view.
+    ///   - path: A binding read during rendering and updated for pushes, pops,
+    ///     Escape, and applicable dismiss actions.
+    ///   - root: A view builder evaluated immediately to create the root view.
     public init(
         path: Binding<NavigationPath>,
         @ViewBuilder root: () -> Root
@@ -210,11 +264,13 @@ public struct NavigationStack<Data, Root: View>: View {
         }
     }
 
-    /// Creates a navigation stack with homogeneous navigation state that you can control.
+    /// Creates a navigation stack controlled by a homogeneous collection binding.
     ///
     /// - Parameters:
-    ///   - path: A binding to a mutable random-access collection of hashable values.
-    ///   - root: A view builder that creates the root view.
+    ///   - path: A binding to a mutable, range-replaceable, random-access
+    ///     collection. SwiftTUI reads it during rendering and updates it for
+    ///     compatible pushes and removals.
+    ///   - root: A view builder evaluated immediately to create the root view.
     public init(
         path: Binding<Data>,
         @ViewBuilder root: () -> Root
@@ -236,21 +292,28 @@ public struct NavigationStack<Data, Root: View>: View {
 /// A view that controls a navigation presentation.
 ///
 /// A navigation link is focusable through its rendered label and activates by
-/// pushing either an explicit destination or a value.
+/// pushing either an explicit destination or a value. An active link responds
+/// to Return key-down or repeat events and to a completed single primary-button
+/// tap. It is inactive outside a ``NavigationStack``, while disabled, or when
+/// its optional value is `nil`.
 public struct NavigationLink<Label: View, Destination: View>: View {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let label: Label
 
     let activation: NavigationLinkActivation
 
-    /// Creates a navigation link that presents a destination view.
+    /// Creates a link that presents an explicit destination view.
+    ///
+    /// The destination builder escapes and is evaluated only after activation,
+    /// using the environment and state context captured by that activation.
     ///
     /// - Parameters:
     ///   - destination: A view builder that creates the destination to push.
-    ///   - label: A view builder that creates the rendered link label.
+    ///   - label: A view builder evaluated immediately to create the rendered,
+    ///     focusable label.
     public init(
         @ViewBuilder destination: @escaping () -> Destination,
         @ViewBuilder label: () -> Label
@@ -286,12 +349,12 @@ public extension NavigationLink where Label == Text {
 
 public extension NavigationLink where Destination == Never {
 
-    /// Creates a navigation link that presents the view corresponding to a value.
+    /// Creates a link that pushes a value for destination lookup.
     ///
     /// - Parameters:
-    ///   - value: The value to append to the navigation path, or `nil` to make
-    ///     the link inactive.
-    ///   - label: A view builder that creates the rendered link label.
+    ///   - value: The value to append to the containing stack's path, or `nil`
+    ///     to render a noninteractive, nonfocusable label.
+    ///   - label: A view builder evaluated immediately to create the label.
     init<Value>(
         value: Value?,
         @ViewBuilder label: () -> Label
@@ -303,7 +366,8 @@ public extension NavigationLink where Destination == Never {
 
 public extension NavigationLink where Label == Text, Destination == Never {
 
-    /// Creates a navigation link that presents the view corresponding to a value, with a text label.
+    /// Creates a navigation link that presents the view corresponding to a
+    /// value, with a text label.
     ///
     /// - Parameters:
     ///   - titleKey: The text used as the link label.
@@ -321,12 +385,17 @@ public extension NavigationLink where Label == Text, Destination == Never {
 
 public extension View {
 
-    /// Associates a destination view with a presented data type for use within a navigation stack.
+    /// Registers a value destination with the nearest containing navigation stack.
+    ///
+    /// The stack selects this builder when the top path value has the same
+    /// concrete type as `data`. The builder can run repeatedly while that value
+    /// is rendered, so don't use it for unrelated side effects.
     ///
     /// - Parameters:
     ///   - data: The value type this destination handles.
     ///   - destination: A view builder that creates a destination for a value.
-    /// - Returns: A view that registers the destination for descendant navigation stacks.
+    /// - Returns: A view that registers the destination while a containing
+    ///   navigation stack collects this subtree.
     func navigationDestination<Value, Destination>(
         for data: Value.Type,
         @ViewBuilder destination: @escaping (Value) -> Destination
@@ -339,11 +408,16 @@ public extension View {
         )
     }
 
-    /// Associates a destination view with a binding that can push the view onto a navigation stack.
+    /// Presents a destination in the containing stack while a binding is `true`.
+    ///
+    /// Escape or the destination's ``DismissAction`` writes `false` to the
+    /// binding. Programmatically writing `false` removes the destination on the
+    /// next render.
     ///
     /// - Parameters:
     ///   - isPresented: A binding that indicates whether the destination is presented.
-    ///   - destination: A view builder that creates the destination to present.
+    ///   - destination: An escaping builder evaluated while the destination is
+    ///     rendered.
     /// - Returns: A view that presents the destination while the binding is `true`.
     func navigationDestination<Destination>(
         isPresented: Binding<Bool>,
@@ -358,11 +432,16 @@ public extension View {
         )
     }
 
-    /// Associates a destination view with a bound value for use within a navigation stack.
+    /// Presents a destination in the containing stack while an item is non-`nil`.
+    ///
+    /// Escape or the destination's ``DismissAction`` writes `nil` to the
+    /// binding. Changing the non-`nil` item changes presentation identity only
+    /// when the new value isn't equal under `AnyHashable` equality.
     ///
     /// - Parameters:
     ///   - item: A binding to the data to present, or `nil` when no destination is presented.
-    ///   - destination: A view builder that creates a destination for a non-`nil` item.
+    ///   - destination: An escaping builder evaluated with the current non-`nil`
+    ///     item while the destination is rendered.
     /// - Returns: A view that presents the destination while the item binding is non-`nil`.
     func navigationDestination<Item, Destination>(
         item: Binding<Item?>,

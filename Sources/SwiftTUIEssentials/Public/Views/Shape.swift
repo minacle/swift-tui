@@ -1,28 +1,44 @@
 public import Terminal
 
-/// A 2D terminal-cell shape that can be used as a view.
+/// A two-dimensional shape whose fill is rasterized into terminal cells.
+///
+/// SwiftTUI's built-in rectangle and the public wrappers produced by this file
+/// are flexible on both layout axes and draw within the finite columns and rows
+/// proposed by their container. For those shapes, an unspecified proposed axis
+/// provides zero drawing extent. An external conformance can provide an
+/// ordinary ``View/body``, but conformance alone doesn't opt that type into the
+/// built-in rasterizer or flexible-axis behavior.
 public protocol Shape: View {
 }
 
-/// A view that draws a shape and can provide that shape for further drawing.
+/// A rendered shape layer that exposes its underlying shape for another fill.
+///
+/// Calling `fill` on a shape view adds a new fill above the existing layer. In
+/// overlapping cells, the later fill is visible.
 public protocol ShapeView<Content>: View where Content: Shape {
 
-    /// The type of shape this view provides.
+    /// The concrete underlying shape available for further fills.
     associatedtype Content: Shape
 
-    /// The shape drawn by this view.
+    /// The underlying shape geometry shared by this view's fill layers.
     nonisolated var shape: Content { get }
 }
 
-/// A rectangular shape aligned inside the frame of the view containing it.
+/// A rectangular shape that fills its proposed terminal-cell bounds.
+///
+/// The rectangle establishes its proposed bounds even when it has no color. It
+/// emits full-block glyphs only when an explicit fill or the inherited
+/// foreground resolves to a terminal color; otherwise it produces no glyphs
+/// within those bounds. Apply ``edge(style:)`` to represent selected outer
+/// edges with half-block and quarter-block glyphs once a color resolves.
 public nonisolated struct Rectangle: Shape {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive shape.
     public typealias Body = Never
 
     let halfCellEdgeStyle: RectangleHalfCellEdgeStyle
 
-    /// Creates a rectangle shape.
+    /// Creates a full-cell rectangle with no half-cell edge insets.
     public init() {
         halfCellEdgeStyle = RectangleHalfCellEdgeStyle()
     }
@@ -31,93 +47,129 @@ public nonisolated struct Rectangle: Shape {
         self.halfCellEdgeStyle = halfCellEdgeStyle
     }
 
-    /// Returns this rectangle with selected edges inset by half a terminal cell.
+    /// Returns this rectangle with a replacement half-cell edge style.
+    ///
+    /// Repeated calls replace the previous edge style rather than combining
+    /// edge sets.
+    ///
+    /// - Parameter style: The set of outer edges to render at half-cell depth.
+    /// - Returns: A rectangle carrying `style`.
     public func edge(style: RectangleHalfCellEdgeStyle) -> Rectangle {
         Rectangle(halfCellEdgeStyle: style)
     }
 }
 
-/// A style that insets selected rectangle edges by half a terminal cell.
+/// A style that renders selected rectangle edges at half-cell depth.
+///
+/// Horizontal edges use upper or lower half blocks, vertical edges use left or
+/// right half blocks, and intersecting selected edges use quarter blocks. If
+/// both opposing edges are selected on a one-cell axis, the shape has no filled
+/// area on that axis.
 public nonisolated struct RectangleHalfCellEdgeStyle: Equatable, Sendable {
 
-    /// The rectangle edges to inset by half a terminal cell.
+    /// The outer edges to render at half-cell depth.
     public var edges: Edge.Set
 
     /// Creates a half-cell rectangle edge style.
     ///
-    /// - Parameter edges: The rectangle edges to inset by half a terminal cell.
+    /// - Parameter edges: The edges to render at half-cell depth. The default
+    ///   empty set leaves a full-block rectangle unchanged.
     public init(edges: Edge.Set = []) {
         self.edges = edges
     }
 }
 
-/// A shape with a translation offset transform applied to it.
+/// A shape translated relative to its unchanged layout bounds.
+///
+/// Positive column and row offsets move drawing toward the trailing and bottom
+/// edges. Drawing outside the proposed bounds is clipped; the translation
+/// doesn't expand or reposition the view's layout frame.
 public nonisolated struct OffsetShape<Content: Shape>: Shape {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive shape.
     public typealias Body = Never
 
     /// The shape to offset.
     public let shape: Content
 
-    /// The terminal-cell offset applied to the shape.
+    /// The terminal-cell column and row translation applied to drawing.
     public let offset: Point
 
     /// Creates an offset shape.
     ///
     /// - Parameters:
     ///   - shape: The shape to offset.
-    ///   - offset: The terminal-cell offset to apply.
+    ///   - offset: The column and row translation to apply without changing
+    ///     layout bounds.
     public init(shape: Content, offset: Point) {
         self.shape = shape
         self.offset = offset
     }
 }
 
-/// A style for rasterizing terminal-cell shapes.
+/// Stores fill-rule and antialiasing preferences for a filled shape.
+///
+/// SwiftTUI's current terminal rectangle rasterizer doesn't change output for
+/// either preference. The values are preserved on ``FillShapeView`` for API
+/// compatibility and future rasterizers.
 public nonisolated struct FillStyle: Equatable, Sendable {
 
-    /// Whether the even-odd fill rule should be used.
+    /// The requested even-odd fill-rule setting.
     public let isEOFilled: Bool
 
-    /// Whether antialiasing should be used.
+    /// The requested antialiasing setting.
     public let isAntialiased: Bool
 
     /// Creates a fill style.
     ///
     /// Terminal-cell rectangle rasterization currently stores these settings
     /// without changing output.
+    ///
+    /// - Parameters:
+    ///   - eoFill: The requested even-odd fill rule. The default is `false`.
+    ///   - antialiased: The requested antialiasing setting. The default is
+    ///     `true`.
     public init(eoFill: Bool = false, antialiased: Bool = true) {
         self.isEOFilled = eoFill
         self.isAntialiased = antialiased
     }
 }
 
-/// A shape provider that fills its shape.
+/// A rendered fill layer for a terminal-cell shape.
+///
+/// `background` is rendered first and this fill is composited above it. A
+/// `nil` style resolves from the current foreground color; if neither provides
+/// a color, this layer draws no block glyphs.
 public nonisolated struct FillShapeView<Content: Shape, Background: View>: ShapeView {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive shape view.
     public typealias Body = Never
 
     /// The shape drawn by this view.
     public let shape: Content
 
-    /// The terminal color used to fill the shape, or `nil` for foreground fill.
+    /// The explicit fill color, or `nil` to resolve the current foreground
+    /// color during rendering.
     public let style: AnyColor?
 
-    /// The fill style used when filling the shape.
+    /// The stored fill preferences associated with this layer.
     public let fillStyle: FillStyle
 
-    /// The background shape view drawn underneath this fill.
+    /// The background view composited underneath this fill layer.
+    ///
+    /// `Background` can be any ``View``; it doesn't need to be another shape or
+    /// shape view.
     public let background: Background
 
     /// Creates a filled shape view.
     ///
     /// - Parameters:
     ///   - shape: The shape to fill.
-    ///   - style: The terminal fill color, or `nil` for foreground fill.
-    ///   - fillStyle: The fill style options to store with the view.
-    ///   - background: A background shape view to draw underneath this fill.
+    ///   - style: The explicit terminal fill color, or `nil` to use the current
+    ///     foreground color at render time.
+    ///   - fillStyle: The fill preferences to retain with the layer. They don't
+    ///     currently alter rectangle rasterization.
+    ///   - background: Any view to composite underneath this fill layer.
     public init(
         shape: Content,
         style: AnyColor?,
@@ -142,51 +194,105 @@ struct SizedShape<Content: Shape>: Shape {
 
 public extension Shape {
 
-    /// Returns the same shape drawn from a terminal-cell rect of the given size.
+    /// Constrains this shape's drawing rectangle without changing its layout
+    /// bounds.
     ///
-    /// This does not change the layout size of views created from the shape.
+    /// The drawing starts at the original top-leading origin and is clipped to
+    /// the proposed layout bounds. A nonpositive column or row value draws no
+    /// fill while preserving the surrounding layout frame.
+    ///
+    /// - Parameter size: The drawing extent in terminal columns and rows.
+    /// - Returns: A shape that uses `size` for rasterization only.
     func size(_ size: Size) -> some Shape {
         SizedShape(shape: self, size: size)
     }
 
-    /// Returns the same shape drawn from a terminal-cell rect of the given size.
+    /// Constrains this shape's drawing rectangle without changing its layout
+    /// bounds.
     ///
-    /// This does not change the layout size of views created from the shape.
+    /// - Parameters:
+    ///   - width: The drawing extent in terminal columns. A nonpositive value
+    ///     draws no fill.
+    ///   - height: The drawing extent in terminal rows. A nonpositive value
+    ///     draws no fill.
+    /// - Returns: A shape that uses the supplied extent for rasterization only.
     func size(width: Int, height: Int) -> some Shape {
         size(Size(columns: width, rows: height))
     }
 
-    /// Changes the relative position of this shape using a terminal-cell point.
+    /// Translates this shape's drawing without changing its layout bounds.
+    ///
+    /// Drawing moved outside those bounds is clipped.
+    ///
+    /// - Parameter offset: The terminal-column and row translation.
+    /// - Returns: An offset shape sharing this shape's geometry.
     func offset(_ offset: Point) -> OffsetShape<Self> {
         OffsetShape(shape: self, offset: offset)
     }
 
-    /// Changes the relative position of this shape using terminal-cell offsets.
+    /// Translates this shape's drawing without changing its layout bounds.
+    ///
+    /// - Parameters:
+    ///   - x: The terminal-column translation. The default is `0`.
+    ///   - y: The terminal-row translation. The default is `0`.
+    /// - Returns: An offset shape clipped to its eventual layout bounds.
     func offset(x: Int = 0, y: Int = 0) -> OffsetShape<Self> {
         offset(Point(column: x, row: y))
     }
 
-    /// Fills this shape with a terminal color.
+    /// Creates the first fill layer for this shape with a type-erased terminal
+    /// color.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for block glyphs.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         FillShapeView(shape: self, style: content, fillStyle: style, background: EmptyView())
     }
 
-    /// Fills this shape with a terminal color.
+    /// Creates the first fill layer with a 16-color terminal SGR value.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for block glyphs.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color.
+    /// Creates the first fill layer with a 256-color terminal SGR value.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for block glyphs.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color.
+    /// Creates the first fill layer with a true-color terminal SGR value.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for block glyphs.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with the default terminal color.
+    /// Creates the first fill layer with the terminal's default foreground
+    /// color.
+    ///
+    /// - Parameters:
+    ///   - content: The default-color reset value.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill(
         _ content: DefaultColor,
         style: FillStyle = FillStyle()
@@ -194,13 +300,26 @@ public extension Shape {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color shape style.
+    /// Creates the first fill layer with a concrete terminal color shape style.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color style for block glyphs.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view containing this fill over an empty background.
     func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView>
     where S: Color & ShapeStyle {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with the current foreground style.
+    /// Creates the first fill layer using the current foreground color.
+    ///
+    /// If no foreground color is present in the rendering environment, the
+    /// layer reserves its proposed bounds but draws no block glyphs.
+    ///
+    /// - Parameter style: Fill preferences to retain; they don't currently
+    ///   alter rectangle output.
+    /// - Returns: A shape view that resolves its color during rendering.
     func fill(style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         FillShapeView(shape: self, style: nil, fillStyle: style, background: EmptyView())
     }
@@ -208,27 +327,58 @@ public extension Shape {
 
 public extension ShapeView {
 
-    /// Fills this shape with a terminal color over this shape view.
+    /// Adds a type-erased terminal-color fill above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for the new fill layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view that composites this view first and the new fill
+    ///   second.
     func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         FillShapeView(shape: shape, style: content, fillStyle: style, background: self)
     }
 
-    /// Fills this shape with a terminal color over this shape view.
+    /// Adds a 16-color terminal SGR fill above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for the new fill layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view with the new fill composited last.
     func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color over this shape view.
+    /// Adds a 256-color terminal SGR fill above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for the new fill layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view with the new fill composited last.
     func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color over this shape view.
+    /// Adds a true-color terminal SGR fill above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color for the new fill layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view with the new fill composited last.
     func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with the default terminal color over this shape view.
+    /// Adds a default-terminal-color fill above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The default-color reset value for the new layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view with the new fill composited last.
     func fill(
         _ content: DefaultColor,
         style: FillStyle = FillStyle()
@@ -236,13 +386,27 @@ public extension ShapeView {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with a terminal color shape style over this shape view.
+    /// Adds a concrete terminal color shape style above this shape view.
+    ///
+    /// - Parameters:
+    ///   - content: The explicit color style for the new layer.
+    ///   - style: Fill preferences to retain; they don't currently alter
+    ///     rectangle output.
+    /// - Returns: A shape view with the new fill composited last.
     func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self>
     where S: Color & ShapeStyle {
         fill(AnyColor(content), style: style)
     }
 
-    /// Fills this shape with the current foreground style over this shape view.
+    /// Adds a fill that resolves the current foreground color above this shape
+    /// view.
+    ///
+    /// If no foreground color is present, the earlier shape view remains
+    /// visible without new block glyphs.
+    ///
+    /// - Parameter style: Fill preferences to retain; they don't currently
+    ///   alter rectangle output.
+    /// - Returns: A shape view with a foreground-resolved layer composited last.
     func fill(style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         FillShapeView(shape: shape, style: nil, fillStyle: style, background: self)
     }

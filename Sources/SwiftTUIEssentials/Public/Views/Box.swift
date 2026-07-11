@@ -1,9 +1,21 @@
 /// A view that draws a box around its content using box drawing characters.
+///
+/// A regular-line border consumes one terminal row for each horizontal edge
+/// and one terminal column for each vertical edge. The box proposes the
+/// remaining interior size to its content and clips content that exceeds that
+/// interior. Each axis resolves independently: a specified positive proposal
+/// becomes the exact size on that axis, while an unspecified axis uses the
+/// content's resolved size plus two cells. If either resolved dimension is zero
+/// or negative, the entire box collapses to an empty zero-column, zero-row
+/// block.
+///
+/// The border inherits foreground color, background color, and dim styling.
+/// Other text attributes don't apply to the border glyphs.
 public nonisolated struct Box<Content: View>: View, BoxRenderable,
     LayoutTraitRenderable
 {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let content: Content
@@ -16,9 +28,10 @@ public nonisolated struct Box<Content: View>: View, BoxRenderable,
         ViewResolver.layoutTraits(from: content)
     }
 
-    /// Creates a regular-line box around view-builder content.
+    /// Creates a regular-line border around view-builder content.
     ///
-    /// - Parameter content: The content to render inside the box border.
+    /// - Parameter content: A builder evaluated immediately to create content
+    ///   for the one-cell inset interior.
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
@@ -26,7 +39,10 @@ public nonisolated struct Box<Content: View>: View, BoxRenderable,
 
 public extension Box where Content == EmptyView {
 
-    /// Creates an empty regular-line box.
+    /// Creates a regular-line box with no interior content.
+    ///
+    /// Without a finite proposal, the result is two columns by two rows. Narrow
+    /// or short proposals collapse the border to tee or cross glyphs.
     init() {
         self.init {
             EmptyView()
@@ -35,11 +51,16 @@ public extension Box where Content == EmptyView {
 }
 
 /// A view that draws a rounded box around its content using box drawing characters.
+///
+/// The one-cell border uses rounded corner glyphs with regular horizontal and
+/// vertical lines. It follows the same sizing, clipping, and style propagation
+/// as ``Box``; degenerate one-row or one-column proposals use regular tee and
+/// cross glyphs because no corner area remains.
 public nonisolated struct RoundedBox<Content: View>: View, BoxRenderable,
     LayoutTraitRenderable
 {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let content: Content
@@ -52,9 +73,10 @@ public nonisolated struct RoundedBox<Content: View>: View, BoxRenderable,
         ViewResolver.layoutTraits(from: content)
     }
 
-    /// Creates a rounded-corner box around view-builder content.
+    /// Creates a rounded-corner border around view-builder content.
     ///
-    /// - Parameter content: The content to render inside the box border.
+    /// - Parameter content: A builder evaluated immediately to create content
+    ///   for the one-cell inset interior.
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
@@ -62,7 +84,9 @@ public nonisolated struct RoundedBox<Content: View>: View, BoxRenderable,
 
 public extension RoundedBox where Content == EmptyView {
 
-    /// Creates an empty rounded-corner box.
+    /// Creates a rounded-corner box with no interior content.
+    ///
+    /// Without a finite proposal, the result is two columns by two rows.
     init() {
         self.init {
             EmptyView()
@@ -71,11 +95,14 @@ public extension RoundedBox where Content == EmptyView {
 }
 
 /// A view that draws a heavy box around its content using box drawing characters.
+///
+/// The heavy-line border consumes one cell on every edge and follows the same
+/// sizing, clipping, and style propagation as ``Box``.
 public nonisolated struct HeavyBox<Content: View>: View, BoxRenderable,
     LayoutTraitRenderable
 {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let content: Content
@@ -88,9 +115,10 @@ public nonisolated struct HeavyBox<Content: View>: View, BoxRenderable,
         ViewResolver.layoutTraits(from: content)
     }
 
-    /// Creates a heavy-line box around view-builder content.
+    /// Creates a heavy-line border around view-builder content.
     ///
-    /// - Parameter content: The content to render inside the box border.
+    /// - Parameter content: A builder evaluated immediately to create content
+    ///   for the one-cell inset interior.
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
@@ -98,7 +126,9 @@ public nonisolated struct HeavyBox<Content: View>: View, BoxRenderable,
 
 public extension HeavyBox where Content == EmptyView {
 
-    /// Creates an empty heavy-line box.
+    /// Creates a heavy-line box with no interior content.
+    ///
+    /// Without a finite proposal, the result is two columns by two rows.
     init() {
         self.init {
             EmptyView()
@@ -107,11 +137,14 @@ public extension HeavyBox where Content == EmptyView {
 }
 
 /// A view that draws a double-line box around its content using box drawing characters.
+///
+/// The double-line border consumes one cell on every edge and follows the same
+/// sizing, clipping, and style propagation as ``Box``.
 public nonisolated struct DoubleBox<Content: View>: View, BoxRenderable,
     LayoutTraitRenderable
 {
 
-    /// The body type for this primitive view.
+    /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
     let content: Content
@@ -124,9 +157,10 @@ public nonisolated struct DoubleBox<Content: View>: View, BoxRenderable,
         ViewResolver.layoutTraits(from: content)
     }
 
-    /// Creates a double-line box around view-builder content.
+    /// Creates a double-line border around view-builder content.
     ///
-    /// - Parameter content: The content to render inside the box border.
+    /// - Parameter content: A builder evaluated immediately to create content
+    ///   for the one-cell inset interior.
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
@@ -134,7 +168,9 @@ public nonisolated struct DoubleBox<Content: View>: View, BoxRenderable,
 
 public extension DoubleBox where Content == EmptyView {
 
-    /// Creates an empty double-line box.
+    /// Creates a double-line box with no interior content.
+    ///
+    /// Without a finite proposal, the result is two columns by two rows.
     init() {
         self.init {
             EmptyView()

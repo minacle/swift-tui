@@ -1,17 +1,24 @@
 public extension Edge {
 
-    /// An efficient set of terminal rectangle edges.
+    /// An option set of edges in a terminal-cell rectangle.
     nonisolated struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
 
-        /// The raw option-set storage value.
+        /// The bit mask that stores the selected edges.
         public let rawValue: Int
 
-        /// Creates an edge set from a raw option-set value.
+        /// Creates an edge set from a raw bit mask.
+        ///
+        /// Unknown bits are preserved and ignored by SwiftTUI's edge-based
+        /// layout modifiers.
+        ///
+        /// - Parameter rawValue: The bit mask to store.
         public init(rawValue: Int) {
             self.rawValue = rawValue
         }
 
         /// Creates a set containing one edge.
+        ///
+        /// - Parameter edge: The edge to include.
         public init(_ edge: Edge) {
             switch edge {
             case .top:
@@ -25,7 +32,10 @@ public extension Edge {
             }
         }
 
-        /// Creates a set from an array literal of edge sets.
+        /// Creates the union of the edge sets in an array literal.
+        ///
+        /// - Parameter elements: The sets to combine. An empty literal creates
+        ///   an empty set.
         public init(arrayLiteral elements: Edge.Set...) {
             self = elements.reduce(Edge.Set(rawValue: 0)) {
                 $0.union($1)
@@ -55,7 +65,11 @@ public extension Edge {
     }
 }
 
-/// The inset distances for the sides of a terminal rectangle.
+/// Nonnegative inset distances for the sides of a terminal-cell rectangle.
+///
+/// Top and bottom values are measured in rows; leading and trailing values are
+/// measured in columns. SwiftTUI currently uses a left-to-right coordinate
+/// system, so leading is the left side.
 public nonisolated struct EdgeInsets: Equatable, Sendable {
 
     /// The inset from the top edge in terminal rows.
@@ -70,14 +84,14 @@ public nonisolated struct EdgeInsets: Equatable, Sendable {
     /// The inset from the trailing edge in terminal columns.
     public let trailing: Int
 
-    /// Creates zero insets.
+    /// Creates an inset value with zero distance on every edge.
     public init() {
         self.init(top: 0, leading: 0, bottom: 0, trailing: 0)
     }
 
     /// Creates explicit terminal-cell insets.
     ///
-    /// Negative values are clamped to zero.
+    /// Each negative component is independently clamped to zero.
     ///
     /// - Parameters:
     ///   - top: The top inset in rows.
@@ -597,9 +611,17 @@ public extension View {
 
     /// Adds padding to specific terminal-cell edges of this view.
     ///
+    /// Padding subtracts the selected insets from any finite parent proposal
+    /// before measuring the child, then adds those cells back around the
+    /// result. It preserves the child's flexible layout axes and translates
+    /// its caret, alignment guides, and interaction regions into the padded
+    /// coordinate space.
+    ///
     /// - Parameters:
-    ///   - edges: The edges that receive padding.
-    ///   - length: The number of terminal cells to add. `nil` uses one cell.
+    ///   - edges: The edges that receive padding. The default is every edge;
+    ///     an empty set adds nothing.
+    ///   - length: The number of terminal cells to add to each selected edge.
+    ///     `nil` uses one cell and negative values are clamped to zero.
     /// - Returns: A view padded on the selected edges.
     func padding(_ edges: Edge.Set = .all, _ length: Int? = nil) -> some View {
         PaddingView(
@@ -611,12 +633,16 @@ public extension View {
     /// Adds equal terminal-cell padding to all edges of this view.
     ///
     /// - Parameter length: The number of terminal cells to add on every edge.
+    ///   Negative values are clamped to zero.
     /// - Returns: A view padded on all edges.
     func padding(_ length: Int) -> some View {
         padding(.all, length)
     }
 
     /// Adds terminal-cell padding using explicit edge insets.
+    ///
+    /// The modifier reduces any finite proposal by the corresponding horizontal
+    /// and vertical totals before measuring the child.
     ///
     /// - Parameter insets: The explicit insets to add around the view.
     /// - Returns: A view padded by the given insets.
@@ -626,10 +652,25 @@ public extension View {
 
     /// Positions this view within an invisible terminal-cell frame.
     ///
+    /// A specified dimension is both the proposal offered to the child and the
+    /// final frame dimension. If the child is smaller, SwiftTUI fills the
+    /// remaining cells; if it is larger, SwiftTUI clips it. `alignment`
+    /// controls both placement and which portion remains visible when clipping.
+    ///
+    /// An unspecified dimension forwards the parent's proposal on that axis.
+    /// If the parent also leaves that axis unspecified, the frame uses the
+    /// child's rendered size. If either resolved frame dimension is zero, the
+    /// result is a wholly empty zero-sized block even when the other dimension
+    /// is positive. If the child produces no rendered block, the frame produces
+    /// no block.
+    ///
     /// - Parameters:
-    ///   - width: The fixed frame width in terminal columns.
-    ///   - height: The fixed frame height in terminal rows.
-    ///   - alignment: The alignment used when the child is smaller than the frame.
+    ///   - width: The fixed frame width in terminal columns, or `nil` to use the
+    ///     parent proposal or natural content width. Negative values become zero.
+    ///   - height: The fixed frame height in terminal rows, or `nil` to use the
+    ///     parent proposal or natural content height. Negative values become zero.
+    ///   - alignment: The guides used to place or clip the child. The default
+    ///     centers it on both axes.
     /// - Returns: A view rendered within the requested frame.
     func frame(
         width: Int? = nil,
@@ -646,14 +687,35 @@ public extension View {
 
     /// Positions this view within an invisible constrained terminal-cell frame.
     ///
+    /// Minimum and maximum values constrain the child proposal and the final
+    /// frame on their respective axes. An ideal value supplies a proposal only
+    /// when the parent leaves that dimension unspecified; it does not by itself
+    /// force fixed content to expand. Unspecified constraints leave that bound
+    /// open.
+    ///
+    /// All supplied lengths are clamped to zero or greater. If a maximum is
+    /// smaller than the corresponding minimum after clamping, SwiftTUI raises
+    /// the maximum to the minimum. The alignment determines where padding is
+    /// added and which portion of oversized content survives clipping. If
+    /// either resolved frame dimension is zero, the result is a wholly empty
+    /// zero-sized block. If the child produces no rendered block, the frame
+    /// produces no block.
+    ///
     /// - Parameters:
-    ///   - minWidth: The minimum frame width in terminal columns.
-    ///   - idealWidth: The proposed ideal width in terminal columns.
-    ///   - maxWidth: The maximum frame width in terminal columns.
-    ///   - minHeight: The minimum frame height in terminal rows.
-    ///   - idealHeight: The proposed ideal height in terminal rows.
-    ///   - maxHeight: The maximum frame height in terminal rows.
-    ///   - alignment: The alignment used when the child is smaller than the frame.
+    ///   - minWidth: The minimum frame width in terminal columns, or `nil` for
+    ///     no lower bound.
+    ///   - idealWidth: The width proposed when the parent does not specify one,
+    ///     or `nil` to use the content's normal proposal behavior.
+    ///   - maxWidth: The maximum frame width in terminal columns, or `nil` for
+    ///     no upper bound.
+    ///   - minHeight: The minimum frame height in terminal rows, or `nil` for no
+    ///     lower bound.
+    ///   - idealHeight: The height proposed when the parent does not specify
+    ///     one, or `nil` to use the content's normal proposal behavior.
+    ///   - maxHeight: The maximum frame height in terminal rows, or `nil` for no
+    ///     upper bound.
+    ///   - alignment: The guides used to place or clip the child. The default
+    ///     centers it on both axes.
     /// - Returns: A view rendered within the resolved constrained frame.
     func frame(
         minWidth: Int? = nil,
@@ -678,17 +740,25 @@ public extension View {
 
     /// Fixes this view at its ideal terminal-cell size.
     ///
-    /// - Returns: A view that ignores proposed width and height while measuring.
+    /// This removes both parent proposal dimensions before rendering the child.
+    /// It does not impose a new size or prevent an inner view from applying its
+    /// own explicit constraints.
+    ///
+    /// - Returns: A view that ignores proposed columns and rows while measuring.
     func fixedSize() -> some View {
         fixedSize(horizontal: true, vertical: true)
     }
 
     /// Fixes this view at its ideal terminal-cell size in selected dimensions.
     ///
+    /// A selected axis receives an unspecified proposal; an unselected axis
+    /// continues to receive the corresponding parent proposal.
+    ///
     /// - Parameters:
-    ///   - horizontal: Whether to ignore proposed width.
-    ///   - vertical: Whether to ignore proposed height.
-    /// - Returns: A view that ignores selected proposed dimensions while measuring.
+    ///   - horizontal: Whether to ignore the parent's proposed column count.
+    ///   - vertical: Whether to ignore the parent's proposed row count.
+    /// - Returns: A view that removes the selected proposal dimensions while
+    ///   measuring its content.
     func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
         FixedSizeView(content: self, horizontal: horizontal, vertical: vertical)
     }

@@ -1,35 +1,46 @@
 import Terminal
 
-/// A value that represents a selection of text.
+/// A value that represents one insertion point or contiguous range in a
+/// specific string.
+///
+/// `TextSelection` stores `String.Index` values rather than integer offsets.
+/// Create and interpret the indices against the same current string value.
+/// Editable controls reject a range whose indices can't be converted into
+/// their current bound text.
 public nonisolated struct TextSelection: Equatable, Hashable {
 
-    /// The indices of the current selection.
+    /// The index representation of the current selection.
     public nonisolated enum Indices: Equatable, Hashable {
 
-        /// The range of a single selection.
+        /// A contiguous range in the selected string.
         ///
         /// An empty range represents an insertion point.
         case selection(Range<String.Index>)
     }
 
-    /// The indices of the current selection.
+    /// The insertion point or range represented by this value.
+    ///
+    /// Assign only indices valid for the text that will consume the selection.
     public var indices: Indices
 
-    /// Creates a selection at an insertion point.
+    /// Creates an empty selection range at an insertion point.
     ///
-    /// - Parameter insertionPoint: The index where text is inserted.
+    /// - Parameter insertionPoint: An index in the string that will consume
+    ///   this selection.
     public init(insertionPoint: String.Index) {
         self.init(range: insertionPoint..<insertionPoint)
     }
 
-    /// Creates a selection over a range of text.
+    /// Creates a selection over a contiguous string range.
     ///
-    /// - Parameter range: The range of selected text.
+    /// - Parameter range: A range whose bounds belong to the string that will
+    ///   consume this selection.
     public init(range: Range<String.Index>) {
         self.indices = .selection(range)
     }
 
-    /// Whether the selection represents an insertion point.
+    /// Indicates whether the stored range is empty and therefore represents an
+    /// insertion point.
     public var isInsertion: Bool {
         switch indices {
         case .selection(let range):
@@ -38,24 +49,31 @@ public nonisolated struct TextSelection: Equatable, Hashable {
     }
 }
 
-/// A behavior that determines how keyboard navigation continues a pointer selection.
+/// Determines which endpoint moves when Shift-modified keyboard navigation
+/// continues a pointer-created selection.
 public nonisolated enum TextSelectionNavigationBehavior: Equatable, Hashable, Sendable {
 
-    /// Continues selection from the endpoint where the pointer drag finished.
+    /// Keeps the original pointer-down anchor and moves the endpoint where the
+    /// drag finished.
     case dragEndpoint
 
-    /// Chooses the active endpoint from the first Shift-modified navigation direction.
+    /// Uses the first Shift-modified navigation direction to choose the moving
+    /// endpoint, reanchoring at the opposite edge of the dragged range.
     case navigationDirection
 }
 
-/// A type-erased shape style value.
+/// A type-erased terminal color shape style.
+///
+/// SwiftTUI's ``ShapeStyle`` protocol currently represents colors only, so
+/// erasure preserves a type-erased terminal color without retaining the
+/// concrete style type.
 @frozen
 public nonisolated struct AnyShapeStyle: ShapeStyle, Sendable {
 
     @usableFromInline
     let color: AnyColor
 
-    /// Creates a type-erased shape style.
+    /// Erases a terminal color shape style.
     ///
     /// - Parameter style: The shape style to erase.
     public init<S>(_ style: S) where S: ShapeStyle {
@@ -71,7 +89,7 @@ public nonisolated struct AnyShapeStyle: ShapeStyle, Sendable {
 /// A type that describes whether text can be selected.
 public nonisolated protocol TextSelectability {
 
-    /// Whether this value enables text selection.
+    /// Indicates whether this type enables pointer selection highlighting.
     static var allowsSelection: Bool {
         get
     }
@@ -80,6 +98,7 @@ public nonisolated protocol TextSelectability {
 /// A value that enables text selection.
 public nonisolated struct EnabledTextSelectability: TextSelectability {
 
+    /// The protocol witness indicating that this type enables selection.
     public static let allowsSelection = true
 
     internal init() {
@@ -89,6 +108,7 @@ public nonisolated struct EnabledTextSelectability: TextSelectability {
 /// A value that disables text selection.
 public nonisolated struct DisabledTextSelectability: TextSelectability {
 
+    /// The protocol witness indicating that this type disables selection.
     public static let allowsSelection = false
 
     internal init() {
@@ -113,7 +133,18 @@ public extension TextSelectability where Self == DisabledTextSelectability {
 
 public extension View {
 
-    /// Controls whether people can select text within this view.
+    /// Controls whether static descendant text registers pointer-selection
+    /// regions.
+    ///
+    /// Selection is disabled by default. Enabling it lets a primary-button drag
+    /// highlight one static `Text` target at a time. This modifier doesn't
+    /// expose the selected range through a binding and doesn't automatically
+    /// copy selected text to the terminal clipboard. Disabled or hidden views
+    /// don't register selection interaction.
+    ///
+    /// - Parameter selectability: A value whose type determines whether static
+    ///   text selection is enabled.
+    /// - Returns: A view with the selection setting applied to descendants.
     nonisolated func textSelection<S>(_ selectability: S) -> some View
     where S: TextSelectability {
         EnvironmentValueView(
@@ -123,7 +154,8 @@ public extension View {
         )
     }
 
-    /// Sets how keyboard navigation continues a selection created by pointer dragging.
+    /// Sets how editable text continues a pointer-created selection with
+    /// Shift-modified keyboard navigation.
     ///
     /// - Parameter behavior: The navigation behavior to apply to editable text.
     /// - Returns: A view with the updated text-selection navigation behavior.
@@ -137,10 +169,15 @@ public extension View {
         )
     }
 
-    /// Sets the foreground style used for selected text.
+    /// Sets the foreground color used for selected text.
     ///
     /// Pass an optional style so that `nil` preserves each selected character's
-    /// original foreground style.
+    /// original foreground color. Selection background comes from the current
+    /// tint; clearing tint removes that background independently.
+    ///
+    /// - Parameter style: The selected-text foreground color, or `nil` to keep
+    ///   each character's existing foreground.
+    /// - Returns: A view with the selected-text foreground override.
     func textSelectionForegroundStyle<S>(_ style: S?) -> some View
     where S: ShapeStyle {
         environment(\.textSelectionForegroundStyle, style.map(AnyShapeStyle.init))
@@ -151,9 +188,10 @@ public extension EnvironmentValues {
 
     /// The behavior used when keyboard navigation continues a pointer selection.
     ///
-    /// iOS, macOS, tvOS, visionOS, and watchOS default to
-    /// ``TextSelectionNavigationBehavior/navigationDirection``. Other platforms
-    /// default to ``TextSelectionNavigationBehavior/dragEndpoint``.
+    /// macOS builds default to
+    /// ``TextSelectionNavigationBehavior/navigationDirection``. Non-Apple
+    /// builds such as Linux default to
+    /// ``TextSelectionNavigationBehavior/dragEndpoint``.
     nonisolated var textSelectionNavigationBehavior: TextSelectionNavigationBehavior {
         get {
             self[TextSelectionNavigationBehaviorKey.self]
@@ -163,7 +201,10 @@ public extension EnvironmentValues {
         }
     }
 
-    /// The optional foreground style applied to selected text.
+    /// The optional foreground color applied to selected text.
+    ///
+    /// The default is `nil`, which preserves each selected character's
+    /// foreground color.
     nonisolated var textSelectionForegroundStyle: AnyShapeStyle? {
         get {
             self[TextSelectionForegroundStyleKey.self]

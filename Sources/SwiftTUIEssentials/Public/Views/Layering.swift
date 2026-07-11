@@ -295,7 +295,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: A 16-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
@@ -305,7 +307,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: A 256-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
@@ -315,7 +319,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: A true-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
@@ -325,7 +331,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: The terminal default color reset style.
     /// - Returns: A view with the given background style behind it.
@@ -335,7 +343,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: A type-erased terminal SGR color style.
     /// - Returns: A view with the given background style behind it.
@@ -345,7 +355,9 @@ public extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
-    /// SwiftTUI fills the modified view's rendered bounds with the style.
+    /// SwiftTUI fills cells in the modified view's rendered bounds that don't
+    /// already have an explicit background. Modifier order determines which
+    /// padding or frame cells belong to those bounds.
     ///
     /// - Parameter style: A terminal shape style.
     /// - Returns: A view with the given background style behind it.
@@ -356,11 +368,17 @@ public extension View {
     /// Layers view-builder content behind this view.
     ///
     /// The modified view keeps control of the rendered size. Background
-    /// content is aligned within that size and clipped to the same bounds.
+    /// content receives an unspecified column-and-row proposal, is aligned
+    /// within the modified view's size, and is clipped to the same bounds. It
+    /// doesn't expand the modified view. An unconstrained flexible primitive
+    /// such as ``Rectangle`` has zero drawing extent under this unspecified
+    /// proposal; give it an explicit frame or drawing size to produce a
+    /// background.
     ///
     /// - Parameters:
     ///   - alignment: The alignment used to place the background stack.
-    ///   - content: A view builder that creates the background views.
+    ///   - content: A builder evaluated immediately to create the background
+    ///     views.
     /// - Returns: A view with the given background content.
     func background<Background: View>(
         alignment: Alignment = .center,
@@ -376,11 +394,15 @@ public extension View {
     /// Layers view-builder content in front of this view.
     ///
     /// The modified view keeps control of the rendered size. Overlay content
-    /// is aligned within that size and clipped to the same bounds.
+    /// receives an unspecified column-and-row proposal, is aligned within the
+    /// modified view's size, and is clipped to the same bounds. It doesn't
+    /// expand the modified view. An unconstrained flexible primitive such as
+    /// ``Rectangle`` has zero drawing extent under this unspecified proposal;
+    /// give it an explicit frame or drawing size to produce an overlay.
     ///
     /// - Parameters:
     ///   - alignment: The alignment used to place the overlay stack.
-    ///   - content: A view builder that creates the overlay views.
+    ///   - content: A builder evaluated immediately to create the overlay views.
     /// - Returns: A view with the given overlay content.
     func overlay<Overlay: View>(
         alignment: Alignment = .center,

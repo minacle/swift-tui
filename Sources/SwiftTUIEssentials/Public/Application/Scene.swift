@@ -6,19 +6,29 @@
 @preconcurrency
 public protocol Scene {}
 
-/// A marker protocol for scene-builder results created from limited-availability branches.
+/// Marks a scene-builder result created from a limited-availability branch.
+///
+/// ``SceneBuilder`` uses this protocol to constrain its optional-branch result.
+/// Application code normally receives the conformance through
+/// ``LimitedAvailabilityScene`` rather than declaring a conformance directly.
 public protocol _LimitedAvailabilitySceneMarker {}
 
 /// The single terminal window used by a SwiftTUI app.
 ///
 /// A `WindowGroup` supplies the root view hierarchy for the terminal session.
+/// Despite its name, this type represents one terminal viewport; SwiftTUI does
+/// not create multiple platform windows from a group.
 public nonisolated struct WindowGroup<Content: View>: Scene {
 
     let root: Content
 
-    /// Creates a terminal window group with the given root view content.
+    /// Creates the root terminal scene from view-builder content.
     ///
-    /// - Parameter content: A view builder that produces the root terminal view.
+    /// SwiftTUI evaluates `content` during app construction and retains the
+    /// resulting view hierarchy for the terminal session.
+    ///
+    /// - Parameter content: A view builder that produces the root terminal
+    ///   view hierarchy.
     @MainActor
     public init(@ViewBuilder content: () -> Content) {
         self.root = content()
@@ -33,7 +43,7 @@ public nonisolated struct LimitedAvailabilityScene<Content: Scene>: Scene, _Limi
 
     let scene: Content
 
-    /// Creates a limited-availability scene wrapper.
+    /// Wraps a scene produced by an availability-limited branch.
     ///
     /// - Parameter scene: The scene produced by an availability-limited branch.
     public init(_ scene: Content) {
@@ -44,7 +54,8 @@ public nonisolated struct LimitedAvailabilityScene<Content: Scene>: Scene, _Limi
 /// A scene builder result that includes availability-limited content when available.
 ///
 /// SwiftTUI uses this type for optional scene-builder branches that contain
-/// limited-availability scene content.
+/// limited-availability scene content. A `nil` value resolves to no root scene,
+/// so the app returns without starting a terminal session.
 public nonisolated struct OptionalScene<Content>: Scene where Content: Scene & _LimitedAvailabilitySceneMarker {
 
     let scene: Content?
@@ -57,11 +68,15 @@ public nonisolated struct OptionalScene<Content>: Scene where Content: Scene & _
     }
 }
 
-/// A result builder for app scenes.
+/// Builds the root scene hierarchy declared by an ``App``.
+///
+/// The builder supports one scene expression and optional control flow created
+/// by limited-availability checks. It doesn't combine multiple independent
+/// window groups.
 @resultBuilder
 public enum SceneBuilder {
 
-    /// Returns the single scene in a scene-builder block.
+    /// Builds a scene block containing one scene expression.
     ///
     /// - Parameter content: The scene expression in the block.
     /// - Returns: The scene to use as the app's scene body.
@@ -69,7 +84,7 @@ public enum SceneBuilder {
         content
     }
 
-    /// Returns a scene expression unchanged.
+    /// Converts a scene expression into builder content without wrapping it.
     ///
     /// - Parameter content: The scene expression.
     /// - Returns: The same scene expression.
@@ -87,10 +102,12 @@ public enum SceneBuilder {
         LimitedAvailabilityScene(scene)
     }
 
-    /// Builds an optional limited-availability scene.
+    /// Builds optional content from a limited-availability scene branch.
     ///
-    /// - Parameter scene: The optional scene branch result.
-    /// - Returns: An optional scene wrapper.
+    /// - Parameter scene: The branch result, or `nil` when the branch isn't
+    ///   present.
+    /// - Returns: A wrapper that resolves the scene when present and otherwise
+    ///   resolves no root scene.
     public static func buildOptional<Content>(
         _ scene: Content?
     ) -> OptionalScene<Content> where Content: Scene & _LimitedAvailabilitySceneMarker {

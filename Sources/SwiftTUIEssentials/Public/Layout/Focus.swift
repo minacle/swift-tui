@@ -223,30 +223,55 @@ public extension View {
 
     /// Specifies whether this view can receive focus.
     ///
-    /// Focusable views register their rendered terminal frame as a focus region.
+    /// A focusable view registers its rendered terminal frame as a focus region
+    /// for keyboard traversal, programmatic focus requests, and pointer-down
+    /// focus. The modifier does not draw a focus indicator or otherwise change
+    /// the rendered cells; descendants can read `EnvironmentValues.isFocused`
+    /// to choose their own focused appearance.
     ///
-    /// - Parameter isFocusable: Pass `true` to allow focus, or `false` to
-    ///   explicitly disable focus registration.
-    /// - Returns: A view with focus registration behavior.
+    /// Passing `false` explicitly removes the view from focus eligibility and
+    /// rejects focus requests associated with the same interaction path. A
+    /// disabled or hidden view is likewise not focusable.
+    ///
+    /// - Parameter isFocusable: `true` to register a focus candidate; `false`
+    ///   to make this interaction path ineligible. The default is `true`.
+    /// - Returns: A view with the requested focus eligibility.
     func focusable(_ isFocusable: Bool = true) -> some View {
         FocusableView(content: self, isFocusable: isFocusable)
     }
 
-    /// Binds this view's focus state to a Boolean focus state value.
+    /// Binds this view's focus state to a Boolean focus-state value.
     ///
-    /// - Parameter condition: The focus binding that becomes `true` while this
-    ///   view has focus.
-    /// - Returns: A view connected to the supplied focus binding.
+    /// This modifier implicitly registers a focus candidate; a separate
+    /// ``View/focusable(_:)`` call is not required. Setting the binding to
+    /// `true` requests focus for the view, and setting it to `false` clears that
+    /// request. Keyboard or pointer focus changes update the binding. The
+    /// modifier also supplies the resulting state through
+    /// `EnvironmentValues.isFocused` to the modified subtree.
+    ///
+    /// - Parameter condition: The binding that is `true` exactly while this
+    ///   view owns focus.
+    /// - Returns: A view registered for focus and synchronized with the binding.
     func focused(_ condition: FocusState<Bool>.Binding) -> some View {
         FocusedView(content: self, attachment: condition.focusAttachment())
     }
 
-    /// Binds this view's focus state to the given focus state value.
+    /// Binds this view's focus state to one value of an optional focus state.
+    ///
+    /// This modifier implicitly registers a focus candidate. Assigning `value`
+    /// to `binding` requests focus for this view; assigning `nil` clears the
+    /// focus request. When focus moves to this view, SwiftTUI stores `value` in
+    /// the binding, and when the binding's focused candidate loses focus it is
+    /// cleared. The focused state is also available to descendants through
+    /// `EnvironmentValues.isFocused`.
     ///
     /// - Parameters:
-    ///   - binding: The optional focus binding that stores the focused value.
-    ///   - value: The value assigned while this view has focus.
-    /// - Returns: A view connected to the supplied focus binding.
+    ///   - binding: The optional focus-state binding shared by a group of focus
+    ///     candidates.
+    ///   - value: The value that identifies this candidate. If multiple visible
+    ///     candidates use the same value, the first rendered candidate receives
+    ///     a programmatic request.
+    /// - Returns: A view registered for focus and associated with `value`.
     func focused<Value>(
         _ binding: FocusState<Value?>.Binding,
         equals value: Value

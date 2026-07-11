@@ -152,16 +152,26 @@ public extension View {
     /// Places content beside an edge of this view and reduces the space
     /// proposed to this view by the content's size.
     ///
-    /// The modifier preserves this view's layout flexibility. Apply multiple
-    /// edge insets to accumulate them; later modifiers occupy the outermost
-    /// available edge first.
+    /// The inset uses its natural thickness along the selected edge and is
+    /// offered the available length on the perpendicular axis. For example, a
+    /// top inset is measured at its natural row count and can expand across the
+    /// available columns. If the builder produces no rendered view, SwiftTUI
+    /// adds neither inset space nor the requested gap.
+    ///
+    /// The modifier preserves this view's layout flexibility and translates
+    /// the rendered caret and interaction regions with their content. Apply
+    /// multiple edge insets to accumulate them; later modifiers occupy the
+    /// outermost available edge. For perpendicular insets, modifier order also
+    /// determines which inset occupies the shared corner.
     ///
     /// - Parameters:
-    ///   - edge: The edge where the inset content appears.
+    ///   - edge: The single edge beside which the supplemental content appears.
     ///   - spacing: The number of blank terminal cells between the inset and
     ///     this view. Negative values are clamped to zero.
-    ///   - content: A view builder that creates the inset content.
-    /// - Returns: A view with content placed beside the selected edge.
+    ///   - content: A view builder that creates one supplemental inset region.
+    ///     Multiple builder children are grouped into that region.
+    /// - Returns: A view with the supplemental content placed beside the
+    ///   selected edge.
     func edgeInset<Inset: View>(
         _ edge: Edge,
         spacing: Int = 0,

@@ -4,19 +4,30 @@ public import Observation
 /// An action that terminates the running SwiftTUI app.
 ///
 /// Read this action from `Environment(\.terminate)` and call it to request a
-/// graceful exit from the app's terminal event loop.
+/// graceful exit from the app's terminal event loop. The app runner's action
+/// records the request synchronously. The runner observes it near the end of
+/// the current loop iteration, after any pending input, gesture deadlines, and
+/// required redraw for that iteration. A directly initialized action can
+/// instead run any closure supplied by the caller.
 public nonisolated struct TerminateAction {
 
     private let action: () -> Void
 
-    /// Creates a terminate action.
+    /// Creates an action that synchronously invokes a closure.
     ///
-    /// - Parameter action: The closure to run when the action is called.
+    /// The default closure does nothing, so a standalone action doesn't imply
+    /// that an application runner exists or that termination succeeded.
+    ///
+    /// - Parameter action: The closure to run on each invocation.
     public init(_ action: @escaping () -> Void = {}) {
         self.action = action
     }
 
-    /// Requests termination by invoking the stored action.
+    /// Synchronously invokes the action's stored closure.
+    ///
+    /// When this value comes from ``EnvironmentValues/terminate``, the closure
+    /// normally requests app termination. Custom and default values can have
+    /// different behavior.
     public func callAsFunction() {
         action()
     }
@@ -24,11 +35,19 @@ public nonisolated struct TerminateAction {
 
 /// An action that opens a URL.
 ///
-/// SwiftTUI only invokes the installed handler. The default action discards
-/// URLs and does not call a platform URL opener.
+/// SwiftTUI passes the URL unchanged to the installed handler. The action
+/// doesn't validate the URL, resolve redirects, or invoke a platform URL
+/// opener. The default environment action returns ``Result/discarded``.
+///
+/// The type uses unchecked sendability to carry an arbitrary handler. This
+/// conformance doesn't make a captured closure or its state safe for concurrent
+/// access; callers remain responsible for the handler's isolation.
 public nonisolated struct OpenURLAction: @unchecked Sendable {
 
-    /// The result of an open URL action.
+    /// Describes how an installed URL handler responded to a request.
+    ///
+    /// SwiftTUI treats only ``handled`` as accepted. It doesn't perform the
+    /// fallback represented by either `systemAction` value.
     public nonisolated struct Result: Equatable, Sendable {
 
         private enum Storage: Equatable, Sendable {
@@ -42,19 +61,25 @@ public nonisolated struct OpenURLAction: @unchecked Sendable {
 
         private let storage: Storage
 
-        /// The handler opened the URL.
+        /// The handler accepted and handled the URL request.
         public static let handled = Result(storage: .handled)
 
-        /// The handler discarded the URL.
+        /// The handler declined the URL request without a fallback.
         public static let discarded = Result(storage: .discarded)
 
-        /// The handler asks the system to open the original URL.
+        /// The handler requests a system fallback for the original URL.
+        ///
+        /// SwiftTUI records this result as not accepted and doesn't invoke a
+        /// system URL opener.
         public static let systemAction = Result(storage: .systemAction(nil))
 
-        /// The handler asks the system to open the specified URL.
+        /// Returns a result that requests a system fallback for another URL.
         ///
-        /// SwiftTUI does not provide a default system opener, so this result is
-        /// only accepted when a custom handler treats it as handled.
+        /// SwiftTUI doesn't validate or open the supplied URL and records this
+        /// result as not accepted.
+        ///
+        /// - Parameter url: The URL a separate system-opening layer could use.
+        /// - Returns: A system-action result carrying `url`.
         public static func systemAction(_ url: URL) -> Result {
             Result(storage: .systemAction(url))
         }
@@ -66,25 +91,32 @@ public nonisolated struct OpenURLAction: @unchecked Sendable {
 
     private let handler: (URL) -> Result
 
-    /// Creates an action that opens a URL.
+    /// Creates an action backed by a URL handler.
     ///
-    /// - Parameter handler: The closure to run for the given URL.
+    /// The closure is retained for the lifetime of this action and runs
+    /// synchronously when the action is called.
+    ///
+    /// - Parameter handler: The closure that receives each unmodified URL and
+    ///   returns its disposition.
     public init(handler: @escaping (URL) -> Result) {
         self.handler = handler
     }
 
-    /// Opens a URL by invoking the installed handler.
+    /// Invokes the installed handler and discards its result.
     ///
-    /// - Parameter url: The URL to open.
+    /// - Parameter url: The unvalidated URL to pass to the handler.
     public func callAsFunction(_ url: URL) {
         _ = result(for: url)
     }
 
-    /// Opens a URL by invoking the installed handler and reporting acceptance.
+    /// Invokes the installed handler and reports whether it returned
+    /// ``Result/handled``.
     ///
     /// - Parameters:
-    ///   - url: The URL to open.
-    ///   - completion: A closure that receives whether the handler accepted the URL.
+    ///   - url: The unvalidated URL to pass to the handler.
+    ///   - completion: A closure invoked synchronously with `true` only for
+    ///     ``Result/handled``. Both system-action results and ``Result/discarded``
+    ///     produce `false`.
     public func callAsFunction(_ url: URL, completion: @escaping (Bool) -> Void) {
         completion(result(for: url).accepted)
     }
@@ -98,21 +130,28 @@ public nonisolated struct OpenURLAction: @unchecked Sendable {
 ///
 /// Read this action from `Environment(\.copy)` and call it with a string or
 /// substring to publish the text through the clipboard service installed by
-/// the running app.
+/// the running app. The action forwards text verbatim: it performs no
+/// redaction, confirmation, or success reporting. The app runner's terminal
+/// service can expose the value to the host clipboard through OSC 52, so don't
+/// pass secrets unless that transfer is intended.
 public nonisolated struct CopyAction {
 
     private let action: (String) -> Void
 
-    /// Creates a copy action.
+    /// Creates a copy action backed by a retained closure.
     ///
-    /// - Parameter action: The closure to run with copied text.
+    /// - Parameter action: The closure to invoke synchronously with copied text.
     public init(_ action: @escaping (String) -> Void) {
         self.action = action
     }
 
-    /// Copies text by invoking the installed clipboard service.
+    /// Forwards text to the installed clipboard closure.
     ///
-    /// - Parameter text: The string or substring to copy.
+    /// This method doesn't report whether a terminal or clipboard accepted the
+    /// value.
+    ///
+    /// - Parameter text: The string or substring to convert to `String` and
+    ///   forward without validation.
     public func callAsFunction<S>(_ text: S) where S: StringProtocol {
         action(String(text))
     }
@@ -122,19 +161,21 @@ public nonisolated struct CopyAction {
 ///
 /// Read this action from `Environment(\.paste)`. The action returns `nil`
 /// when the clipboard service is unavailable or doesn't contain readable
-/// UTF-8 text.
+/// UTF-8 text. Treat returned text as untrusted input; this wrapper doesn't
+/// validate, sanitize, or limit clipboard contents.
 public nonisolated struct PasteAction {
 
     private let action: () -> String?
 
-    /// Creates a paste action.
+    /// Creates a paste action backed by a retained closure.
     ///
-    /// - Parameter action: The closure that reads clipboard text.
+    /// - Parameter action: The closure invoked synchronously to read clipboard
+    ///   text.
     public init(_ action: @escaping () -> String?) {
         self.action = action
     }
 
-    /// Reads text from the installed clipboard service.
+    /// Invokes the installed clipboard-reading closure.
     ///
     /// - Returns: Clipboard text, or `nil` when no text is available.
     public func callAsFunction() -> String? {
@@ -142,32 +183,39 @@ public nonisolated struct PasteAction {
     }
 }
 
-/// A key for accessing values in the environment.
+/// A type-level key for storing a value in ``EnvironmentValues``.
+///
+/// Define a distinct key type for each value. When no override is present,
+/// ``EnvironmentValues`` reads ``defaultValue`` without storing it.
 public protocol EnvironmentKey {
 
-    /// The value type stored for this environment key.
+    /// The type of value associated with this key.
     associatedtype Value
 
-    /// The default value for the environment key.
+    /// The value returned when an environment contains no explicit override
+    /// for this key.
     nonisolated static var defaultValue: Value { get }
 }
 
 /// A collection of environment values propagated through a view hierarchy.
 ///
 /// Environment values are copied and transformed as SwiftTUI resolves the view
-/// tree for rendering and event handling.
+/// tree for rendering and event handling. Value-key overrides have value
+/// semantics, while observable objects are stored and propagated by reference.
 public nonisolated struct EnvironmentValues {
 
     private var storage: [ObjectIdentifier: Any] = [:]
 
     private var observableObjects: [ObjectIdentifier: AnyObject] = [:]
 
-    /// Creates an environment value collection with default values.
+    /// Creates an environment with no explicit overrides or observable objects.
+    ///
+    /// Reading a key from this value returns that key's declared default.
     public init() {}
 
-    /// Accesses the value associated with an environment key.
+    /// Reads or replaces the value associated with an environment key type.
     ///
-    /// - Parameter key: The key type that identifies the value.
+    /// - Parameter key: The key type that uniquely identifies the value.
     public nonisolated subscript<Key: EnvironmentKey>(_ key: Key.Type) -> Key.Value {
         get {
             guard let storedValue = storage[ObjectIdentifier(key)],
@@ -197,7 +245,11 @@ public nonisolated struct EnvironmentValues {
 
 public extension EnvironmentValues {
 
-    /// A Boolean value that indicates whether this environment allows user interaction.
+    /// Indicates whether descendants can register user-interaction handlers.
+    ///
+    /// The default is `true`. ``View/disabled(_:)`` combines its value with the
+    /// inherited setting, so a descendant can't re-enable interaction beneath
+    /// a disabled ancestor by applying `disabled(false)`.
     nonisolated var isEnabled: Bool {
         get {
             self[IsEnabledKey.self]
@@ -207,7 +259,11 @@ public extension EnvironmentValues {
         }
     }
 
-    /// A Boolean value that indicates whether the nearest focusable ancestor has focus.
+    /// Indicates whether the nearest focusable view for this environment has
+    /// focus.
+    ///
+    /// SwiftTUI maintains this read-only value while resolving a focused view.
+    /// It defaults to `false` outside that scope.
     internal(set) nonisolated var isFocused: Bool {
         get {
             self[IsFocusedKey.self]
@@ -217,7 +273,11 @@ public extension EnvironmentValues {
         }
     }
 
-    /// A Boolean value that indicates whether this view is currently presented.
+    /// Indicates whether the current navigation destination is presented.
+    ///
+    /// SwiftTUI sets this read-only value inside an active navigation
+    /// destination, including value-, Boolean-, item-, and explicitly pushed
+    /// destinations. It defaults to `false` elsewhere.
     internal(set) nonisolated var isPresented: Bool {
         get {
             self[IsPresentedKey.self]
@@ -227,7 +287,10 @@ public extension EnvironmentValues {
         }
     }
 
-    /// A Boolean value that indicates whether scrollable views allow scrolling.
+    /// Indicates whether scrollable descendants accept scrolling input.
+    ///
+    /// The default is `true`. This setting controls interaction; it doesn't
+    /// remove the scroll view or change its current scroll position.
     nonisolated var isScrollEnabled: Bool {
         get {
             self[IsScrollEnabledKey.self]
@@ -325,24 +388,37 @@ public extension EnvironmentValues {
 }
 
 /// A property wrapper that reads a value from a view's environment.
+///
+/// SwiftTUI materializes the wrapper with the active environment snapshot. The
+/// storage belongs to the wrapper instance, not to each rendered identity: if
+/// the same view value is rendered in multiple environments, the most recent
+/// materialization replaces the earlier snapshot. Read or capture the value
+/// while constructing the relevant body instead of relying on an escaped action
+/// to recover an earlier identity's wrapper snapshot.
 @propertyWrapper
 public struct Environment<Value> {
 
     private let storage: EnvironmentStorage<Value>
 
-    /// The current environment value at the wrapped key path.
+    /// The value read from this wrapper instance's most recently materialized
+    /// environment snapshot.
     public var wrappedValue: Value {
         storage.value
     }
 
-    /// A bindable projection of the environment value.
+    /// A dynamic-member projection for binding writable properties of an
+    /// observable environment object.
+    ///
+    /// The projection reads this wrapper instance's most recently materialized
+    /// object on every access; it doesn't copy properties into independent or
+    /// per-identity storage.
     public var projectedValue: EnvironmentBindable<Value> {
         EnvironmentBindable(getValue: {
             storage.value
         })
     }
 
-    /// Creates an environment reader for a key path.
+    /// Creates a wrapper that reads an environment key path.
     ///
     /// - Parameter keyPath: A key path into ``EnvironmentValues``.
     public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
@@ -351,7 +427,11 @@ public struct Environment<Value> {
         }
     }
 
-    /// Creates an environment reader for an observable object type.
+    /// Creates a wrapper that requires an observable object of the given type.
+    ///
+    /// SwiftTUI looks up objects by their exact concrete type. Reading
+    /// ``wrappedValue`` traps if no matching ancestor installed one with
+    /// ``View/environment(_:)``.
     ///
     /// - Parameter objectType: The observable object type to read from the
     ///   current environment.
@@ -367,7 +447,10 @@ public struct Environment<Value> {
         }
     }
 
-    /// Creates an environment reader for an optional observable object type.
+    /// Creates a wrapper for an optional observable object of the given type.
+    ///
+    /// SwiftTUI looks up objects by their exact concrete type and returns `nil`
+    /// when no matching ancestor installed one.
     ///
     /// - Parameter objectType: The observable object type to read from the
     ///   current environment.
@@ -380,15 +463,23 @@ public struct Environment<Value> {
     }
 }
 
-/// A dynamic-member projection that creates bindings to observable environment objects.
+/// A dynamic-member projection that creates bindings to observable object
+/// properties.
+///
+/// Bindings created from this value read the current object reference on every
+/// access and write directly through its reference-writable key path. The
+/// projection doesn't retain a snapshot of individual property values.
 @dynamicMemberLookup
 public struct EnvironmentBindable<Value> {
 
     private let getValue: () -> Value
 
-    /// Creates a projection around an environment value.
+    /// Creates a projection around a fixed observable object reference.
     ///
-    /// - Parameter wrappedValue: The value read from the current environment.
+    /// Unlike ``Environment/projectedValue``, this initializer always returns
+    /// the supplied reference and doesn't track later environment replacement.
+    ///
+    /// - Parameter wrappedValue: The observable object reference to expose.
     public init(_ wrappedValue: Value) {
         self.getValue = {
             wrappedValue
@@ -399,7 +490,7 @@ public struct EnvironmentBindable<Value> {
         self.getValue = getValue
     }
 
-    /// Creates a binding to a writable property of an observable environment object.
+    /// Creates a binding to a writable property of the current observable object.
     ///
     /// - Parameter keyPath: A reference-writable key path into the object.
     /// - Returns: A binding that reads and writes the selected property.
@@ -793,8 +884,10 @@ public extension View {
     /// Adds a condition that controls whether users can interact with this view.
     ///
     /// - Parameter disabled: A Boolean value that determines whether users can
-    ///   interact with this view.
-    /// - Returns: A view that controls whether users can interact with this view.
+    ///   interact with this view. Passing `false` preserves the inherited
+    ///   setting; it doesn't override a disabled ancestor.
+    /// - Returns: A view whose descendants register interaction only while the
+    ///   inherited environment and this modifier are both enabled.
     nonisolated func disabled(_ disabled: Bool) -> some View {
         TransformedEnvironmentView(
             content: self,
@@ -805,7 +898,11 @@ public extension View {
         )
     }
 
-    /// Sets the environment value of the specified key path to the given value.
+    /// Overrides an environment value for this view's descendant hierarchy.
+    ///
+    /// A closer nested override for the same key path takes precedence. The
+    /// value is scoped to view resolution and registered callbacks from this
+    /// subtree; it doesn't mutate an ancestor's environment value.
     ///
     /// - Parameters:
     ///   - keyPath: A writable key path into ``EnvironmentValues``.
@@ -822,7 +919,11 @@ public extension View {
         )
     }
 
-    /// Sets an observable object in the environment by its type.
+    /// Installs an observable object for this view's descendant hierarchy.
+    ///
+    /// Objects are keyed by exact concrete type. A closer modifier for the same
+    /// type takes precedence, and the modified hierarchy retains the object
+    /// reference while the view value is retained.
     ///
     /// - Parameter object: The observable object to expose to descendant views.
     /// - Returns: A view with the observable object in its environment.
@@ -832,7 +933,12 @@ public extension View {
         TypedEnvironmentObjectView(content: self, object: object)
     }
 
-    /// Transforms the environment value of the specified key path.
+    /// Transforms an inherited environment value for this view's descendants.
+    ///
+    /// SwiftTUI invokes `transform` while resolving the subtree, potentially
+    /// more than once across measurement and rendering. Use it only to mutate
+    /// the supplied value; don't rely on the closure for unrelated side
+    /// effects.
     ///
     /// - Parameters:
     ///   - keyPath: A writable key path into ``EnvironmentValues``.
@@ -850,12 +956,21 @@ public extension View {
         )
     }
 
-    /// Performs an action when the user requests app termination.
+    /// Handles a termination request delivered to this rendered view hierarchy.
     ///
     /// The action is registered with the currently rendered view hierarchy and
-    /// runs when SwiftTUI dispatches a termination request.
+    /// runs with the runtime environment and state path captured during
+    /// rendering. An `@Environment` wrapper reused across rendered identities
+    /// still exposes that wrapper instance's most recent materialization.
+    /// The runtime retains only one termination handler: a later registration
+    /// in render order replaces an earlier one, so multiple `onTerminate`
+    /// modifiers don't compose.
     ///
-    /// - Parameter action: The action to run before termination completes.
+    /// The handler doesn't terminate the app automatically. Call the
+    /// ``EnvironmentValues/terminate`` action to exit, or update state without
+    /// calling it to present a confirmation flow.
+    ///
+    /// - Parameter action: The action to run for a termination request.
     /// - Returns: A view with a termination handler attached.
     func onTerminate(perform action: @escaping () -> Void) -> some View {
         OnTerminateView(
@@ -866,6 +981,14 @@ public extension View {
     }
 
     /// Performs an action when SwiftTUI dispatches an incoming URL to this view.
+    ///
+    /// The callback receives the URL unchanged. SwiftTUI restores the runtime
+    /// environment and state path captured during rendering, but a reused
+    /// `@Environment` wrapper still exposes its most recent materialization.
+    /// Incoming dispatch invokes every rendered `onOpenURL` registration; the
+    /// callback has no result with which to stop later handlers. This modifier
+    /// doesn't replace ``EnvironmentValues/openURL`` and therefore doesn't
+    /// control activation of attributed-text links.
     ///
     /// - Parameter action: The action to run with the incoming URL.
     /// - Returns: A view with an incoming URL handler attached.

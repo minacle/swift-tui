@@ -1,32 +1,50 @@
 public import Terminal
 
-/// A proxy for access to the terminal size of a geometry reader.
+/// The local terminal-cell geometry supplied by a ``GeometryReader``.
+///
+/// The proxy describes the reader's proposal, not the size eventually chosen
+/// by its content. An axis that has no concrete proposal is represented as
+/// zero. Its coordinate space always begins at the top-leading cell.
 public nonisolated struct GeometryProxy: Equatable, Sendable {
 
-    /// The size proposed to the geometry reader.
+    /// The concrete portion of the size proposed to the geometry reader.
+    ///
+    /// An unspecified proposal dimension appears as zero in this value.
     public let size: Size
 
-    /// The proposed width in terminal columns.
+    /// The proposed width in terminal columns, or zero when unspecified.
     public var columns: Int {
         size.columns
     }
 
-    /// The proposed height in terminal rows.
+    /// The proposed height in terminal rows, or zero when unspecified.
     public var rows: Int {
         size.rows
     }
 
-    /// A frame with zero origin and this proxy's size.
+    /// The reader's local frame, with a top-leading zero origin.
     public var frame: Rect {
         Rect(origin: .zero, size: size)
     }
 
     /// Creates a geometry proxy from a terminal-cell size.
+    ///
+    /// This public initializer is useful for testing geometry-dependent view
+    /// builders. It stores the supplied size without normalization.
+    ///
+    /// - Parameter size: The terminal-cell size represented by the proxy. The
+    ///   default is zero columns by zero rows.
     public init(size: Size = Size()) {
         self.size = size
     }
 
     /// Creates a geometry proxy from terminal columns and rows.
+    ///
+    /// Values are stored without clamping.
+    ///
+    /// - Parameters:
+    ///   - columns: The represented width. The default is zero.
+    ///   - rows: The represented height. The default is zero.
     public init(columns: Int = 0, rows: Int = 0) {
         self.init(size: Size(columns: columns, rows: rows))
     }
@@ -34,22 +52,42 @@ public nonisolated struct GeometryProxy: Equatable, Sendable {
 
 /// A container view that defines its content as a function of its terminal size.
 ///
-/// `GeometryReader` expands flexibly in both axes and passes the proposed
-/// terminal-cell size to its content closure.
+/// `GeometryReader` is flexible in both axes and passes the concrete parent
+/// proposal to its content closure. A missing proposal axis appears as zero in
+/// the proxy while remaining unspecified when the content itself is rendered;
+/// content can therefore use its natural size on that axis.
+///
+/// When both resolved dimensions are positive, the reader occupies each
+/// specified dimension exactly, padding smaller content and clipping larger
+/// content from the top-leading origin. If either resolved dimension is zero or
+/// negative, the reader produces an empty zero-sized block. If the content
+/// produces no rendered block, the reader also produces no block. Carets and
+/// interaction regions outside a nonempty frame are clipped with the visible
+/// content.
+///
+/// ```swift
+/// GeometryReader { proxy in
+///     Text("\(proxy.columns)x\(proxy.rows)")
+/// }
+/// .frame(width: 20, height: 4)
+/// ```
 public nonisolated struct GeometryReader<Content: View>: View {
 
     /// The body type for this primitive view.
     public typealias Body = Never
 
-    /// The content builder evaluated with the current geometry proxy.
+    /// The content builder evaluated with the current local geometry.
+    ///
+    /// SwiftTUI may evaluate this closure during layout measurement as well as
+    /// rendering. Keep the builder free of externally visible side effects.
     public let content: (GeometryProxy) -> Content
 
     let statePath: [Int]?
 
-    /// Creates a geometry reader.
+    /// Creates a geometry reader whose content depends on its proposal.
     ///
     /// - Parameter content: A view builder that receives the current terminal
-    ///   geometry proxy.
+    ///   geometry proxy. The closure may be evaluated more than once per update.
     public init(@ViewBuilder content: @escaping (GeometryProxy) -> Content) {
         self.content = content
         self.statePath = StateContext.currentPath

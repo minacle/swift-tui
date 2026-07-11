@@ -1,4 +1,14 @@
-/// A container view that arranges child views in a two-dimensional grid.
+/// A container that aligns child views in terminal-cell rows and columns.
+///
+/// Place cells inside ``GridRow`` values. SwiftTUI gives every column the width
+/// of its widest nonspanning requirement, then distributes any additional width
+/// required by spanning cells. Every row uses the height of its tallest cell,
+/// and smaller cells are aligned within those rectangles. A direct child that
+/// is not in a `GridRow` becomes a full-width row spanning all columns.
+///
+/// Flexible cells can divide extra proposed columns or rows. Use
+/// ``View/gridCellUnsizedAxes(_:)`` when a flexible cell should retain its
+/// natural size instead of expanding the grid on an axis.
 public nonisolated struct Grid<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -14,14 +24,19 @@ public nonisolated struct Grid<Content: View>: View {
 
     /// Creates a grid with the specified alignment and terminal-cell spacing.
     ///
-    /// A `nil` spacing value uses the terminal default of two columns or one
-    /// row. Negative explicit values are clamped to zero.
+    /// A `nil` spacing value uses the default ``ViewSpacing`` distance: two
+    /// columns horizontally or one row vertically. Negative explicit values
+    /// are clamped to zero.
     ///
     /// - Parameters:
-    ///   - alignment: The default alignment for content in each cell.
-    ///   - horizontalSpacing: The columns between adjacent cells.
-    ///   - verticalSpacing: The rows between adjacent grid rows.
-    ///   - content: A view builder that creates grid rows and full-width views.
+    ///   - alignment: The fallback horizontal and vertical guides for cell
+    ///     content that has no row, column, or anchor override.
+    ///   - horizontalSpacing: Blank columns between adjacent grid columns, or
+    ///     `nil` for two columns.
+    ///   - verticalSpacing: Blank rows between adjacent grid rows, or `nil` for
+    ///     one row.
+    ///   - content: A builder that creates ``GridRow`` values and optional
+    ///     full-width children in source order.
     public init(
         alignment: Alignment = .center,
         horizontalSpacing: Int? = nil,
@@ -36,6 +51,10 @@ public nonisolated struct Grid<Content: View>: View {
 }
 
 /// A horizontal row of cells in a ``Grid``.
+///
+/// Each direct child produced by `content` is one cell; an ``EmptyView`` does
+/// not reserve a cell. Outside a grid, `GridRow` is transparent and its children
+/// participate directly in the surrounding container.
 public nonisolated struct GridRow<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -48,9 +67,10 @@ public nonisolated struct GridRow<Content: View>: View {
     /// Creates a row of grid cells.
     ///
     /// - Parameters:
-    ///   - alignment: An optional vertical alignment that overrides the grid's
-    ///     default for this row.
-    ///   - content: A view builder whose child views become successive cells.
+    ///   - alignment: The vertical guide for every cell in this row, or `nil`
+    ///     to use the grid's vertical alignment.
+    ///   - content: A builder whose nonempty direct children become successive
+    ///     cells.
     public init(
         alignment: VerticalAlignment? = nil,
         @ViewBuilder content: () -> Content
@@ -160,7 +180,9 @@ public extension View {
 
     /// Tells a cell in a grid row to span the specified number of columns.
     ///
-    /// Values less than one are treated as one column.
+    /// The span begins at the cell's normal source-order column and includes
+    /// intervening grid spacing. Values less than one are treated as one. This
+    /// modifier has no layout effect outside a grid.
     ///
     /// - Parameter count: The number of columns occupied by the cell.
     /// - Returns: A view with the requested grid-column span.
@@ -170,7 +192,13 @@ public extension View {
 
     /// Specifies a custom anchor for aligning a view in its grid cell.
     ///
-    /// - Parameter anchor: The unit point to align in the view and cell.
+    /// The anchor overrides the grid's default alignment and any row or column
+    /// guide for this cell. SwiftTUI applies the same normalized point to the
+    /// free horizontal and vertical space, truncating fractional cell offsets
+    /// toward zero. ``UnitPoint`` values are not clamped to the unit square.
+    ///
+    /// - Parameter anchor: The unit point used to position the view within its
+    ///   allocated cell rectangle.
     /// - Returns: A view with the requested grid-cell anchor.
     nonisolated func gridCellAnchor(_ anchor: UnitPoint) -> some View {
         GridCellAnchorView(content: self, anchor: anchor)
@@ -178,16 +206,26 @@ public extension View {
 
     /// Prevents a grid from offering extra space on the specified axes.
     ///
-    /// - Parameter axes: The axes on which the cell remains at its ideal size.
-    /// - Returns: A view that does not expand on those grid axes.
+    /// The cell's natural size still contributes to intrinsic column widths and
+    /// row heights. On a selected axis, however, the cell neither marks the
+    /// corresponding grid track as flexible nor receives that track's expanded
+    /// proposal.
+    ///
+    /// - Parameter axes: The axes on which the cell keeps its natural proposal.
+    /// - Returns: A view excluded from flexible grid expansion on those axes.
     nonisolated func gridCellUnsizedAxes(_ axes: Axis.Set) -> some View {
         GridCellUnsizedAxesView(content: self, axes: axes)
     }
 
     /// Overrides the horizontal alignment of the grid column containing this view.
     ///
-    /// - Parameter guide: The horizontal alignment for the column.
-    /// - Returns: A view that sets its grid column's alignment.
+    /// The override applies to every ordinary cell in the column. If multiple
+    /// cells provide an override, the first one encountered in row source order
+    /// determines the column guide. Full-width rows do not define a column
+    /// alignment.
+    ///
+    /// - Parameter guide: The horizontal guide used by the containing column.
+    /// - Returns: A view that proposes this guide for its grid column.
     nonisolated func gridColumnAlignment(_ guide: HorizontalAlignment) -> some View {
         GridColumnAlignmentView(content: self, alignment: guide)
     }

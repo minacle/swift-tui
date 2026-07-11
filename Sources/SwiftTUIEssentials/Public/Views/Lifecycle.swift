@@ -163,10 +163,11 @@ protocol LifecycleModifierRenderable {
 
 public extension View {
 
-    /// Adds an action to perform before this view appears.
+    /// Adds an action to perform when this view first appears at an identity.
     ///
-    /// The action runs after SwiftTUI renders the view for the first time at a
-    /// stable identity path.
+    /// The action runs after SwiftTUI completes the first render containing the
+    /// identity. Re-rendering the same identity doesn't run it again; removing
+    /// and later recreating the identity does.
     ///
     /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
     /// - Returns: A view with an appear handler attached.
@@ -182,7 +183,9 @@ public extension View {
     /// Adds an action to perform after this view disappears.
     ///
     /// The action runs when a previously rendered identity path is no longer
-    /// present in the rendered view hierarchy.
+    /// present in a subsequent rendered hierarchy. SwiftTUI restores the
+    /// runtime environment and state path captured by the removed registration
+    /// before discarding that identity's state subtree.
     ///
     /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
     /// - Returns: A view with a disappear handler attached.
@@ -195,18 +198,25 @@ public extension View {
         )
     }
 
-    /// Adds an asynchronous task to perform while this view is visible.
+    /// Adds an asynchronous task while this view's identity remains in the
+    /// rendered hierarchy.
     ///
-    /// SwiftTUI starts the task when the view appears and cancels it when the
-    /// view disappears.
+    /// SwiftTUI starts one unstructured task after the view's identity appears.
+    /// Stable re-renders don't restart a completed or running task. When the
+    /// identity disappears, SwiftTUI requests cancellation and removes its task
+    /// record without waiting for cleanup. Cancellation is cooperative: work
+    /// that doesn't observe cancellation can continue and retain captured
+    /// values after the view disappears.
     ///
     /// - Parameters:
-    ///   - name: An optional diagnostic name.
-    ///   - priority: The task priority.
-    ///   - file: The source file identifier used for diagnostics.
-    ///   - line: The source line used for diagnostics.
-    ///   - action: The asynchronous operation to run.
-    /// - Returns: A view with a visibility-scoped task attached.
+    ///   - name: Currently ignored. The runtime doesn't retain a task name or
+    ///     include it in diagnostics.
+    ///   - priority: The priority passed when creating the unstructured task.
+    ///   - file: Currently ignored; no source-file metadata is retained.
+    ///   - line: Currently ignored; no source-line metadata is retained.
+    ///   - action: The escaping asynchronous operation. Its inherited actor
+    ///     isolation remains authoritative for execution.
+    /// - Returns: A view with a rendered-hierarchy-scoped task attached.
     nonisolated func task(
         name: String? = nil,
         priority: TaskPriority = .userInitiated,
@@ -225,19 +235,25 @@ public extension View {
         )
     }
 
-    /// Adds an asynchronous task to perform while this view is visible.
+    /// Adds an asynchronous task while this view's identity remains in the
+    /// rendered hierarchy.
     ///
-    /// SwiftTUI starts the task on the supplied executor preference when the
-    /// view appears and cancels it when the view disappears.
+    /// SwiftTUI creates one unstructured task with the supplied executor
+    /// preference after the identity appears. An actor-isolated action still
+    /// runs on its actor. When the identity disappears, SwiftTUI requests
+    /// cancellation and removes its record without awaiting cleanup;
+    /// uncooperative work can continue and retain captured values.
     ///
     /// - Parameters:
-    ///   - name: An optional diagnostic name.
-    ///   - taskExecutor: The executor preference for the task.
-    ///   - priority: The task priority.
-    ///   - file: The source file identifier used for diagnostics.
-    ///   - line: The source line used for diagnostics.
-    ///   - action: The asynchronous operation to run.
-    /// - Returns: A view with a visibility-scoped task attached.
+    ///   - name: Currently ignored. The runtime doesn't retain a task name or
+    ///     include it in diagnostics.
+    ///   - taskExecutor: The preference passed when creating the task. It
+    ///     doesn't override the action's actor isolation.
+    ///   - priority: The priority passed when creating the unstructured task.
+    ///   - file: Currently ignored; no source-file metadata is retained.
+    ///   - line: Currently ignored; no source-line metadata is retained.
+    ///   - action: The escaping asynchronous operation to run.
+    /// - Returns: A view with a rendered-hierarchy-scoped task attached.
     nonisolated func task(
         name: String? = nil,
         executorPreference taskExecutor: any TaskExecutor,
@@ -259,16 +275,23 @@ public extension View {
 
     /// Adds an asynchronous task that restarts when the given value changes.
     ///
-    /// SwiftTUI cancels the current task and starts a new one when `value`
-    /// changes while the view remains visible.
+    /// SwiftTUI compares `value` with the identifier registered for the same
+    /// rendered identity. When it changes, SwiftTUI requests cancellation of
+    /// the previous task and immediately starts a new unstructured task without
+    /// waiting for the old task to finish. Cancellation is cooperative, so the
+    /// old operation can continue and overlap the replacement if it ignores the
+    /// request. Disappearance has the same cancellation boundary.
     ///
     /// - Parameters:
-    ///   - value: The equatable task identity value.
-    ///   - name: An optional diagnostic name.
-    ///   - priority: The task priority.
-    ///   - file: The source file identifier used for diagnostics.
-    ///   - line: The source line used for diagnostics.
-    ///   - action: The asynchronous operation to run.
+    ///   - value: The equatable identifier. Equal values preserve the existing
+    ///     task record.
+    ///   - name: Currently ignored. The runtime doesn't retain a task name or
+    ///     include it in diagnostics.
+    ///   - priority: The priority passed when creating each task.
+    ///   - file: Currently ignored; no source-file metadata is retained.
+    ///   - line: Currently ignored; no source-line metadata is retained.
+    ///   - action: The escaping asynchronous operation. Its inherited actor
+    ///     isolation remains authoritative for execution.
     /// - Returns: A view with an identity-scoped task attached.
     nonisolated func task<ID: Equatable>(
         id value: ID,
@@ -291,17 +314,25 @@ public extension View {
 
     /// Adds an asynchronous task that restarts when the given value changes.
     ///
-    /// SwiftTUI cancels the current task and starts a new one on the supplied
-    /// executor preference when `value` changes while the view remains visible.
+    /// When `value` changes, SwiftTUI requests cancellation of the previous task
+    /// and immediately creates a replacement with the supplied executor
+    /// preference. It doesn't await the old task, so an operation that ignores
+    /// cancellation can overlap the replacement and retain its captures. An
+    /// actor-isolated action still runs on its actor rather than being forced
+    /// onto the preferred executor. Disappearance requests cancellation under
+    /// the same cooperative boundary.
     ///
     /// - Parameters:
-    ///   - value: The equatable task identity value.
-    ///   - name: An optional diagnostic name.
-    ///   - taskExecutor: The executor preference for the task.
-    ///   - priority: The task priority.
-    ///   - file: The source file identifier used for diagnostics.
-    ///   - line: The source line used for diagnostics.
-    ///   - action: The asynchronous operation to run.
+    ///   - value: The equatable identifier. Equal values preserve the existing
+    ///     task record.
+    ///   - name: Currently ignored. The runtime doesn't retain a task name or
+    ///     include it in diagnostics.
+    ///   - taskExecutor: The preference passed when creating each task. It
+    ///     doesn't override action actor isolation.
+    ///   - priority: The priority passed when creating each task.
+    ///   - file: Currently ignored; no source-file metadata is retained.
+    ///   - line: Currently ignored; no source-line metadata is retained.
+    ///   - action: The escaping asynchronous operation to run.
     /// - Returns: A view with an identity-scoped task attached.
     nonisolated func task<ID: Equatable>(
         id value: ID,

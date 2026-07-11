@@ -149,16 +149,20 @@ protocol ChangeModifierRenderable {
 
 public extension View {
 
-    /// Adds a modifier for this view that fires an action when a specific value changes.
+    /// Runs an action when a value changes and, optionally, on registration.
     ///
     /// SwiftTUI compares the current value to the value registered for the same
     /// rendered identity path during the previous render pass. When `initial` is
-    /// true, the action runs once when this modifier is first registered.
+    /// true, the action runs once when this modifier is first registered. The
+    /// callback runs after the render pass in the environment and state context
+    /// captured by this modifier. Removing the view discards the remembered
+    /// value without firing the action.
     ///
     /// - Parameters:
     ///   - value: The equatable value to observe.
     ///   - initial: Whether to run the action on the first render pass.
-    ///   - action: The action to run when the value changes.
+    ///   - action: The escaping action to run after a detected change or the
+    ///     requested initial registration.
     /// - Returns: A view with a change handler attached.
     func onChange<Value: Equatable>(
         of value: Value,
@@ -174,17 +178,22 @@ public extension View {
         )
     }
 
-    /// Adds a modifier for this view that fires an action when a specific value changes.
+    /// Runs an action when a value changes and, optionally, on registration.
     ///
     /// SwiftTUI compares the current value to the value registered for the same
     /// rendered identity path during the previous render pass. The action receives
     /// the old value and the new value. When `initial` is true, the action runs once
-    /// with the initial value passed as both the old and new value.
+    /// with the initial value passed as both the old and new value. The callback
+    /// runs after the render pass in the environment and state context captured
+    /// by this modifier. Removing the view discards the remembered value without
+    /// firing the action.
     ///
     /// - Parameters:
     ///   - value: The equatable value to observe.
     ///   - initial: Whether to run the action on the first render pass.
-    ///   - action: The action to run with the old and new values.
+    ///   - action: The escaping action to run with the previous and current
+    ///     values after a detected change, or with the initial value in both
+    ///     positions for a requested initial registration.
     /// - Returns: A view with a change handler attached.
     func onChange<Value: Equatable>(
         of value: Value,

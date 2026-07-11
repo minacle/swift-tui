@@ -3,9 +3,24 @@ import Terminal
 /// A view that renders the first child whose ideal size fits the proposed size.
 ///
 /// `ViewThatFits` evaluates its children in declaration order. It measures each
-/// child at its ideal size on the constrained axes, then renders the first child
-/// whose measured size fits within the corresponding proposed terminal-cell
-/// dimensions.
+/// child that produces a non-`nil` rendered element at its ideal size on the
+/// constrained axes, then selects the first element whose measured size fits
+/// within the corresponding proposed terminal-cell dimensions. Unselected axes
+/// continue to receive the parent proposal but don't participate in the fit
+/// decision.
+///
+/// If no measured element fits, SwiftTUI selects the final non-`nil` element as
+/// a fallback. A selected ``Spacer`` can materialize as no block for a zero-size
+/// final proposal; in that case this view produces no output and doesn't try a
+/// later alternative. Measurement of discarded candidates doesn't register
+/// their focus, pointer, or scrolling regions.
+///
+/// ```swift
+/// ViewThatFits(in: .horizontal) {
+///     Text("Detailed status")
+///     Text("Status")
+/// }
+/// ```
 public nonisolated struct ViewThatFits<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -18,9 +33,11 @@ public nonisolated struct ViewThatFits<Content: View>: View {
     /// Creates a view that chooses the first child that fits along the given axes.
     ///
     /// - Parameters:
-    ///   - axes: The axes used to test whether a child fits. Passing an empty set
-    ///     chooses the first renderable child.
-    ///   - content: A view builder that provides alternatives in preference order.
+    ///   - axes: The axes used for ideal-size measurement and fit testing. The
+    ///     default tests both axes. An empty set chooses the first child that
+    ///     produces a non-`nil` rendered element without comparing sizes.
+    ///   - content: A builder that provides alternatives from most to least
+    ///     preferred.
     public init(
         in axes: Axis.Set = [.horizontal, .vertical],
         @ViewBuilder content: () -> Content

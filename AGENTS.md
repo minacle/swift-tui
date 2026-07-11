@@ -1,5 +1,98 @@
 # SwiftTUI Repository Instructions
 
+## Documentation comments
+
+- Write documentation comments in English for every `public` or `open`
+  declaration owned by `SwiftTUIEssentials`, `SwiftTUIControls`, or `SwiftTUI`.
+  This includes types, protocols, initializers, methods, properties, subscripts,
+  type aliases, enum cases, option-set values, and public conformance witnesses.
+- Also document internal declarations whose purpose, side effects, lifetime,
+  performance, safety requirements, or invariants aren't evident from their
+  signatures. Use regular comments for implementation walkthroughs that don't
+  belong in generated API documentation.
+- Begin with a concise, standalone summary sentence. For a nontrivial API,
+  follow it with enough discussion for a library user to understand the
+  observable contract without reading the implementation or tests.
+- Do not treat a one-line restatement of the declaration as sufficient
+  documentation. Describe the behavior that changes a caller's decisions,
+  including applicable defaults, state transitions, side effects, propagation
+  or scoping rules, and meaningful limitations.
+- Document terminal-specific semantics precisely when relevant: proposed
+  columns and rows, flexible axes, wrapping or clipping, focus eligibility,
+  keyboard and pointer activation, scrolling, binding synchronization,
+  selection publication, and caret visibility. Preserve the distinction
+  between a rendered text caret and the terminal cursor.
+- For APIs involving sensitive text, unsafe inputs, external state, callbacks,
+  or retained work, state the security, validation, ownership, cancellation,
+  and lifetime boundaries that callers must not infer from the type signature.
+- Document every parameter whose role or accepted values aren't completely
+  obvious. Use DocC sections such as `- Parameters:`, `- Returns:`, `- Throws:`,
+  `- Precondition:`, and `- Complexity:` whenever those contracts apply.
+  Explain the semantics of default and `nil` values instead of merely repeating
+  their types.
+- Add a short compiling example for public types or operations whose intended
+  composition isn't clear from a single call. Examples must use APIs that are
+  public in the documented module and must reflect the current implementation.
+- Use DocC symbol links for related declarations and verify that the links
+  resolve in the declaration's owning module. Use exact API spelling and the
+  repository's terminal terminology throughout.
+- Describe only behavior supported by the implementation and tests. Do not
+  promise SwiftUI parity, platform behavior, ordering, thread safety,
+  performance, or error handling that the library doesn't guarantee.
+- When changing behavior, update its existing documentation in the same patch.
+  When deprecating an API, identify the replacement and migration direction.
+  When removing an API, remove or redirect stale symbol links and examples.
+
+## Documentation preservation during moves
+
+- Treat documentation as part of the public API when moving declarations or
+  splitting targets. Preserve the complete comment first, then update module
+  names, symbol links, and behavior that genuinely changed.
+- Do not replace a multi-paragraph contract with a generic one-line summary to
+  make a move or refactor easier. Review documentation-only changes in the diff
+  separately from code movement and investigate every deleted paragraph.
+- After a target split, audit each new target independently. A comment visible
+  through the umbrella `SwiftTUI` module doesn't prove that the declaration's
+  owning module has complete or correctly resolving documentation.
+- Compare public symbol graphs before and after structural changes. Account for
+  every added, removed, or newly undocumented source-owned symbol; a successful
+  build alone isn't evidence that documentation was preserved.
+
+## Documentation validation
+
+- For every public-API or documentation change, dump the symbol graphs and
+  inspect the graphs for all three package modules. Treat any source-owned
+  public symbol without a documentation comment as a failed check:
+
+```sh
+swift package dump-symbol-graph \
+  --minimum-access-level public \
+  --skip-synthesized-members \
+  --pretty-print
+```
+
+- Generate the combined DocC archive for the umbrella and owning modules.
+  Resolve broken links, malformed markup, duplicate topics, and other DocC
+  diagnostics before finishing:
+
+```sh
+rm -rf /private/tmp/swift-tui-docc
+swift package \
+  --allow-writing-to-directory /private/tmp/swift-tui-docc \
+  generate-documentation \
+  --target SwiftTUI \
+  --target SwiftTUIEssentials \
+  --target SwiftTUIControls \
+  --enable-experimental-combined-documentation \
+  --disable-indexing \
+  --output-path /private/tmp/swift-tui-docc
+```
+
+- Finish with a prose-quality pass. Check that summaries are specific, examples
+  use only current public APIs and remain valid Swift at the documented call
+  site, parameter descriptions match their declarations, security notes remain
+  visible, and moved comments haven't silently lost contract details.
+
 ## Test organization
 
 - Write tests with Swift Testing under `Tests/SwiftTUIEssentialsTests` or

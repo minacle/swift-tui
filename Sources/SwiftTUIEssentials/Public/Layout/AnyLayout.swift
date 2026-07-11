@@ -1,10 +1,34 @@
-/// A type-erased instance of the layout protocol.
+/// A type-erased layout value that can switch concrete layout algorithms.
 ///
 /// Use `AnyLayout` to select between layout types while preserving the
-/// identity and state of the views arranged by the layout.
+/// identity and state of the views arranged at the same position in the view
+/// hierarchy. The wrapper forwards measurement, placement, spacing, alignment,
+/// cache, and built-in stack-orientation behavior to its current layout.
+///
+/// The wrapped layout type may change between renders. When that happens,
+/// SwiftTUI creates a compatible cache for the new type rather than passing the
+/// old layout's cache across the type boundary.
+///
+/// ```swift
+/// let useVerticalLayout = true
+/// let layout = useVerticalLayout
+///     ? AnyLayout(VStackLayout(spacing: 1))
+///     : AnyLayout(HStackLayout(spacing: 2))
+///
+/// layout {
+///     Text("Status")
+///     Text("Ready")
+/// }
+/// ```
 public nonisolated struct AnyLayout: Layout, Sendable {
 
-    /// The type-erased cache used by the wrapped layout.
+    /// Opaque cache storage owned by an ``AnyLayout`` value.
+    ///
+    /// Obtain a cache from ``AnyLayout/makeCache(subviews:)`` and keep it on the
+    /// same layout path. If the wrapped concrete type changes, call
+    /// ``AnyLayout/updateCache(_:subviews:)`` before passing the cache to any
+    /// other layout callback. The value keeps the concrete cache type hidden
+    /// and has no public initializer.
     public struct Cache {
 
         fileprivate var layoutType: ObjectIdentifier
@@ -20,16 +44,30 @@ public nonisolated struct AnyLayout: Layout, Sendable {
     private let box: AnyLayoutBox
 
     /// Creates a type-erased value that wraps the specified layout.
+    ///
+    /// - Parameter layout: The concrete layout whose behavior and cache are
+    ///   forwarded by this value.
     public init<L: Layout>(_ layout: L) {
         box = ConcreteAnyLayoutBox(layout: layout)
     }
 
-    /// Creates the wrapped layout's cache.
+    /// Creates the wrapped layout's initial cache.
+    ///
+    /// - Parameter subviews: The current proxies for the layout's children.
+    /// - Returns: Opaque storage initialized by the wrapped layout.
     public func makeCache(subviews: Subviews) -> Cache {
         box.makeCache(subviews: subviews)
     }
 
-    /// Updates the wrapped layout's cache or replaces it after a type change.
+    /// Updates the wrapped layout's cache for the current subviews.
+    ///
+    /// If the cache belongs to a different concrete layout type, this method
+    /// discards it and calls that current layout's `makeCache(subviews:)`
+    /// implementation. Otherwise it forwards to `updateCache(_:subviews:)`.
+    ///
+    /// - Parameters:
+    ///   - cache: The opaque cache to update or replace.
+    ///   - subviews: The current proxies for the layout's children.
     public func updateCache(_ cache: inout Cache, subviews: Subviews) {
         guard cache.layoutType == box.layoutType else {
             cache = box.makeCache(subviews: subviews)
@@ -38,7 +76,13 @@ public nonisolated struct AnyLayout: Layout, Sendable {
         box.updateCache(&cache.storage, subviews: subviews)
     }
 
-    /// Returns the spacing preferred by the wrapped layout.
+    /// Returns the outer spacing preferred by the wrapped layout.
+    ///
+    /// - Parameters:
+    ///   - subviews: The children whose spacing the layout can inspect.
+    ///   - cache: The wrapped layout's mutable cache. Mutations remain visible
+    ///     to subsequent layout callbacks in the same pass.
+    /// - Returns: The preferred terminal-cell spacing around the composite.
     public func spacing(
         subviews: Subviews,
         cache: inout Cache
@@ -49,7 +93,13 @@ public nonisolated struct AnyLayout: Layout, Sendable {
         )
     }
 
-    /// Returns the size required by the wrapped layout.
+    /// Returns the terminal-cell size required by the wrapped layout.
+    ///
+    /// - Parameters:
+    ///   - proposal: The parent proposal forwarded to the wrapped layout.
+    ///   - subviews: The child proxies available for measurement.
+    ///   - cache: The wrapped layout's mutable cache.
+    /// - Returns: The size reported by the wrapped layout.
     public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -63,6 +113,13 @@ public nonisolated struct AnyLayout: Layout, Sendable {
     }
 
     /// Places subviews using the wrapped layout.
+    ///
+    /// - Parameters:
+    ///   - bounds: The layout rectangle, including its origin in the layout's
+    ///     local terminal-cell coordinate space.
+    ///   - proposal: The original proposal received from the parent.
+    ///   - subviews: The child proxies to place.
+    ///   - cache: The wrapped layout's mutable cache.
     public func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -77,7 +134,16 @@ public nonisolated struct AnyLayout: Layout, Sendable {
         )
     }
 
-    /// Returns an explicit horizontal guide from the wrapped layout.
+    /// Returns the wrapped layout's explicit horizontal guide.
+    ///
+    /// - Parameters:
+    ///   - guide: The horizontal guide requested by an ancestor.
+    ///   - bounds: The resolved layout bounds.
+    ///   - proposal: The original parent proposal.
+    ///   - subviews: The child proxies used by the layout.
+    ///   - cache: The wrapped layout's mutable cache.
+    /// - Returns: The guide's column in the layout coordinate space, or `nil`
+    ///   when the wrapped layout provides no container-level value.
     public func explicitAlignment(
         of guide: HorizontalAlignment,
         in bounds: Rect,
@@ -94,7 +160,16 @@ public nonisolated struct AnyLayout: Layout, Sendable {
         )
     }
 
-    /// Returns an explicit vertical guide from the wrapped layout.
+    /// Returns the wrapped layout's explicit vertical guide.
+    ///
+    /// - Parameters:
+    ///   - guide: The vertical guide requested by an ancestor.
+    ///   - bounds: The resolved layout bounds.
+    ///   - proposal: The original parent proposal.
+    ///   - subviews: The child proxies used by the layout.
+    ///   - cache: The wrapped layout's mutable cache.
+    /// - Returns: The guide's row in the layout coordinate space, or `nil`
+    ///   when the wrapped layout provides no container-level value.
     public func explicitAlignment(
         of guide: VerticalAlignment,
         in bounds: Rect,

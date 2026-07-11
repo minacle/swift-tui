@@ -1,13 +1,31 @@
-/// A horizontal container that can participate in conditional layouts.
+/// A layout value that arranges subviews in a horizontal terminal-cell row.
+///
+/// Invoke this value with a view builder to use ``HStack``'s rendering path, or
+/// erase it with ``AnyLayout`` for a layout that can change at runtime. Direct
+/// calls to the `Layout` witness methods use a flat solver that shares finite
+/// remaining columns among every horizontally flexible proxy, including
+/// ``Spacer`` values. That direct-call allocator doesn't apply `HStack`'s
+/// content-before-spacer priority.
 public nonisolated struct HStackLayout: Layout, Sendable {
 
-    /// The vertical alignment of subviews.
+    /// The vertical guide used to align subviews of different heights.
     public var alignment: VerticalAlignment
 
-    /// The number of terminal columns between adjacent subviews.
+    /// The preferred number of blank columns between adjacent subviews.
+    ///
+    /// `nil` resolves each gap from the adjacent views' ``ViewSpacing`` values.
+    /// An explicit negative value remains observable through this property but
+    /// is treated as zero during measurement and rendering.
     public var spacing: Int?
 
     /// Creates a horizontal stack layout.
+    ///
+    /// - Parameters:
+    ///   - alignment: The vertical guide used to align children. The default is
+    ///     ``VerticalAlignment/center``.
+    ///   - spacing: An explicit number of blank columns between children, or
+    ///     `nil` to use their spacing preferences. Rendering treats negative
+    ///     values as zero.
     public init(
         alignment: VerticalAlignment = .center,
         spacing: Int? = nil
@@ -16,14 +34,29 @@ public nonisolated struct HStackLayout: Layout, Sendable {
         self.spacing = spacing
     }
 
-    /// The horizontal orientation of this stack layout.
+    /// Properties that identify this as a horizontal stack-like layout.
+    ///
+    /// The horizontal orientation makes ``Spacer`` flexible only in columns
+    /// and makes divider views render vertically within this container.
     public static var layoutProperties: LayoutProperties {
         var properties = LayoutProperties()
         properties.stackOrientation = .horizontal
         return properties
     }
 
-    /// Returns the size required by the horizontal arrangement.
+    /// Measures the horizontal arrangement under a parent proposal.
+    ///
+    /// Children initially receive an unspecified column proposal and the
+    /// proposed row count. If the parent supplies extra columns, flexible
+    /// children share that remainder after spacing is reserved.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed terminal columns and rows. An unspecified
+    ///     dimension lets the layout use its natural size on that axis.
+    ///   - subviews: The children to measure in leading-to-trailing order.
+    ///   - cache: The empty cache required by ``Layout``.
+    /// - Returns: The sum of child widths and gaps, and the height required to
+    ///   align every child on `alignment`.
     public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -37,7 +70,17 @@ public nonisolated struct HStackLayout: Layout, Sendable {
         ).size
     }
 
-    /// Places subviews from leading to trailing.
+    /// Places subviews from leading to trailing in the supplied bounds.
+    ///
+    /// Placement uses `bounds.size` as the resolved proposal, so the `proposal`
+    /// argument does not independently change placement.
+    ///
+    /// - Parameters:
+    ///   - bounds: The terminal-cell rectangle in which to place the children.
+    ///   - proposal: The original parent proposal, retained for ``Layout``
+    ///     conformance.
+    ///   - subviews: The children to place in source order.
+    ///   - cache: The empty cache required by ``Layout``.
     public func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -53,16 +96,34 @@ public nonisolated struct HStackLayout: Layout, Sendable {
     }
 }
 
-/// A vertical container that can participate in conditional layouts.
+/// A layout value that arranges subviews in a vertical terminal-cell column.
+///
+/// Invoke this value with a view builder to use ``VStack``'s rendering path, or
+/// erase it with ``AnyLayout`` for a layout that can change at runtime. Direct
+/// calls to the `Layout` witness methods use a flat solver that shares finite
+/// remaining rows among every vertically flexible proxy, including ``Spacer``
+/// values. That direct-call allocator doesn't apply `VStack`'s
+/// content-before-spacer priority.
 public nonisolated struct VStackLayout: Layout, Sendable {
 
-    /// The horizontal alignment of subviews.
+    /// The horizontal guide used to align subviews of different widths.
     public var alignment: HorizontalAlignment
 
-    /// The number of terminal rows between adjacent subviews.
+    /// The preferred number of blank rows between adjacent subviews.
+    ///
+    /// `nil` resolves each gap from the adjacent views' ``ViewSpacing`` values.
+    /// An explicit negative value remains observable through this property but
+    /// is treated as zero during measurement and rendering.
     public var spacing: Int?
 
     /// Creates a vertical stack layout.
+    ///
+    /// - Parameters:
+    ///   - alignment: The horizontal guide used to align children. The default
+    ///     is ``HorizontalAlignment/center``.
+    ///   - spacing: An explicit number of blank rows between children, or `nil`
+    ///     to use their spacing preferences. Rendering treats negative values
+    ///     as zero.
     public init(
         alignment: HorizontalAlignment = .center,
         spacing: Int? = nil
@@ -71,14 +132,29 @@ public nonisolated struct VStackLayout: Layout, Sendable {
         self.spacing = spacing
     }
 
-    /// The vertical orientation of this stack layout.
+    /// Properties that identify this as a vertical stack-like layout.
+    ///
+    /// The vertical orientation makes ``Spacer`` flexible only in rows and
+    /// makes divider views render horizontally within this container.
     public static var layoutProperties: LayoutProperties {
         var properties = LayoutProperties()
         properties.stackOrientation = .vertical
         return properties
     }
 
-    /// Returns the size required by the vertical arrangement.
+    /// Measures the vertical arrangement under a parent proposal.
+    ///
+    /// Children initially receive the proposed column count and an unspecified
+    /// row proposal. If the parent supplies extra rows, flexible children share
+    /// that remainder after spacing is reserved.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed terminal columns and rows. An unspecified
+    ///     dimension lets the layout use its natural size on that axis.
+    ///   - subviews: The children to measure in top-to-bottom order.
+    ///   - cache: The empty cache required by ``Layout``.
+    /// - Returns: The width required to align every child on `alignment`, and
+    ///   the sum of child heights and gaps.
     public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -92,7 +168,17 @@ public nonisolated struct VStackLayout: Layout, Sendable {
         ).size
     }
 
-    /// Places subviews from top to bottom.
+    /// Places subviews from top to bottom in the supplied bounds.
+    ///
+    /// Placement uses `bounds.size` as the resolved proposal, so the `proposal`
+    /// argument does not independently change placement.
+    ///
+    /// - Parameters:
+    ///   - bounds: The terminal-cell rectangle in which to place the children.
+    ///   - proposal: The original parent proposal, retained for ``Layout``
+    ///     conformance.
+    ///   - subviews: The children to place in source order.
+    ///   - cache: The empty cache required by ``Layout``.
     public func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -108,18 +194,35 @@ public nonisolated struct VStackLayout: Layout, Sendable {
     }
 }
 
-/// An overlaying container that can participate in conditional layouts.
+/// A layout value that overlays subviews in the same terminal-cell rectangle.
+///
+/// Invoke this value with a view builder to obtain the same arrangement as a
+/// ``ZStack``. Children with larger ``View/zIndex(_:)`` values render above
+/// children with smaller values; equal values retain source order.
 public nonisolated struct ZStackLayout: Layout, Sendable {
 
-    /// The alignment of subviews within the overlay.
+    /// The guides used to position every subview within the overlay bounds.
     public var alignment: Alignment
 
-    /// Creates an overlaying stack layout.
+    /// Creates an overlay layout.
+    ///
+    /// - Parameter alignment: The horizontal and vertical guides used to place
+    ///   each child. The default centers children on both axes.
     public init(alignment: Alignment = .center) {
         self.alignment = alignment
     }
 
-    /// Returns the size required by the overlay.
+    /// Measures the terminal-cell size required by the overlay.
+    ///
+    /// A specified proposal dimension becomes the container dimension on that
+    /// axis. An unspecified dimension resolves to the largest corresponding
+    /// child dimension.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed overlay size.
+    ///   - subviews: The overlaid children to measure.
+    ///   - cache: The empty cache required by ``Layout``.
+    /// - Returns: The resolved overlay size.
     public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -132,7 +235,17 @@ public nonisolated struct ZStackLayout: Layout, Sendable {
         ).size
     }
 
-    /// Places every subview at the configured alignment.
+    /// Places every subview at the configured alignment in `bounds`.
+    ///
+    /// Placement uses `bounds.size` as the child proposal. Content outside the
+    /// resolved bounds is clipped when SwiftTUI composites the layout.
+    ///
+    /// - Parameters:
+    ///   - bounds: The terminal-cell rectangle shared by the children.
+    ///   - proposal: The original parent proposal, retained for ``Layout``
+    ///     conformance.
+    ///   - subviews: The children to place.
+    ///   - cache: The empty cache required by ``Layout``.
     public func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -147,19 +260,44 @@ public nonisolated struct ZStackLayout: Layout, Sendable {
     }
 }
 
-/// A two-dimensional grid that can participate in conditional layouts.
+/// A layout value that arranges ``GridRow`` content in a two-dimensional grid.
+///
+/// Invoke this value with a view builder to obtain the same row, spanning, and
+/// cell-modifier behavior as ``Grid``. Direct calls to its ``Layout`` witness
+/// methods receive only a flat `Subviews` collection and therefore measure and
+/// place that collection as a single horizontal row.
 public nonisolated struct GridLayout: Layout, Sendable {
 
-    /// The default alignment of content in each cell.
+    /// The default horizontal and vertical guides for content in each cell.
     public var alignment: Alignment
 
-    /// The number of terminal columns between adjacent cells.
+    /// The preferred number of blank columns between adjacent grid cells.
+    ///
+    /// When this value is invoked as a grid view, `nil` uses the default two
+    /// columns. A direct flat `Layout` witness call instead resolves each gap
+    /// from the adjacent subviews' actual ``ViewSpacing`` values. A negative
+    /// stored value is treated as zero during rendering.
     public var horizontalSpacing: Int?
 
-    /// The number of terminal rows between adjacent rows.
+    /// The preferred number of blank rows between adjacent grid rows.
+    ///
+    /// When this value is invoked as a grid view, `nil` uses the default one
+    /// row. Direct flat `Layout` witness calls contain only one row and don't
+    /// use this property. A negative stored value is treated as zero during
+    /// rendering.
     public var verticalSpacing: Int?
 
     /// Creates a grid layout.
+    ///
+    /// - Parameters:
+    ///   - alignment: The fallback alignment for cells that do not override a
+    ///     row, column, or cell anchor.
+    ///   - horizontalSpacing: Blank columns between cells, or `nil` for the
+    ///     grid view's two-column default and adjacent spacing preferences in
+    ///     direct flat witness calls. Rendering treats negative values as zero.
+    ///   - verticalSpacing: Blank rows between grid rows, or `nil` for the grid
+    ///     view's one-row default. Direct flat witness calls don't use this
+    ///     value. Rendering treats negative values as zero.
     public init(
         alignment: Alignment = .center,
         horizontalSpacing: Int? = nil,
@@ -170,7 +308,18 @@ public nonisolated struct GridLayout: Layout, Sendable {
         self.verticalSpacing = verticalSpacing
     }
 
-    /// Returns the size required when the layout is invoked directly.
+    /// Measures direct `Subviews` as one horizontal row.
+    ///
+    /// The two-dimensional `GridRow` structure is available when this value is
+    /// invoked as a view; a direct protocol call has no row metadata. With
+    /// `horizontalSpacing == nil`, the direct path resolves gaps from adjacent
+    /// subview spacing rather than using the grid view's two-column default.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed terminal-cell size.
+    ///   - subviews: The flat children to measure from leading to trailing.
+    ///   - cache: The empty cache required by ``Layout``.
+    /// - Returns: The size of the resulting single-row arrangement.
     public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -184,7 +333,17 @@ public nonisolated struct GridLayout: Layout, Sendable {
         ).size
     }
 
-    /// Places direct subviews as one grid row.
+    /// Places direct `Subviews` as one horizontal row.
+    ///
+    /// Placement uses `bounds.size`; `verticalSpacing` has no effect on this
+    /// flat protocol path because it contains only one row.
+    ///
+    /// - Parameters:
+    ///   - bounds: The terminal-cell rectangle in which to place the row.
+    ///   - proposal: The original parent proposal, retained for ``Layout``
+    ///     conformance.
+    ///   - subviews: The flat children to place from leading to trailing.
+    ///   - cache: The empty cache required by ``Layout``.
     public func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,

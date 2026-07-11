@@ -1,4 +1,8 @@
 /// The preferred terminal-cell spacing around a view.
+///
+/// A spacing value is metadata consumed by containers when no explicit gap is
+/// supplied. For two adjacent views, the resolved distance is the larger of
+/// their preferences on the shared edges; preferences are not added together.
 public nonisolated struct ViewSpacing: Sendable {
 
     private var top: Int
@@ -9,7 +13,10 @@ public nonisolated struct ViewSpacing: Sendable {
 
     private var trailing: Int
 
-    /// A spacing value with no preferred distance on any edge.
+    /// A spacing value with no preference on any edge.
+    ///
+    /// This does not force an adjacent view's preference to zero; distance
+    /// resolution still uses the other view's shared-edge value.
     public static let zero = ViewSpacing(
         top: 0,
         leading: 0,
@@ -34,9 +41,12 @@ public nonisolated struct ViewSpacing: Sendable {
 
     /// Merges another spacing value into this value on selected edges.
     ///
+    /// Each selected edge becomes the larger of the two preferences. Edges not
+    /// in `edges` remain unchanged.
+    ///
     /// - Parameters:
     ///   - other: The spacing preferences to merge.
-    ///   - edges: The edges affected by the merge.
+    ///   - edges: The edges affected by the merge. The default is every edge.
     public mutating func formUnion(
         _ other: ViewSpacing,
         edges: Edge.Set = .all
@@ -59,7 +69,7 @@ public nonisolated struct ViewSpacing: Sendable {
     ///
     /// - Parameters:
     ///   - other: The spacing preferences to merge.
-    ///   - edges: The edges affected by the merge.
+    ///   - edges: The edges affected by the merge. The default is every edge.
     /// - Returns: The merged spacing preferences.
     public func union(
         _ other: ViewSpacing,

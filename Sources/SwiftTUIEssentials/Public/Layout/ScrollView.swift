@@ -1,51 +1,66 @@
 import Foundation
 import Terminal
 
-/// A scrollable axis.
+/// An axis in terminal-cell layout and scrolling.
 public nonisolated enum Axis: Sendable {
 
-    /// Horizontal scrolling over terminal columns.
+    /// The horizontal axis measured in terminal columns.
     case horizontal
 
-    /// Vertical scrolling over terminal rows.
+    /// The vertical axis measured in terminal rows.
     case vertical
 
-    /// A set of scrollable axes.
+    /// An option set of terminal layout axes.
     public struct Set: OptionSet, Sendable {
 
-        /// The raw option-set storage value.
+        /// The bit mask that stores the selected axes.
         public let rawValue: Int
 
-        /// Creates a set from a raw option-set value.
+        /// Creates an axis set from a raw bit mask.
+        ///
+        /// Unknown bits are preserved and ignored by SwiftTUI's axis-based
+        /// layout operations.
+        ///
+        /// - Parameter rawValue: The bit mask to store.
         public init(rawValue: Int) {
             self.rawValue = rawValue
         }
 
-        /// Enables horizontal scrolling.
+        /// The horizontal axis.
         public static let horizontal = Set(rawValue: 1 << 0)
 
-        /// Enables vertical scrolling.
+        /// The vertical axis.
         public static let vertical = Set(rawValue: 1 << 1)
     }
 }
 
-/// An edge of a terminal rectangle.
+/// A directional edge of a terminal-cell rectangle.
+///
+/// Leading and trailing mean left and right in SwiftTUI's current
+/// left-to-right coordinate system.
 public nonisolated enum Edge: Equatable, Hashable, Sendable {
 
-    /// The top row.
+    /// The top horizontal edge.
     case top
 
-    /// The bottom row.
+    /// The bottom horizontal edge.
     case bottom
 
-    /// The leading column.
+    /// The leading vertical edge.
     case leading
 
-    /// The trailing column.
+    /// The trailing vertical edge.
     case trailing
 }
 
-/// A normalized point in a two-dimensional rectangle.
+/// A scale-independent point relative to a two-dimensional rectangle.
+///
+/// By convention, zero is the leading or top edge and one is the trailing or
+/// bottom edge. The initializer does not clamp components to `0...1`; values
+/// outside that interval extrapolate beyond the rectangle. Layout and scrolling
+/// operations convert resolved coordinates to `Int`, so components must be
+/// finite and produce `Int`-representable offsets; `NaN`, infinity, or extreme
+/// magnitudes can trap when consumed.
 public nonisolated struct UnitPoint: Equatable, Hashable, Sendable {
 
     /// The horizontal location, where `0` is leading and `1` is trailing.
@@ -54,7 +69,13 @@ public nonisolated struct UnitPoint: Equatable, Hashable, Sendable {
     /// The vertical location, where `0` is top and `1` is bottom.
     public let y: Double
 
-    /// Creates a unit point.
+    /// Creates a unit point without normalizing its components.
+    ///
+    /// - Parameters:
+    ///   - x: The horizontal fraction, where zero is leading and one is trailing.
+    ///   - y: The vertical fraction, where zero is top and one is bottom.
+    /// - Precondition: When this point is used for layout or scrolling, both
+    ///   components are finite and their resolved offsets fit in `Int`.
     public init(x: Double, y: Double) {
         self.x = x
         self.y = y
@@ -91,7 +112,11 @@ public nonisolated struct UnitPoint: Equatable, Hashable, Sendable {
     public static let bottomTrailing = UnitPoint(x: 1, y: 1)
 }
 
-/// A terminal-native point in scrollable content.
+/// A nonnegative offset into scrollable terminal content.
+///
+/// The point is measured from the content's top-leading origin. `x` counts
+/// columns hidden to the leading side and `y` counts rows hidden above the
+/// viewport.
 public nonisolated struct ScrollPoint: Equatable, Sendable {
 
     /// The horizontal content offset in terminal columns.
@@ -102,7 +127,13 @@ public nonisolated struct ScrollPoint: Equatable, Sendable {
 
     /// Creates a scroll point.
     ///
-    /// Negative values are clamped to zero.
+    /// Each negative value is independently clamped to zero. A ``ScrollView``
+    /// later clamps the point again to the maximum offset supported by its
+    /// content, viewport, and enabled axes.
+    ///
+    /// - Parameters:
+    ///   - x: The horizontal content offset in columns. The default is zero.
+    ///   - y: The vertical content offset in rows. The default is zero.
     public init(x: Int = 0, y: Int = 0) {
         self.x = max(x, 0)
         self.y = max(y, 0)
@@ -112,7 +143,10 @@ public nonisolated struct ScrollPoint: Equatable, Sendable {
 /// A semantic position within a scroll view.
 ///
 /// A scroll position can be automatic, a concrete content point, or an edge
-/// request that the renderer resolves for the current viewport.
+/// request that the renderer resolves for the current content and viewport.
+/// These states are mutually exclusive. When used through
+/// ``View/scrollPosition(_:)``, concrete and edge requests are clamped and the
+/// binding is updated with the resolved concrete point.
 public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private enum Storage: Equatable, Sendable {
@@ -126,7 +160,7 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private var storage: Storage
 
-    /// The concrete content point, if this position stores one.
+    /// The concrete content point, or `nil` for automatic and edge positions.
     public var point: ScrollPoint? {
         guard case .point(let point) = storage else {
             return nil
@@ -135,17 +169,17 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
         return point
     }
 
-    /// The horizontal content offset, if this position stores a point.
+    /// The horizontal content offset, or `nil` if no concrete point is stored.
     public var x: Int? {
         point?.x
     }
 
-    /// The vertical content offset, if this position stores a point.
+    /// The vertical content offset, or `nil` if no concrete point is stored.
     public var y: Int? {
         point?.y
     }
 
-    /// The requested edge, if this position stores an edge.
+    /// The requested edge, or `nil` for automatic and concrete positions.
     public var edge: Edge? {
         guard case .edge(let edge) = storage else {
             return nil
@@ -154,57 +188,82 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
         return edge
     }
 
-    /// Creates an automatic scroll position.
+    /// Creates an automatic position with no explicit point or edge request.
     public init() {
         self.storage = .automatic
     }
 
     /// Creates a position at a concrete content point.
+    ///
+    /// - Parameter point: The nonnegative offsets to request. The scroll view
+    ///   clamps them to its enabled axes and maximum content extent.
     public init(point: ScrollPoint) {
         self.storage = .point(point)
     }
 
-    /// Creates a position with a horizontal content offset.
+    /// Creates a point position with a horizontal offset and zero vertical offset.
+    ///
+    /// - Parameter x: The requested column offset. Negative values become zero.
     public init(x: Int) {
         self.init(point: ScrollPoint(x: x))
     }
 
-    /// Creates a position with a vertical content offset.
+    /// Creates a point position with a vertical offset and zero horizontal offset.
+    ///
+    /// - Parameter y: The requested row offset. Negative values become zero.
     public init(y: Int) {
         self.init(point: ScrollPoint(y: y))
     }
 
-    /// Creates a position with horizontal and vertical content offsets.
+    /// Creates a point position with horizontal and vertical content offsets.
+    ///
+    /// - Parameters:
+    ///   - x: The requested column offset. Negative values become zero.
+    ///   - y: The requested row offset. Negative values become zero.
     public init(x: Int, y: Int) {
         self.init(point: ScrollPoint(x: x, y: y))
     }
 
     /// Creates a position that requests an edge of the scrollable content.
+    ///
+    /// - Parameter edge: The edge to align with the corresponding viewport edge.
     public init(edge: Edge) {
         self.storage = .edge(edge)
     }
 
-    /// Updates the position to a concrete content point.
+    /// Replaces the current state with a concrete content point.
+    ///
+    /// - Parameter point: The new nonnegative content offsets.
     public mutating func scrollTo(point: ScrollPoint) {
         storage = .point(point)
     }
 
-    /// Updates the position to a horizontal content offset.
+    /// Replaces the current state with a horizontal offset and zero vertical offset.
+    ///
+    /// - Parameter x: The requested column offset. Negative values become zero.
     public mutating func scrollTo(x: Int) {
         storage = .point(ScrollPoint(x: x))
     }
 
-    /// Updates the position to a vertical content offset.
+    /// Replaces the current state with a vertical offset and zero horizontal offset.
+    ///
+    /// - Parameter y: The requested row offset. Negative values become zero.
     public mutating func scrollTo(y: Int) {
         storage = .point(ScrollPoint(y: y))
     }
 
-    /// Updates the position to horizontal and vertical content offsets.
+    /// Replaces the current state with horizontal and vertical content offsets.
+    ///
+    /// - Parameters:
+    ///   - x: The requested column offset. Negative values become zero.
+    ///   - y: The requested row offset. Negative values become zero.
     public mutating func scrollTo(x: Int, y: Int) {
         storage = .point(ScrollPoint(x: x, y: y))
     }
 
-    /// Updates the position to request an edge of the scrollable content.
+    /// Replaces the current state with an edge request and clears its point.
+    ///
+    /// - Parameter edge: The edge to align with the corresponding viewport edge.
     public mutating func scrollTo(edge: Edge) {
         storage = .edge(edge)
     }
@@ -212,8 +271,15 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
 
 /// A scrollable view.
 ///
-/// `ScrollView` clips its content to the proposed terminal-cell viewport and
-/// allows horizontal, vertical, or two-axis scrolling.
+/// `ScrollView` measures content without constraining the enabled scrolling
+/// axes, then clips it to the terminal-cell viewport proposed by its parent.
+/// Offsets on disabled axes are ignored. The view participates flexibly on its
+/// scrolling axes; a vertical scroll view also accepts the available width so
+/// its viewport can fill a containing stack.
+///
+/// Enabled scroll views register their visible frame for pointer-wheel input;
+/// they do not need keyboard focus to scroll. Use ``View/scrollDisabled(_:)``
+/// to suppress user input without suppressing bound or proxy-driven positions.
 public nonisolated struct ScrollView<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -226,8 +292,10 @@ public nonisolated struct ScrollView<Content: View>: View {
     /// Creates a scroll view.
     ///
     /// - Parameters:
-    ///   - axes: The axes that can scroll. The default is vertical.
-    ///   - content: A view builder that creates the scrollable content.
+    ///   - axes: The axes along which content is measured without a finite
+    ///     viewport proposal and can be offset. The default is vertical; an
+    ///     empty set permits no scrolling.
+    ///   - content: A builder that creates the single scrollable content region.
     public init(
         _ axes: Axis.Set = .vertical,
         @ViewBuilder content: () -> Content
@@ -237,7 +305,13 @@ public nonisolated struct ScrollView<Content: View>: View {
     }
 }
 
-/// A proxy value that supports programmatic scrolling of descendant scroll views.
+/// A scoped action proxy for programmatically scrolling descendant scroll views.
+///
+/// Obtain a proxy from ``ScrollViewReader`` and call it from an action closure,
+/// such as a button or pointer handler. The proxy searches descendant scroll
+/// views in render order and acts on the first one containing the requested
+/// ``View/id(_:)``. Missing identifiers and identifiers outside the reader's
+/// subtree are ignored.
 public struct ScrollViewProxy {
 
     private let context: StateActionContext?
@@ -246,11 +320,23 @@ public struct ScrollViewProxy {
         self.context = context
     }
 
-    /// Scrolls to the first descendant scroll view child with the given identifier.
+    /// Scrolls to the first in-scope descendant target with the given identifier.
     ///
     /// If `anchor` is `nil`, SwiftTUI scrolls by the minimum amount needed to
     /// reveal the identified view. If `anchor` is non-`nil`, SwiftTUI aligns the
-    /// same unit point in the target view and scroll viewport.
+    /// same unit point in the target view and scroll viewport. The resulting
+    /// offset is limited to the scroll view's enabled axes and clamped to its
+    /// content bounds. When the resolved point changes, a bound
+    /// ``ScrollPosition`` is updated with the new point; a no-op reveal leaves
+    /// an existing automatic binding unchanged.
+    ///
+    /// - Parameters:
+    ///   - id: The hashable identifier attached to the target view.
+    ///   - anchor: The relative target and viewport point to align, or `nil` to
+    ///     perform the smallest reveal.
+    /// - Precondition: Call this method from an action associated with rendered
+    ///   reader content. Calling it while the reader's content builder is
+    ///   rendering, or on a proxy created only for measurement, traps.
     public func scrollTo<ID>(_ id: ID, anchor: UnitPoint? = nil) where ID: Hashable {
         guard let context else {
             preconditionFailure(
@@ -262,7 +348,26 @@ public struct ScrollViewProxy {
     }
 }
 
-/// A view that provides programmatic scrolling through a scroll view proxy.
+/// A view that scopes and supplies a proxy for programmatic scrolling.
+///
+/// Put the target ``ScrollView`` and the control that invokes
+/// ``ScrollViewProxy/scrollTo(_:anchor:)`` inside the reader. The content
+/// closure may run during measurement and rendering; use the proxy only from an
+/// action closure, not while constructing the view tree.
+///
+/// ```swift
+/// ScrollViewReader { proxy in
+///     VStack {
+///         Text("Show details")
+///             .onTapGesture {
+///                 proxy.scrollTo("details", anchor: .top)
+///             }
+///         ScrollView {
+///             Text("Details").id("details")
+///         }
+///     }
+/// }
+/// ```
 public struct ScrollViewReader<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -272,9 +377,11 @@ public struct ScrollViewReader<Content: View>: View {
 
     let statePath: [Int]?
 
-    /// Creates a scroll view reader.
+    /// Creates a scroll view reader around its content subtree.
     ///
-    /// - Parameter content: A view builder that receives a scroll proxy.
+    /// - Parameter content: A builder that receives the reader's scoped proxy.
+    ///   SwiftTUI may evaluate the builder more than once; defer proxy calls to
+    ///   actions created by the builder.
     public init(@ViewBuilder content: @escaping (ScrollViewProxy) -> Content) {
         self.content = content
         self.statePath = StateContext.currentPath
@@ -410,23 +517,43 @@ public extension View {
     /// Binds this view's identity to a hashable value.
     ///
     /// SwiftTUI uses this identity for subtree state and as a scroll target for
-    /// ``ScrollViewProxy/scrollTo(_:anchor:)``.
+    /// ``ScrollViewProxy/scrollTo(_:anchor:)``. The identifier is scoped by the
+    /// surrounding view hierarchy and reader rather than forming a process-wide
+    /// namespace.
+    ///
+    /// - Parameter id: The stable, hashable identity to assign to this subtree.
+    /// - Returns: A view whose state path and rendered scroll-target region use
+    ///   the supplied identity.
     func id<ID>(_ id: ID) -> some View where ID: Hashable {
         IdentifiedView(content: self, id: AnyHashable(id))
     }
 
-    /// Associates a binding to a scroll position with scroll views within this view.
+    /// Supplies a scroll-position binding to descendant scroll views.
     ///
-    /// - Parameter position: A binding read and updated by descendant scroll views.
-    /// - Returns: A view that supplies scroll position state to descendant scroll views.
+    /// A descendant reads the binding as its requested position. After resolving
+    /// a concrete point or edge against its viewport, and after user or proxy
+    /// scrolling, it writes the clamped concrete point back. Axes not enabled by
+    /// that scroll view remain at zero. Scope this modifier close to the intended
+    /// scroll view when multiple descendants should not share a position.
+    ///
+    /// - Parameter position: The requested and resolved scroll position.
+    /// - Returns: A view that supplies the binding to scrollable descendants in
+    ///   its modified subtree.
     func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
         ScrollPositionView(content: self, position: position)
     }
 
     /// Disables or enables user scrolling in scrollable descendant views.
     ///
-    /// - Parameter disabled: Whether user-driven scrolling is disabled.
-    /// - Returns: A view that controls scrolling in its descendants.
+    /// Disabling removes descendant wheel-input regions but leaves their current
+    /// offsets, ``View/scrollPosition(_:)`` bindings, and
+    /// ``ScrollViewProxy/scrollTo(_:anchor:)`` actions effective. An inner
+    /// `scrollDisabled(false)` cannot re-enable scrolling disabled by an outer
+    /// ancestor.
+    ///
+    /// - Parameter disabled: `true` to block user wheel input in the subtree;
+    ///   `false` to preserve the inherited setting.
+    /// - Returns: A view with the transformed scrolling environment.
     nonisolated func scrollDisabled(_ disabled: Bool) -> some View {
         TransformedEnvironmentView(
             content: self,
