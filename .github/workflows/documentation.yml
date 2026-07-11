@@ -172,11 +172,11 @@ jobs:
           <html lang="en">
           <head>
             <meta charset="utf-8">
-            <meta http-equiv="refresh" content="0; url=latest/documentation/swifttui/">
-            <title>SwiftTUI Documentation</title>
+            <meta http-equiv="refresh" content="0; url=latest/documentation/">
+            <title>swift-tui Documentation</title>
           </head>
           <body>
-            <p><a href="latest/documentation/swifttui/">SwiftTUI documentation</a></p>
+            <p><a href="latest/documentation/">swift-tui documentation</a></p>
           </body>
           </html>
           HTML
