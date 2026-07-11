@@ -108,6 +108,8 @@ public nonisolated struct LayoutSubview: Equatable {
 
     let placements: LayoutPlacementStore
 
+    let measurements: LayoutMeasurementStore
+
     /// The layout priority assigned to this subview.
     public var priority: Double {
         child.traits.priority
@@ -127,6 +129,14 @@ public nonisolated struct LayoutSubview: Equatable {
     }
 
     private func measurement(
+        in proposal: ProposedViewSize
+    ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
+        measurements.measurement(for: index, proposal: proposal) {
+            uncachedMeasurement(in: proposal)
+        }
+    }
+
+    private func uncachedMeasurement(
         in proposal: ProposedViewSize
     ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
         let renderProposal = proposal.renderProposal
@@ -247,7 +257,7 @@ public extension LayoutSubview {
 @preconcurrency
 public nonisolated protocol Layout: Sendable {
 
-    /// The mutable cache type used across a layout pass.
+    /// The mutable cache type shared across calls to a layout instance.
     associatedtype Cache = Void
 
     /// The collection type passed to layout methods.
@@ -258,7 +268,7 @@ public nonisolated protocol Layout: Sendable {
     /// - Parameters:
     ///   - proposal: The size proposed by the parent.
     ///   - subviews: The child subviews to measure.
-    ///   - cache: Mutable layout cache for this pass.
+    ///   - cache: Mutable storage shared across layout calls.
     /// - Returns: The layout's terminal-cell size.
     func sizeThatFits(
         proposal: ProposedViewSize,
@@ -272,7 +282,7 @@ public nonisolated protocol Layout: Sendable {
     ///   - bounds: The terminal-cell rectangle assigned to the layout.
     ///   - proposal: The original size proposed by the parent.
     ///   - subviews: The child subviews to place.
-    ///   - cache: Mutable layout cache for this pass.
+    ///   - cache: Mutable storage shared across layout calls.
     func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -302,8 +312,10 @@ public extension Layout where Cache == Void {
 
 public extension Layout {
 
-    /// Default cache update for layouts that do not need cache maintenance.
-    nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {}
+    /// Recreates the cache after the layout or its subviews change.
+    nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache = makeCache(subviews: subviews)
+    }
 
     /// Creates a view that arranges content using this layout.
     ///
@@ -479,6 +491,8 @@ extension LayoutContainer: LayoutRenderable {
         StackAxisContext.withAxis(nil) {
             let proposedSize = ProposedViewSize(proposal)
             let placements = LayoutPlacementStore()
+            let measurements = runtime?.layoutMeasurementStore(at: path)
+                ?? LayoutMeasurementStore()
             let subviews = LayoutSubviews(
                 elements: ViewResolver.stackChildren(
                     from: content,
@@ -486,30 +500,36 @@ extension LayoutContainer: LayoutRenderable {
                     path: path + [0],
                     runtime: runtime
                 ).enumerated().map { index, child in
-                    LayoutSubview(index: index, child: child, placements: placements)
+                    LayoutSubview(
+                        index: index,
+                        child: child,
+                        placements: placements,
+                        measurements: measurements
+                    )
                 }
             )
 
+            if let runtime {
+                return runtime.withLayoutCache(
+                    for: layout,
+                    subviews: subviews,
+                    at: path
+                ) {
+                    render(
+                        proposedSize: proposedSize,
+                        placements: placements,
+                        subviews: subviews,
+                        cache: &$0
+                    )
+                }
+            }
+
             var cache = layout.makeCache(subviews: subviews)
-            layout.updateCache(&cache, subviews: subviews)
-
-            let size = layout.sizeThatFits(
-                proposal: proposedSize,
+            return render(
+                proposedSize: proposedSize,
+                placements: placements,
                 subviews: subviews,
                 cache: &cache
-            )
-            let bounds = Rect(origin: .zero, size: size)
-            layout.placeSubviews(
-                in: bounds,
-                proposal: proposedSize,
-                subviews: subviews,
-                cache: &cache
-            )
-
-            return placedBlock(
-                size: size,
-                placements: placements.placements,
-                subviews: subviews
             )
         }
     }
@@ -520,6 +540,32 @@ extension LayoutContainer: LayoutRenderable {
         runtime: StateRuntime?
     ) -> RenderedElement? {
         renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+
+    private func render(
+        proposedSize: ProposedViewSize,
+        placements: LayoutPlacementStore,
+        subviews: LayoutSubviews,
+        cache: inout L.Cache
+    ) -> RenderedBlock {
+        let size = layout.sizeThatFits(
+            proposal: proposedSize,
+            subviews: subviews,
+            cache: &cache
+        )
+        let bounds = Rect(origin: .zero, size: size)
+        layout.placeSubviews(
+            in: bounds,
+            proposal: proposedSize,
+            subviews: subviews,
+            cache: &cache
+        )
+
+        return placedBlock(
+            size: size,
+            placements: placements.placements,
+            subviews: subviews
+        )
     }
 
     private func placedBlock(
@@ -589,6 +635,50 @@ nonisolated final class LayoutPlacementStore {
             $0.index == placement.index
         }
         placements.append(placement)
+    }
+}
+
+nonisolated final class LayoutMeasurementStore {
+
+    private struct Key: Hashable {
+
+        var index: Int
+
+        var proposal: ProposedViewSizeKey
+    }
+
+    private struct ProposedViewSizeKey: Hashable {
+
+        var columns: Int?
+
+        var rows: Int?
+
+        init(_ proposal: ProposedViewSize) {
+            columns = proposal.columns
+            rows = proposal.rows
+        }
+    }
+
+    typealias Measurement = (
+        size: Size,
+        explicitAlignments: [AlignmentKey: Int]
+    )
+
+    private var measurements: [Key: Measurement] = [:]
+
+    func measurement(
+        for index: Int,
+        proposal: ProposedViewSize,
+        calculate: () -> Measurement
+    ) -> Measurement {
+        let key = Key(index: index, proposal: ProposedViewSizeKey(proposal))
+        if let measurement = measurements[key] {
+            return measurement
+        }
+
+        let measurement = calculate()
+        measurements[key] = measurement
+        return measurement
     }
 }
 

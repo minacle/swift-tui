@@ -38,6 +38,14 @@ final class StateRuntime {
 
     private var scrollViewRenderOrder: [[Int]] = []
 
+    private var layoutCaches: [[Int]: Any] = [:]
+
+    private var layoutMeasurementStores: [[Int]: LayoutMeasurementStore] = [:]
+
+    private var activeLayoutPaths: Set<[Int]> = []
+
+    private var layoutGeneration = 0
+
     private var terminationHandler: TerminationHandler?
 
     private var openURLHandlers: [OpenURLHandler] = []
@@ -66,6 +74,7 @@ final class StateRuntime {
         from view: Content,
         in proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
+        beginLayoutRender()
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
@@ -82,6 +91,7 @@ final class StateRuntime {
             change.finishRender(perform: performChangeHandler)
             tasks.finishRender(start: startTask)
             removePendingStateSubtrees()
+            finishLayoutRender()
         }
 
         let block = observeRender {
@@ -119,6 +129,7 @@ final class StateRuntime {
         from view: Content,
         in proposal: RenderProposal? = nil
     ) -> RenderedElement? {
+        beginLayoutRender()
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         lifecycle.beginRender()
@@ -135,6 +146,7 @@ final class StateRuntime {
             change.finishRender(perform: performChangeHandler)
             tasks.finishRender(start: startTask)
             removePendingStateSubtrees()
+            finishLayoutRender()
         }
 
         return observeRender {
@@ -148,6 +160,53 @@ final class StateRuntime {
         }
 
         return invalidated
+    }
+
+    func layoutMeasurementStore(at path: [Int]) -> LayoutMeasurementStore {
+        if let store = layoutMeasurementStores[path] {
+            return store
+        }
+
+        let store = LayoutMeasurementStore()
+        layoutMeasurementStores[path] = store
+        return store
+    }
+
+    func withLayoutCache<L: Layout, Value>(
+        for layout: L,
+        subviews: L.Subviews,
+        at path: [Int],
+        perform operation: (inout L.Cache) -> Value
+    ) -> Value {
+        activeLayoutPaths.insert(path)
+
+        if let box = layoutCaches[path] as? LayoutCacheBox<L> {
+            if box.generation != layoutGeneration {
+                layout.updateCache(&box.cache, subviews: subviews)
+                box.generation = layoutGeneration
+            }
+            return operation(&box.cache)
+        }
+
+        let box = LayoutCacheBox<L>(
+            cache: layout.makeCache(subviews: subviews),
+            generation: layoutGeneration
+        )
+        layoutCaches[path] = box
+        return operation(&box.cache)
+    }
+
+    private func beginLayoutRender() {
+        layoutGeneration &+= 1
+        activeLayoutPaths = []
+        layoutMeasurementStores = [:]
+    }
+
+    private func finishLayoutRender() {
+        layoutCaches = layoutCaches.filter {
+            activeLayoutPaths.contains($0.key)
+        }
+        layoutMeasurementStores = [:]
     }
 
     fileprivate func cell<Value>(
@@ -1039,6 +1098,15 @@ final class StateRuntime {
         scrollViewRenderOrder.removeAll {
             $0.starts(with: path)
         }
+        layoutCaches = layoutCaches.filter {
+            !$0.key.starts(with: path)
+        }
+        layoutMeasurementStores = layoutMeasurementStores.filter {
+            !$0.key.starts(with: path)
+        }
+        activeLayoutPaths = activeLayoutPaths.filter {
+            !$0.starts(with: path)
+        }
         navigation.removeStateSubtree(at: path)
     }
 
@@ -1231,6 +1299,18 @@ final class StateRuntime {
                 generation: source.requestGeneration
             )
         }
+    }
+}
+
+private final class LayoutCacheBox<L: Layout> {
+
+    var cache: L.Cache
+
+    var generation: Int
+
+    init(cache: L.Cache, generation: Int) {
+        self.cache = cache
+        self.generation = generation
     }
 }
 

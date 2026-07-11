@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed custom `Layout` caches to persist across render passes, pass existing
+  values to `updateCache(_:subviews:)` on subsequent renders, and reuse
+  repeated subview measurements within each render.
 - Fixed emoji-presentation and ZWJ sequences to occupy one two-column terminal
   grapheme across layout and differential rendering.
 - Fixed text insertion filtering so `TextField` and `TextEditor` accept emoji
