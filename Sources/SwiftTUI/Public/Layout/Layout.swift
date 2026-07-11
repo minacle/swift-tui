@@ -401,40 +401,42 @@ extension LayoutContainer: LayoutRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let proposedSize = ProposedViewSize(proposal)
-        let placements = LayoutPlacementStore()
-        let subviews = LayoutSubviews(
-            elements: ViewResolver.stackChildren(
-                from: content,
-                in: proposal,
-                path: path + [0],
-                runtime: runtime
-            ).enumerated().map { index, child in
-                LayoutSubview(index: index, child: child, placements: placements)
-            }
-        )
+        StackAxisContext.withAxis(nil) {
+            let proposedSize = ProposedViewSize(proposal)
+            let placements = LayoutPlacementStore()
+            let subviews = LayoutSubviews(
+                elements: ViewResolver.stackChildren(
+                    from: content,
+                    in: proposal,
+                    path: path + [0],
+                    runtime: runtime
+                ).enumerated().map { index, child in
+                    LayoutSubview(index: index, child: child, placements: placements)
+                }
+            )
 
-        var cache = layout.makeCache(subviews: subviews)
-        layout.updateCache(&cache, subviews: subviews)
+            var cache = layout.makeCache(subviews: subviews)
+            layout.updateCache(&cache, subviews: subviews)
 
-        let size = layout.sizeThatFits(
-            proposal: proposedSize,
-            subviews: subviews,
-            cache: &cache
-        )
-        let bounds = Rect(origin: .zero, size: size)
-        layout.placeSubviews(
-            in: bounds,
-            proposal: proposedSize,
-            subviews: subviews,
-            cache: &cache
-        )
+            let size = layout.sizeThatFits(
+                proposal: proposedSize,
+                subviews: subviews,
+                cache: &cache
+            )
+            let bounds = Rect(origin: .zero, size: size)
+            layout.placeSubviews(
+                in: bounds,
+                proposal: proposedSize,
+                subviews: subviews,
+                cache: &cache
+            )
 
-        return placedBlock(
-            size: size,
-            placements: placements.placements,
-            subviews: subviews
-        )
+            return placedBlock(
+                size: size,
+                placements: placements.placements,
+                subviews: subviews
+            )
+        }
     }
 
     func renderedElement(

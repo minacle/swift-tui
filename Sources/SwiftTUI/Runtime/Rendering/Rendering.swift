@@ -902,14 +902,22 @@ nonisolated struct LayoutTraits: Sendable {
 
     var flexibleAxes: Axis.Set = []
 
+    var fillsStackMinorAxis = false
+
     var priority: Double = 0
 
     var zIndex: Double = 0
 
     private var layoutValues = LayoutValueStorage()
 
-    init(flexibleAxes: Axis.Set = [], priority: Double = 0, zIndex: Double = 0) {
+    init(
+        flexibleAxes: Axis.Set = [],
+        fillsStackMinorAxis: Bool = false,
+        priority: Double = 0,
+        zIndex: Double = 0
+    ) {
         self.flexibleAxes = flexibleAxes
+        self.fillsStackMinorAxis = fillsStackMinorAxis
         self.priority = priority
         self.zIndex = zIndex
     }
@@ -988,6 +996,19 @@ enum LayoutMeasurementContext {
         $taskIsMeasuring.withValue(true) {
             return operation()
         }
+    }
+}
+
+enum StackAxisContext {
+
+    @TaskLocal
+    static var axis: Axis?
+
+    static func withAxis<Value>(
+        _ axis: Axis?,
+        operation: () -> Value
+    ) -> Value {
+        $axis.withValue(axis, operation: operation)
     }
 }
 
@@ -2250,6 +2271,15 @@ enum ViewResolver {
             return .resolved(button.renderedBlock(in: proposal, path: path, runtime: runtime))
         }
 
+        if let divider = view as? any DividerRenderable {
+            return .resolved(
+                DividerRenderer.renderedBlock(
+                    drawingSet: divider.dividerDrawingSet,
+                    proposal: proposal
+                )
+            )
+        }
+
         if let fillShape = view as? any FillShapeRenderable {
             return .resolved(fillShape.renderedBlock(in: proposal, path: path, runtime: runtime))
         }
@@ -2701,11 +2731,13 @@ extension StackRenderable {
 extension HStack: LayoutTraitRenderable, StackRenderable, VerticalStackFlexSuppressing {
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.stackLayoutTraits(
-            from: content,
-            propagatedAxes: [.horizontal, .vertical],
-            spacerAxis: .horizontal
-        )
+        StackAxisContext.withAxis(.horizontal) {
+            ViewResolver.stackLayoutTraits(
+                from: content,
+                propagatedAxes: [.horizontal, .vertical],
+                spacerAxis: .horizontal
+            )
+        }
     }
 
     func renderedBlock(
@@ -2713,28 +2745,32 @@ extension HStack: LayoutTraitRenderable, StackRenderable, VerticalStackFlexSuppr
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackRenderer.horizontal(
-            ViewResolver.stackChildren(
-                from: content,
-                in: RenderProposal(rows: proposal?.rows),
-                path: path + [0],
-                runtime: runtime
-            ),
-            alignment: alignment,
-            spacing: spacing,
-            proposal: proposal
-        )
+        StackAxisContext.withAxis(.horizontal) {
+            StackRenderer.horizontal(
+                ViewResolver.stackChildren(
+                    from: content,
+                    in: RenderProposal(rows: proposal?.rows),
+                    path: path + [0],
+                    runtime: runtime
+                ),
+                alignment: alignment,
+                spacing: spacing,
+                proposal: proposal
+            )
+        }
     }
 }
 
 extension VStack: LayoutTraitRenderable, StackRenderable {
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.stackLayoutTraits(
-            from: content,
-            propagatedAxes: [.horizontal, .vertical],
-            spacerAxis: .vertical
-        )
+        StackAxisContext.withAxis(.vertical) {
+            ViewResolver.stackLayoutTraits(
+                from: content,
+                propagatedAxes: [.horizontal, .vertical],
+                spacerAxis: .vertical
+            )
+        }
     }
 
     func renderedBlock(
@@ -2742,28 +2778,32 @@ extension VStack: LayoutTraitRenderable, StackRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackRenderer.vertical(
-            ViewResolver.stackChildren(
-                from: content,
-                in: RenderProposal(columns: proposal?.columns),
-                path: path + [0],
-                runtime: runtime
-            ),
-            alignment: alignment,
-            spacing: spacing,
-            proposal: proposal
-        )
+        StackAxisContext.withAxis(.vertical) {
+            StackRenderer.vertical(
+                ViewResolver.stackChildren(
+                    from: content,
+                    in: RenderProposal(columns: proposal?.columns),
+                    path: path + [0],
+                    runtime: runtime
+                ),
+                alignment: alignment,
+                spacing: spacing,
+                proposal: proposal
+            )
+        }
     }
 }
 
 extension ZStack: LayoutTraitRenderable, StackRenderable {
 
     var layoutTraits: LayoutTraits {
-        ViewResolver.stackLayoutTraits(
-            from: content,
-            propagatedAxes: [.horizontal, .vertical],
-            spacerAxis: nil
-        )
+        StackAxisContext.withAxis(nil) {
+            ViewResolver.stackLayoutTraits(
+                from: content,
+                propagatedAxes: [.horizontal, .vertical],
+                spacerAxis: nil
+            )
+        }
     }
 
     func renderedBlock(
@@ -2771,16 +2811,18 @@ extension ZStack: LayoutTraitRenderable, StackRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        ZStackRenderer.block(
-            ViewResolver.stackChildren(
-                from: content,
-                in: proposal,
-                path: path + [0],
-                runtime: runtime
-            ),
-            alignment: alignment,
-            proposal: proposal
-        )
+        StackAxisContext.withAxis(nil) {
+            ZStackRenderer.block(
+                ViewResolver.stackChildren(
+                    from: content,
+                    in: proposal,
+                    path: path + [0],
+                    runtime: runtime
+                ),
+                alignment: alignment,
+                proposal: proposal
+            )
+        }
     }
 }
 
@@ -3064,12 +3106,14 @@ enum StackRenderer {
         proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
         let layout = horizontalLayout(from: children, spacing: spacing, proposal: proposal)
-        let items = layout.items
-        guard !items.isEmpty else {
+        guard !layout.items.isEmpty else {
             return nil
         }
 
-        let height = items.compactMap(\.block?.height).max() ?? 1
+        let height = layout.items.compactMap(\.block?.height).max() ?? 1
+        let items = layout.items.map {
+            $0.fillingMinorAxis(height)
+        }
         let width = layout.width
         let bounds = RenderedRect(width: width, height: height)
         let runs = items.flatMap { item -> [RenderedRun] in
@@ -3136,12 +3180,14 @@ enum StackRenderer {
         proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
         let layout = verticalLayout(from: children, spacing: spacing, proposal: proposal)
-        let items = layout.items
-        guard !items.isEmpty else {
+        guard !layout.items.isEmpty else {
             return nil
         }
 
-        let width = items.compactMap(\.block?.width).max() ?? 0
+        let width = layout.items.compactMap(\.block?.width).max() ?? 0
+        let items = layout.items.map {
+            $0.fillingMinorAxis(width)
+        }
         let height = layout.height
         let bounds = RenderedRect(width: width, height: height)
         let runs = items.flatMap { item -> [RenderedRun] in
@@ -3218,12 +3264,31 @@ enum StackRenderer {
 
         var width: Int
 
+        var traits: LayoutTraits
+
+        var render: (RenderProposal?, Bool) -> RenderedElement?
+
         var block: RenderedBlock? {
             guard case .block(let block) = content else {
                 return nil
             }
 
             return block
+        }
+
+        func fillingMinorAxis(_ height: Int) -> HorizontalItem {
+            guard traits.fillsStackMinorAxis,
+                  traits.flexibleAxes.contains(.vertical),
+                  let content = render(
+                      RenderProposal(columns: width, rows: height),
+                      false
+                  ) else {
+                return self
+            }
+
+            var item = self
+            item.content = content
+            return item
         }
     }
 
@@ -3235,12 +3300,31 @@ enum StackRenderer {
 
         var height: Int
 
+        var traits: LayoutTraits
+
+        var render: (RenderProposal?, Bool) -> RenderedElement?
+
         var block: RenderedBlock? {
             guard case .block(let block) = content else {
                 return nil
             }
 
             return block
+        }
+
+        func fillingMinorAxis(_ width: Int) -> VerticalItem {
+            guard traits.fillsStackMinorAxis,
+                  traits.flexibleAxes.contains(.horizontal),
+                  let content = render(
+                      RenderProposal(columns: width, rows: height),
+                      false
+                  ) else {
+                return self
+            }
+
+            var item = self
+            item.content = content
+            return item
         }
     }
 
@@ -3335,7 +3419,13 @@ enum StackRenderer {
                 return nil
             }
 
-            let item = HorizontalItem(content: element, x: x, width: itemWidth)
+            let item = HorizontalItem(
+                content: element,
+                x: x,
+                width: itemWidth,
+                traits: child.traits,
+                render: child.render
+            )
             x += item.width + max(spacing, 0)
             return item
         }
@@ -3428,7 +3518,13 @@ enum StackRenderer {
                 return nil
             }
 
-            let item = VerticalItem(content: element, y: y, height: itemHeight)
+            let item = VerticalItem(
+                content: element,
+                y: y,
+                height: itemHeight,
+                traits: child.traits,
+                render: child.render
+            )
             y += item.height + max(spacing, 0)
             return item
         }

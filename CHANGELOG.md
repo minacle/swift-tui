@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SwiftUI-compatible `Divider` and terminal-native `HeavyDivider` and
+  `DoubleDivider`, which draw matching box-style lines across a stack's minor
+  axis and default to horizontal lines outside `HStack` and `VStack`.
 - Added `View.edgeInset(_:spacing:content:)` for placing terminal content at an
   available edge while proposing the remaining space to the modified view.
 - Added SwiftUI-compatible `EnvironmentValues.lineLimit` and read-only

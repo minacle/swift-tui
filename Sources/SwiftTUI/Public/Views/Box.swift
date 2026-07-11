@@ -287,7 +287,7 @@ enum BoxRenderer {
         )
     }
 
-    private static func borderStyle(from style: TextStyle) -> TextStyle {
+    static func borderStyle(from style: TextStyle) -> TextStyle {
         var borderStyle = TextStyle.plain
         borderStyle.foregroundStyle = style.foregroundStyle
         borderStyle.backgroundStyle = style.backgroundStyle
