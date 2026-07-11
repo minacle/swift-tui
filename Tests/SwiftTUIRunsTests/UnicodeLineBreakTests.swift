@@ -1,11 +1,19 @@
 import Foundation
-import Observation
 import Testing
-@testable import SwiftTUIEssentials
-import SwiftTUIControls
+@testable import SwiftTUIRuns
 
 @Suite("Unicode Line Breaking")
 struct UnicodeLineBreakTests {
+
+    @Test
+    func `embedded Unicode line-break data resolves representative scalar classes`() {
+        #expect(UnicodeLineBreakClass.lineBreakDataRangeCount == 3654)
+        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x0A)!) == .lineFeed)
+        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x20)!) == .space)
+        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0xA0)!) == .glue)
+        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x200B)!) == .zeroWidthSpace)
+        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x4E00)!) == .ideographic)
+    }
 
     @Test
     func `a zero-width space creates an allowed line-break opportunity`() {

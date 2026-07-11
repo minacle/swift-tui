@@ -3,7 +3,8 @@
 ## Documentation comments
 
 - Write documentation comments in English for every `public` or `open`
-  declaration owned by `SwiftTUIEssentials`, `SwiftTUIControls`, or `SwiftTUI`.
+  declaration owned by `SwiftTUIRuns`, `SwiftTUIEssentials`,
+  `SwiftTUIControls`, or `SwiftTUI`.
   This includes types, protocols, initializers, methods, properties, subscripts,
   type aliases, enum cases, option-set values, and public conformance witnesses.
 - Also document internal declarations whose purpose, side effects, lifetime,
@@ -61,7 +62,7 @@
 ## Documentation validation
 
 - For every public-API or documentation change, dump the symbol graphs and
-  inspect the graphs for all three package modules. Treat any source-owned
+  inspect the graphs for all four package modules. Treat any source-owned
   public symbol without a documentation comment as a failed check:
 
 ```sh
@@ -81,6 +82,7 @@ swift package \
   --allow-writing-to-directory /private/tmp/swift-tui-docc \
   generate-documentation \
   --target SwiftTUI \
+  --target SwiftTUIRuns \
   --target SwiftTUIEssentials \
   --target SwiftTUIControls \
   --enable-experimental-combined-documentation \
@@ -95,8 +97,9 @@ swift package \
 
 ## Test organization
 
-- Write tests with Swift Testing under `Tests/SwiftTUIEssentialsTests` or
-  `Tests/SwiftTUIControlsTests`, according to API ownership.
+- Write tests with Swift Testing under `Tests/SwiftTUIRunsTests`,
+  `Tests/SwiftTUIEssentialsTests`, or `Tests/SwiftTUIControlsTests`, according
+  to API ownership.
 - Place each test in the domain that owns the behavior: `Application`, `Core`,
   `Environment`, `Input`, `Layout`, `Navigation`, `Rendering`, `State`, `Text`,
   or `Views`.

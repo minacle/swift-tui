@@ -1,4 +1,5 @@
 public import Foundation
+public import SwiftTUIRuns
 public import Terminal
 
 /// A terminal SGR color.
@@ -252,7 +253,9 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// The body type for this directly rendered primitive view.
     public typealias Body = Never
 
-    nonisolated let runs: [TextRun]
+    nonisolated let runGroup: RunGroup
+
+    nonisolated let annotations: [TextAnnotation]
 
     /// The plain string obtained by concatenating all text runs.
     ///
@@ -261,11 +264,11 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// - Complexity: O(n), where n is the total number of characters across
     ///   the stored runs.
     public var content: String {
-        runs.map(\.text).joined()
+        runGroup.content
     }
 
     nonisolated var hasAttributedAlignment: Bool {
-        runs.contains { $0.alignment != nil }
+        annotations.contains { $0.alignment != nil }
     }
 
     /// Creates text from a string without localization or interpolation lookup.
@@ -280,7 +283,21 @@ public nonisolated struct Text: View, Equatable, Sendable {
 
     /// Stores plain string content for the public plain-text initializers.
     internal init(content: String) {
-        self.runs = [TextRun(text: content)]
+        self.runGroup = RunGroup(content)
+        self.annotations = []
+    }
+
+    /// Creates text from a recursive group of attributed terminal-text runs.
+    ///
+    /// Run attributes are merged with the text style inherited from the view
+    /// environment. This initializer does not add links, alignment, selection,
+    /// truncation, or terminal-input sanitization; those remain view-layer
+    /// responsibilities.
+    ///
+    /// - Parameter content: The attributed runs to render as one text view.
+    public init(_ content: RunGroup) {
+        self.runGroup = content
+        self.annotations = []
     }
 
     /// Creates text that renders a `String` verbatim.
@@ -310,7 +327,13 @@ public nonisolated struct Text: View, Equatable, Sendable {
     ///
     /// - Parameter attributedContent: The attributed string to render.
     public init(_ attributedContent: AttributedString) {
-        self.runs = TextRun.runs(from: attributedContent)
+        let converted = TextAnnotation.convert(attributedContent)
+        self.runGroup = RunGroup {
+            for run in converted.runs {
+                run
+            }
+        }
+        self.annotations = converted.annotations
     }
 }
 
@@ -335,49 +358,51 @@ public extension Text {
     }
 }
 
-nonisolated struct TextRun: Equatable, Sendable {
-
-    var text: String
-
-    var style: TextStyle
+nonisolated struct TextAnnotation: Equatable, Sendable {
 
     var link: URL?
 
     var alignment: AttributedTextAlignment?
 
-    init(
-        text: String,
-        style: TextStyle = .plain,
-        link: URL? = nil,
-        alignment: AttributedTextAlignment? = nil
-    ) {
-        self.text = text
-        self.style = style
+    var range: Range<RunIndex>
+
+    init(link: URL?, alignment: AttributedTextAlignment?, range: Range<RunIndex>) {
         self.link = link
         self.alignment = alignment
+        self.range = range
     }
 
-    static func runs(from attributedString: AttributedString) -> [TextRun] {
-        attributedString.runs.compactMap { run -> TextRun? in
-            let text = String(attributedString.characters[run.range])
+    static func convert(
+        _ attributedString: AttributedString
+    ) -> (runs: [Run], annotations: [TextAnnotation]) {
+        var offset = 0
+        var runs: [Run] = []
+        var annotations: [TextAnnotation] = []
+        for attributedRun in attributedString.runs {
+            let text = String(attributedString.characters[attributedRun.range])
             guard !text.isEmpty else {
-                return nil
+                continue
             }
 
             var style = TextStyle()
 #if canImport(Darwin)
-            style = TextStyle(inlinePresentationIntent: run.inlinePresentationIntent)
+            style = TextStyle(inlinePresentationIntent: attributedRun.inlinePresentationIntent)
 #endif
-            style.foregroundStyle = run.foregroundColor
-            style.backgroundStyle = run.backgroundColor
-
-            return TextRun(
-                text: text,
-                style: style,
-                link: run.link,
-                alignment: run.alignment
+            style.foregroundStyle = attributedRun.foregroundColor
+            style.backgroundStyle = attributedRun.backgroundColor
+            let upperOffset = offset + text.count
+            runs.append(Run(text, attributes: style.inheritingRunAttributes))
+            annotations.append(
+                TextAnnotation(
+                    link: attributedRun.link,
+                    alignment: attributedRun.alignment,
+                    range: RunIndex(characterOffset: offset)
+                        ..< RunIndex(characterOffset: upperOffset)
+                )
             )
+            offset = upperOffset
         }
+        return (runs, annotations)
     }
 }
 
@@ -398,6 +423,18 @@ nonisolated struct TextStyle: Equatable, Sendable {
     var isStrikethrough: Bool = false
 
     static let plain = TextStyle()
+
+    var inheritingRunAttributes: RunAttributes {
+        RunAttributes(
+            foregroundColor: foregroundStyle,
+            backgroundColor: backgroundStyle,
+            isBold: isBold ? true : nil,
+            isDim: isDim ? true : nil,
+            isItalic: isItalic ? true : nil,
+            isUnderline: isUnderline ? true : nil,
+            isStrikethrough: isStrikethrough ? true : nil
+        )
+    }
 
     var isPlain: Bool {
         foregroundStyle == nil
@@ -433,6 +470,18 @@ nonisolated struct TextStyle: Equatable, Sendable {
             isItalic: isItalic || override.isItalic,
             isUnderline: isUnderline || override.isUnderline,
             isStrikethrough: isStrikethrough || override.isStrikethrough
+        )
+    }
+
+    func merging(_ attributes: RunAttributes) -> TextStyle {
+        TextStyle(
+            foregroundStyle: attributes.foregroundColor ?? foregroundStyle,
+            backgroundStyle: attributes.backgroundColor ?? backgroundStyle,
+            isBold: attributes.isBold ?? isBold,
+            isDim: attributes.isDim ?? isDim,
+            isItalic: attributes.isItalic ?? isItalic,
+            isUnderline: attributes.isUnderline ?? isUnderline,
+            isStrikethrough: attributes.isStrikethrough ?? isStrikethrough
         )
     }
 

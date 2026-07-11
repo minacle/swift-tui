@@ -1,4 +1,49 @@
 import Foundation
+import SwiftTUIRuns
+
+nonisolated struct EditableTextSingleLineLayout {
+
+    let content: String
+
+    let runLayout: RunLayout
+
+    init(_ content: String) {
+        self.content = content
+        self.runLayout = RunGroup(content).layout()
+    }
+
+    var columns: Int {
+        runLayout.totalColumns
+    }
+
+    func column(atCharacterOffset offset: Int) -> Int {
+        columns(in: 0..<offset)
+    }
+
+    func columns(in range: Range<Int>) -> Int {
+        let lowerBound = min(max(range.lowerBound, 0), content.count)
+        let upperBound = min(max(range.upperBound, lowerBound), content.count)
+        return runLayout.columns(
+            in: RunIndex(characterOffset: lowerBound)
+                ..< RunIndex(characterOffset: upperBound)
+        )
+    }
+
+    func offset(nearestColumn column: Int) -> Int {
+        let targetColumn = max(column, 0)
+        var precedingColumns = 0
+        for (row, line) in runLayout.lines.enumerated() {
+            let lineEndColumn = precedingColumns + line.columns
+            if targetColumn < lineEndColumn {
+                return runLayout.index(
+                    at: Point(column: targetColumn - precedingColumns, row: row)
+                ).characterOffset
+            }
+            precedingColumns = lineEndColumn
+        }
+        return content.count
+    }
+}
 
 enum EditableTextSingleLineRenderer {
 
@@ -91,6 +136,7 @@ enum EditableTextSingleLineRenderer {
 
         let currentText = fieldState?.text ?? text.wrappedValue
         let layoutText = displayMode.layoutText(for: currentText)
+        let singleLineLayout = EditableTextSingleLineLayout(layoutText)
         let isFocused = runtime?.isFocused(at: interactionPath) == true
         if updatesInteractiveState {
             fieldState?.publishSelectionOnFocus(isFocused, to: selection)
@@ -98,15 +144,14 @@ enum EditableTextSingleLineRenderer {
         if updatesInteractiveState, let maxWidth = proposal?.columns {
             fieldState?.updateHorizontalScrollOffset(
                 maxWidth: maxWidth,
-                layoutText: layoutText
+                layout: singleLineLayout
             )
         }
         let horizontalScrollOffset = proposal?.columns == nil
             ? 0
             : fieldState?.horizontalScrollOffset ?? 0
-        let scrollColumn = TerminalText.columnWidth(
-            layoutText,
-            upToCharacterOffset: horizontalScrollOffset
+        let scrollColumn = singleLineLayout.column(
+            atCharacterOffset: horizontalScrollOffset
         )
         var labelEnvironment = EnvironmentRenderContext.current
         labelEnvironment.isFocused = isFocused
@@ -122,10 +167,10 @@ enum EditableTextSingleLineRenderer {
             ? renderedCaret(
                 state: fieldState,
                 isFocused: isFocused,
-                layoutText: layoutText
+                layout: singleLineLayout
             )
             : nil
-        let displayTextWidth = TerminalText.columnWidth(displayText.content)
+        let displayTextWidth = RunGroup(displayText.content).measure().maximumContentColumns
         let reservesTrailingCaretCell = !currentText.isEmpty
         let contentWidth = max(
             reservesTrailingCaretCell ? displayTextWidth + 1 : displayTextWidth,
@@ -191,17 +236,14 @@ enum EditableTextSingleLineRenderer {
     private static func renderedCaret(
         state: EditableTextSingleLineState?,
         isFocused: Bool,
-        layoutText: String
+        layout: EditableTextSingleLineLayout
     ) -> RenderedCaret? {
         guard isFocused, let state else {
             return nil
         }
 
         return RenderedCaret(
-            column: TerminalText.columnWidth(
-                layoutText,
-                upToCharacterOffset: state.offset
-            )
+            column: layout.column(atCharacterOffset: state.offset)
         )
     }
 
@@ -445,20 +487,21 @@ final class EditableTextSingleLineState {
     }
 
     private func offset(toColumn column: Int, layoutText: String) -> Int {
-        let scrollColumn = TerminalText.columnWidth(
-            layoutText,
-            upToCharacterOffset: horizontalScrollOffset
-        )
-        return Self.offset(in: layoutText, nearestColumn: scrollColumn + column)
+        let layout = EditableTextSingleLineLayout(layoutText)
+        let scrollColumn = layout.column(atCharacterOffset: horizontalScrollOffset)
+        return layout.offset(nearestColumn: scrollColumn + column)
     }
 
-    func updateHorizontalScrollOffset(maxWidth: Int, layoutText: String) {
+    func updateHorizontalScrollOffset(
+        maxWidth: Int,
+        layout: EditableTextSingleLineLayout
+    ) {
         guard maxWidth > 0 else {
             horizontalScrollOffset = 0
             return
         }
 
-        let textWidth = TerminalText.columnWidth(layoutText)
+        let textWidth = layout.columns
         if textWidth <= maxWidth {
             horizontalScrollOffset = 0
             return
@@ -473,10 +516,8 @@ final class EditableTextSingleLineState {
         }
 
         let visibleUpperOffset = offset < text.count ? offset + 1 : offset
-        if TerminalText.columnWidth(
-            layoutText,
-            lowerCharacterOffset: horizontalScrollOffset,
-            upperCharacterOffset: visibleUpperOffset
+        if layout.columns(
+            in: horizontalScrollOffset..<visibleUpperOffset
         ) <= visibleTextWidth {
             return
         }
@@ -484,10 +525,8 @@ final class EditableTextSingleLineState {
         var newOffset = offset
         while newOffset > 0 {
             let previousOffset = newOffset - 1
-            let width = TerminalText.columnWidth(
-                layoutText,
-                lowerCharacterOffset: previousOffset,
-                upperCharacterOffset: visibleUpperOffset
+            let width = layout.columns(
+                in: previousOffset..<visibleUpperOffset
             )
             guard width <= visibleTextWidth else {
                 break
@@ -545,18 +584,7 @@ final class EditableTextSingleLineState {
     }
 
     private static func offset(in text: String, nearestColumn column: Int) -> Int {
-        var currentColumn = 0
-        var offset = 0
-        for character in text {
-            let characterWidth = TerminalText.columnWidth(String(character))
-            guard currentColumn + characterWidth <= column else {
-                break
-            }
-
-            currentColumn += characterWidth
-            offset += 1
-        }
-        return min(offset, text.count)
+        EditableTextSingleLineLayout(text).offset(nearestColumn: column)
     }
 }
 

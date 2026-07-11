@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the public `SwiftTUIRuns` library product with recursive `Run` and
+  `RunGroup` values, inheritable terminal attributes, intrinsic measurements,
+  Unicode-aware wrapping, character-offset layout mapping, and line-local
+  source-range fitting queries.
 - Added the `SwiftTUIEssentials` and `SwiftTUIControls` library products.
   `SwiftTUIEssentials` contains the complete application foundation, while
   `SwiftTUIControls` adds the standard controls and re-exports Essentials.
@@ -18,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Changed `Text` and `EditableText` to share `SwiftTUIRuns` terminal-width,
+  Unicode line-breaking, wrapping, and source-position layout results.
 - **Breaking:** Moved `Button`, `ButtonSizing`, `TextField`, `SecureField`,
   `TextEditor`, and `onSubmit` ownership to `SwiftTUIControls`. The existing
   `SwiftTUI` product continues to re-export these APIs, but module-qualified

@@ -1,6 +1,5 @@
 import Testing
-@testable import SwiftTUIEssentials
-import SwiftTUIControls
+@testable import SwiftTUIRuns
 
 @Suite("Terminal Text Width")
 struct TerminalTextWidthTests {

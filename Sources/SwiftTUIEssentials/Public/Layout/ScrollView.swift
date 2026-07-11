@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUIRuns
 import Terminal
 
 /// An axis in terminal-cell layout and scrolling.
@@ -830,8 +831,11 @@ enum ScrollViewRenderer {
     private static func maxHorizontalOffset(for content: RenderedBlock, width: Int) -> Int {
         let caretAllowance = content.caret == nil || content.width < width ? 0 : 1
         var offset = max(content.width - width + caretAllowance, 0)
-        while offset > 0 && content.lines.contains(where: { line in
-            !TerminalText.isCharacterBoundary(line, atColumn: offset)
+        let lines = content.lines.compactMap {
+            RunGroup($0).layout().lines.first
+        }
+        while offset > 0 && lines.contains(where: { line in
+            offset < line.columns && !line.isCharacterBoundary(atColumn: offset)
         }) {
             offset += 1
         }

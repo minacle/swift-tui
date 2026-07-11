@@ -1,3 +1,4 @@
+import SwiftTUIRuns
 import Terminal
 
 /// A value that represents one insertion point or contiguous range in a
@@ -476,6 +477,7 @@ enum TextSelectionRenderer {
         var pendingColumn = 0
         var pendingStyle: TextStyle?
         var column = 0
+        let layout = RunGroup(text).layout()
 
         func flush() {
             guard !pendingText.isEmpty, let pendingStyle else {
@@ -509,9 +511,11 @@ enum TextSelectionRenderer {
                 pendingStyle = characterStyle
             }
 
-            let characterText = String(character)
-            pendingText += characterText
-            column += TerminalText.columnWidth(characterText)
+            pendingText.append(character)
+            column += layout.columns(
+                in: RunIndex(characterOffset: index)
+                    ..< RunIndex(characterOffset: index + 1)
+            )
         }
         flush()
         return runs

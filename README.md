@@ -34,7 +34,11 @@ Add the `SwiftTUI` product to your executable target:
 )
 ```
 
-The package also provides two narrower products:
+The package also provides three narrower products:
+
+- `SwiftTUIRuns` provides recursive attributed string runs, terminal-cell
+  measurement, Unicode line breaking, wrapping, and source-position mapping
+  without depending on SwiftTUI views or runtime state.
 
 - `SwiftTUIEssentials` contains the application runtime, state, environment,
   layout, rendering, input, navigation, scrolling, text, and `EditableText`
@@ -45,7 +49,7 @@ The package also provides two narrower products:
 
 Use one of them in place of `SwiftTUI` when you want an explicit dependency
 boundary. The `SwiftTUI` product remains the recommended convenience import
-and re-exports both modules.
+and re-exports the narrower modules.
 
 ## Example
 

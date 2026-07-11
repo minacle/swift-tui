@@ -15,6 +15,52 @@ struct TextContentAndLinkTests {
     }
 
     @Test
+    func `Text renders nested RunGroup attributes with explicit child overrides`() {
+        let text = Text(
+            RunGroup {
+                Run("A")
+                RunGroup {
+                    Run("B").bold(false)
+                    Run("C")
+                }
+                .bold()
+            }
+            .foregroundColor(Color16.red)
+        )
+
+        #expect(ViewResolver.block(from: text)?.runs == [
+            RenderedRun(
+                text: "AB",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.red))
+            ),
+            RenderedRun(
+                text: "C",
+                column: 2,
+                style: TextStyle(
+                    foregroundStyle: AnyColor(Color16.red),
+                    isBold: true
+                )
+            ),
+        ])
+    }
+
+    @Test
+    func `Text keeps styles aligned after a grapheme crosses Run boundaries`() {
+        let text = Text(
+            RunGroup {
+                Run("e").bold()
+                Run("\u{0301}").italic()
+                Run("X").underline()
+            }
+        )
+
+        #expect(ViewResolver.block(from: text)?.runs == [
+            RenderedRun(text: "e\u{0301}", style: TextStyle(isBold: true)),
+            RenderedRun(text: "X", column: 1, style: TextStyle(isUnderline: true)),
+        ])
+    }
+
+    @Test
     func `Text initializers preserve content from StringProtocol and AttributedString values`() {
         let string = ["Hel", "lo"].joined()
         let substring = string[string.startIndex..<string.index(string.startIndex, offsetBy: 4)]

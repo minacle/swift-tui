@@ -13,12 +13,27 @@ let swiftSettings: [SwiftSetting] = [
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 ]
 
+let runSwiftSettings: [SwiftSetting] = [
+    .defaultIsolation(nil),
+    .strictMemorySafety(),
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("ImmutableWeakCaptures"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
+
 let package = Package(
     name: "swift-tui",
     platforms: [
         .macOS(.v15),
     ],
     products: [
+        .library(
+            name: "SwiftTUIRuns",
+            targets: ["SwiftTUIRuns"]
+        ),
         .library(
             name: "SwiftTUI",
             targets: ["SwiftTUI"]
@@ -48,8 +63,19 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "SwiftTUIRuns",
+            dependencies: [
+                .product(
+                    name: "Terminal",
+                    package: "swift-terminal"
+                ),
+            ],
+            swiftSettings: runSwiftSettings,
+        ),
+        .target(
             name: "SwiftTUIEssentials",
             dependencies: [
+                "SwiftTUIRuns",
                 .product(
                     name: "Terminal",
                     package: "swift-terminal"
@@ -73,6 +99,11 @@ let package = Package(
                 "SwiftTUIEssentials",
             ],
             swiftSettings: swiftSettings,
+        ),
+        .testTarget(
+            name: "SwiftTUIRunsTests",
+            dependencies: ["SwiftTUIRuns"],
+            swiftSettings: runSwiftSettings,
         ),
         .testTarget(
             name: "SwiftTUIEssentialsTests",

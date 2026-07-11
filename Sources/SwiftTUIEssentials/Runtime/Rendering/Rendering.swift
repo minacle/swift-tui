@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUIRuns
 
 nonisolated struct TerminalViewportSize: Equatable, Sendable {
 
@@ -33,6 +34,8 @@ nonisolated struct RenderedRun: Equatable, Sendable {
 
     var link: URL?
 
+    private let terminalColumns: Int
+
     init(
         text: String,
         row: Int = 0,
@@ -45,10 +48,11 @@ nonisolated struct RenderedRun: Equatable, Sendable {
         self.column = column
         self.style = style
         self.link = link
+        self.terminalColumns = RunGroup(text).measure().maximumContentColumns
     }
 
     var width: Int {
-        TerminalText.columnWidth(text)
+        terminalColumns
     }
 
     var isEmpty: Bool {
@@ -97,6 +101,7 @@ nonisolated struct RenderedRun: Equatable, Sendable {
         var text = ""
         var textStartColumn: Int?
         var column = column
+        let layout = RunGroup(self.text).layout()
 
         func flush() {
             guard !text.isEmpty, let startColumn = textStartColumn else {
@@ -116,9 +121,11 @@ nonisolated struct RenderedRun: Equatable, Sendable {
             textStartColumn = nil
         }
 
-        for character in self.text {
-            let characterText = String(character)
-            let characterWidth = TerminalText.columnWidth(characterText)
+        for (offset, character) in self.text.enumerated() {
+            let characterWidth = layout.columns(
+                in: RunIndex(characterOffset: offset)
+                    ..< RunIndex(characterOffset: offset + 1)
+            )
             let nextColumn = column + characterWidth
 
             if column >= lowerBound, nextColumn <= upperBound {
@@ -349,7 +356,9 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         explicitAlignments: [AlignmentKey: Int] = [:],
         spacing: ViewSpacing = ViewSpacing()
     ) {
-        let minimumWidth = lines.map(TerminalText.columnWidth).max() ?? 0
+        let minimumWidth = lines.map {
+            RunGroup($0).measure().maximumContentColumns
+        }.max() ?? 0
         self.runs = lines.enumerated().compactMap { row, line in
             line.isEmpty ? nil : RenderedRun(text: line, row: row, style: style)
         }
@@ -419,6 +428,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         }
 
         var lines = Array(repeating: "", count: height)
+        var lineColumns = Array(repeating: 0, count: height)
         for run in runs.sorted(by: { lhs, rhs in
             if lhs.row == rhs.row {
                 return lhs.column < rhs.column
@@ -429,16 +439,21 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 continue
             }
 
-            let currentWidth = TerminalText.columnWidth(lines[run.row])
+            let currentWidth = lineColumns[run.row]
             if currentWidth < run.column {
                 lines[run.row] += String(repeating: " ", count: run.column - currentWidth)
+                lineColumns[run.row] = run.column
             }
             lines[run.row] += run.text
+            lineColumns[run.row] += run.width
         }
 
         return lines.enumerated().map { row, line in
             if !line.isEmpty || paddedRows.contains(row) {
-                return TerminalText.lineProjection(line, paddedToWidth: width)
+                return line + String(
+                    repeating: " ",
+                    count: max(width - lineColumns[row], 0)
+                )
             }
             return line
         }
@@ -888,9 +903,13 @@ private nonisolated struct CompositedCell: Equatable {
         to rows: inout [Int: [Int: CompositedCell]]
     ) {
         var column = run.column
-        for character in run.text {
+        let layout = RunGroup(run.text).layout()
+        for (offset, character) in run.text.enumerated() {
             let text = String(character)
-            let width = TerminalText.columnWidth(text)
+            let width = layout.columns(
+                in: RunIndex(characterOffset: offset)
+                    ..< RunIndex(characterOffset: offset + 1)
+            )
             guard width > 0 else {
                 continue
             }
@@ -1754,38 +1773,17 @@ private struct TextSourceLine {
 
     var upperOffset: Int
 
-    static func mappedLines(for text: String, maxWidth: Int?) -> [TextSourceLine] {
-        let displayLines = TextLineWrapper.wrappedLines(for: text, maxWidth: maxWidth)
-        var lines: [TextSourceLine] = []
-        var searchStart = text.startIndex
-        for displayLine in displayLines {
-            let range: Range<String.Index>
-            if displayLine.isEmpty {
-                range = searchStart..<searchStart
-            }
-            else if let found = text.range(of: displayLine, range: searchStart..<text.endIndex) {
-                range = found
-            }
-            else {
-                range = searchStart..<searchStart
-            }
-
-            let lowerOffset = text.distance(from: text.startIndex, to: range.lowerBound)
-            let upperOffset = text.distance(from: text.startIndex, to: range.upperBound)
-            lines.append(
-                TextSourceLine(
-                    text: displayLine,
-                    sourceOffsets: Array(lowerOffset..<upperOffset).map(Optional.some),
-                    lowerOffset: lowerOffset,
-                    upperOffset: upperOffset
-                )
+    static func mappedLines(for text: Text, maxWidth: Int?) -> [TextSourceLine] {
+        text.runGroup.layout(fittingColumns: maxWidth).lines.map { line in
+            let lowerOffset = line.sourceRange.lowerBound.characterOffset
+            let upperOffset = line.sourceRange.upperBound.characterOffset
+            return TextSourceLine(
+                text: line.runs.map(\.content).joined(),
+                sourceOffsets: Array(lowerOffset..<upperOffset).map(Optional.some),
+                lowerOffset: lowerOffset,
+                upperOffset: upperOffset
             )
-            searchStart = range.upperBound
-            if searchStart < text.endIndex, text[searchStart] == "\n" {
-                searchStart = text.index(after: searchStart)
-            }
         }
-        return lines
     }
 
     func truncated(
@@ -1811,7 +1809,10 @@ private struct TextSourceLine {
         let contentWidth = maxWidth - 3
         switch mode {
         case .head:
-            let suffix = TerminalText.suffix(endingLine.text, maxWidth: contentWidth)
+            let suffix = Self.suffix(
+                of: endingLine.text,
+                fittingColumns: contentWidth
+            )
             let suffixCount = suffix.count
             return TextSourceLine(
                 text: "..." + suffix,
@@ -1822,18 +1823,24 @@ private struct TextSourceLine {
             )
         case .middle:
             let preferredPrefixWidth = (contentWidth + 1) / 2
-            var prefix = TerminalText.prefix(text, maxWidth: preferredPrefixWidth)
-            var suffix = TerminalText.suffix(
-                endingLine.text,
-                maxWidth: contentWidth - TerminalText.columnWidth(prefix)
+            var prefix = Self.prefix(
+                of: text,
+                fittingColumns: preferredPrefixWidth
             )
-            prefix = TerminalText.prefix(
-                text,
-                maxWidth: contentWidth - TerminalText.columnWidth(suffix)
+            var suffix = Self.suffix(
+                of: endingLine.text,
+                fittingColumns: contentWidth
+                    - RunGroup(prefix).measure().maximumContentColumns
             )
-            suffix = TerminalText.suffix(
-                endingLine.text,
-                maxWidth: contentWidth - TerminalText.columnWidth(prefix)
+            prefix = Self.prefix(
+                of: text,
+                fittingColumns: contentWidth
+                    - RunGroup(suffix).measure().maximumContentColumns
+            )
+            suffix = Self.suffix(
+                of: endingLine.text,
+                fittingColumns: contentWidth
+                    - RunGroup(prefix).measure().maximumContentColumns
             )
             let prefixCount = prefix.count
             let suffixCount = suffix.count
@@ -1846,7 +1853,7 @@ private struct TextSourceLine {
                 upperOffset: endingLine.upperOffset
             )
         case .tail:
-            let prefix = TerminalText.prefix(text, maxWidth: contentWidth)
+            let prefix = Self.prefix(of: text, fittingColumns: contentWidth)
             let prefixCount = prefix.count
             return TextSourceLine(
                 text: prefix + "...",
@@ -1856,6 +1863,26 @@ private struct TextSourceLine {
                 upperOffset: lowerOffset + prefixCount
             )
         }
+    }
+
+    private static func prefix(of text: String, fittingColumns columns: Int) -> String {
+        guard let line = RunGroup(text).layout().lines.first else {
+            return ""
+        }
+        let range = line.prefixRange(fittingColumns: columns)
+        let count = range.upperBound.characterOffset
+            - line.sourceRange.lowerBound.characterOffset
+        return String(text.prefix(count))
+    }
+
+    private static func suffix(of text: String, fittingColumns columns: Int) -> String {
+        guard let line = RunGroup(text).layout().lines.first else {
+            return ""
+        }
+        let range = line.suffixRange(fittingColumns: columns)
+        let count = line.sourceRange.upperBound.characterOffset
+            - range.lowerBound.characterOffset
+        return String(text.suffix(count))
     }
 
     private func unboundedTruncation(
@@ -1899,7 +1926,7 @@ enum TextLayoutRenderer {
         runtime: StateRuntime?
     ) -> RenderedBlock {
         let lineLimit = EnvironmentRenderContext.current.textLineLimit
-        var lines = TextSourceLine.mappedLines(for: text.content, maxWidth: proposal?.columns)
+        var lines = TextSourceLine.mappedLines(for: text, maxWidth: proposal?.columns)
         let isTruncated = lineLimit.number.map { lines.count > $0 } ?? false
         let endingLine = lines.last
 
@@ -1934,7 +1961,9 @@ enum TextLayoutRenderer {
             ? runtime?.textSelectionState(at: path)
             : nil
         selectionState?.clamp(upperBound: text.content.count)
-        let naturalWidth = lines.map { TerminalText.columnWidth($0.text) }.max() ?? 0
+        let naturalWidth = lines.map {
+            RunGroup($0.text).measure().maximumContentColumns
+        }.max() ?? 0
         let alignmentWidth = if text.hasAttributedAlignment {
             proposal?.columns
         }
@@ -2057,8 +2086,16 @@ private struct TextRunLayoutResult {
         let targetColumn = max(point.column - line.column, 0)
         var column = 0
         var offset = line.source.lowerOffset
-        for (character, sourceOffset) in zip(line.source.text, line.source.sourceOffsets) {
-            let width = TerminalText.columnWidth(String(character))
+        let displayLayout = RunGroup(line.source.text).layout()
+        for (localOffset, pair) in zip(
+            line.source.text,
+            line.source.sourceOffsets
+        ).enumerated() {
+            let sourceOffset = pair.1
+            let width = displayLayout.columns(
+                in: RunIndex(characterOffset: localOffset)
+                    ..< RunIndex(characterOffset: localOffset + 1)
+            )
             guard column + width <= targetColumn else {
                 return sourceOffset ?? offset
             }
@@ -2107,6 +2144,7 @@ private enum TextRunLayoutMapper {
             var pendingLink: URL?
             var rowRuns: [RenderedRun] = []
             var rowAlignment: AttributedTextAlignment?
+            let lineLayout = RunGroup(line.text).layout()
 
             func flush() {
                 guard !pendingText.isEmpty, let style = pendingStyle else {
@@ -2127,7 +2165,12 @@ private enum TextRunLayoutMapper {
                 pendingLink = nil
             }
 
-            for (character, sourceOffset) in zip(line.text, line.sourceOffsets) {
+            for (localOffset, pair) in zip(
+                line.text,
+                line.sourceOffsets
+            ).enumerated() {
+                let character = pair.0
+                let sourceOffset = pair.1
                 let styledCharacter = sourceOffset.flatMap {
                     characters.indices.contains($0) ? characters[$0] : nil
                 }
@@ -2153,7 +2196,10 @@ private enum TextRunLayoutMapper {
 
                 let characterText = String(character)
                 pendingText += characterText
-                column += TerminalText.columnWidth(characterText)
+                column += lineLayout.columns(
+                    in: RunIndex(characterOffset: localOffset)
+                        ..< RunIndex(characterOffset: localOffset + 1)
+                )
             }
 
             flush()
@@ -2175,20 +2221,36 @@ private enum TextRunLayoutMapper {
         baseStyle: TextStyle,
         tint: AnyColor?
     ) -> [StyledCharacter] {
-        text.runs.flatMap { run -> [StyledCharacter] in
-            var style = baseStyle.merged(with: run.style)
-            if run.link != nil, style.foregroundStyle == nil, let tint {
+        var resolvedAttributes = Array<RunAttributes?>(
+            repeating: nil,
+            count: text.content.count
+        )
+        for line in text.runGroup.layout().lines {
+            for run in line.runs {
+                for offset in run.sourceRange.lowerBound.characterOffset
+                    ..< run.sourceRange.upperBound.characterOffset
+                {
+                    resolvedAttributes[offset] = run.attributes
+                }
+            }
+        }
+        var offset = 0
+        return text.content.map { character in
+            defer { offset += 1 }
+            let annotation = text.annotations.first {
+                $0.range.contains(RunIndex(characterOffset: offset))
+            }
+            var style = baseStyle.merging(resolvedAttributes[offset] ?? RunAttributes())
+            if annotation?.link != nil, style.foregroundStyle == nil, let tint {
                 style.foregroundStyle = tint
             }
 
-            return run.text.map {
-                StyledCharacter(
-                    character: $0,
-                    style: style,
-                    link: run.link,
-                    alignment: run.alignment
-                )
-            }
+            return StyledCharacter(
+                character: character,
+                style: style,
+                link: annotation?.link,
+                alignment: annotation?.alignment
+            )
         }
     }
 
@@ -2202,7 +2264,10 @@ private enum TextRunLayoutMapper {
             return 0
         }
 
-        let padding = max(width - TerminalText.columnWidth(line), 0)
+        let padding = max(
+            width - RunGroup(line).measure().maximumContentColumns,
+            0
+        )
         if let alignment {
             switch alignment {
             case .left:
@@ -2223,203 +2288,6 @@ private enum TextRunLayoutMapper {
         }
     }
 
-}
-
-enum TextLineWrapper {
-
-    static func wrappedLines(for text: String, maxWidth: Int?) -> [String] {
-        let paragraphs = UnicodeLineBreak.lineSegments(in: text).map(String.init)
-        guard let maxWidth else {
-            return paragraphs
-        }
-        guard maxWidth > 0 else {
-            return []
-        }
-
-        let lines = paragraphs.flatMap { paragraph in
-            wrappedParagraph(paragraph, maxWidth: maxWidth)
-        }
-        return lines.isEmpty ? [""] : lines
-    }
-
-    private static func wrappedParagraph(_ paragraph: String, maxWidth: Int) -> [String] {
-        guard !paragraph.isEmpty else {
-            return [""]
-        }
-
-        var lines: [String] = []
-        var start = paragraph.startIndex
-        let opportunities = UnicodeLineBreak.opportunities(in: paragraph)
-        var opportunityIndex = opportunities.startIndex
-
-        while start < paragraph.endIndex {
-            while opportunityIndex < opportunities.endIndex,
-                  opportunities[opportunityIndex].index <= start
-            {
-                opportunityIndex = opportunities.index(after: opportunityIndex)
-            }
-
-            if TerminalText.columnWidth(String(paragraph[start..<paragraph.endIndex])) <= maxWidth {
-                lines.append(String(paragraph[start..<paragraph.endIndex]))
-                break
-            }
-
-            var bestBreak: UnicodeLineBreak.Opportunity?
-            var scanIndex = opportunityIndex
-            while scanIndex < opportunities.endIndex {
-                let opportunity = opportunities[scanIndex]
-                let width = TerminalText.columnWidth(String(paragraph[start..<opportunity.index]))
-                guard width <= maxWidth else {
-                    break
-                }
-
-                bestBreak = opportunity
-                scanIndex = opportunities.index(after: scanIndex)
-            }
-
-            let fallbackEnd = fittingCharacterBoundary(
-                in: paragraph,
-                from: start,
-                maxWidth: maxWidth
-            )
-            if let bestBreak {
-                let lineEnd = trimmingTrailingWhitespace(
-                    in: paragraph,
-                    lowerBound: start,
-                    upperBound: bestBreak.index
-                )
-                if shouldPreserveFittingBreakSpaces(
-                    in: paragraph,
-                    lowerBound: start,
-                    fallbackEnd: fallbackEnd
-                ) {
-                    lines.append(String(paragraph[start..<fallbackEnd]))
-                    start = fallbackEnd
-                }
-                else {
-                    lines.append(String(paragraph[start..<lineEnd]))
-                    start = skippingLeadingWhitespace(in: paragraph, from: bestBreak.index)
-                    opportunityIndex = scanIndex
-                }
-            }
-            else {
-                lines.append(String(paragraph[start..<fallbackEnd]))
-                if fallbackEnd > start {
-                    start = skippingLeadingWhitespace(in: paragraph, from: fallbackEnd)
-                }
-                else {
-                    if TerminalText.columnWidth(String(paragraph[start])) > maxWidth {
-                        break
-                    }
-                    start = paragraph.index(after: start)
-                }
-            }
-        }
-
-        return lines
-    }
-
-    private static func fittingCharacterBoundary(
-        in text: String,
-        from start: String.Index,
-        maxWidth: Int
-    ) -> String.Index {
-        var index = start
-        var width = 0
-        while index < text.endIndex {
-            let nextIndex = text.index(after: index)
-            let characterWidth = TerminalText.columnWidth(String(text[index]))
-            guard width + characterWidth <= maxWidth else {
-                break
-            }
-
-            width += characterWidth
-            index = nextIndex
-        }
-        if index < text.endIndex,
-           index > start,
-           UnicodeLineBreak.preventsBreakBefore(text[index])
-        {
-            let previousIndex = text.index(before: index)
-            if TerminalText.columnWidth(String(text[start..<previousIndex])) >= 2 {
-                index = previousIndex
-            }
-        }
-        return index
-    }
-
-    private static func shouldPreserveFittingBreakSpaces(
-        in text: String,
-        lowerBound: String.Index,
-        fallbackEnd: String.Index
-    ) -> Bool {
-        guard fallbackEnd > lowerBound else {
-            return false
-        }
-        if containsOnlyBreakSpaces(in: text, from: fallbackEnd) {
-            return true
-        }
-
-        let previousIndex = text.index(before: fallbackEnd)
-        return UnicodeLineBreak.isBreakSpace(text[previousIndex])
-            && fallbackEnd < text.endIndex
-            && UnicodeLineBreak.isBreakSpace(text[fallbackEnd])
-    }
-
-    private static func containsOnlyBreakSpaces(
-        in text: String,
-        from start: String.Index
-    ) -> Bool {
-        var index = start
-        while index < text.endIndex {
-            guard UnicodeLineBreak.isBreakSpace(text[index]) else {
-                return false
-            }
-            index = text.index(after: index)
-        }
-        return true
-    }
-
-    private static func trimmingTrailingWhitespace(
-        in text: String,
-        lowerBound: String.Index,
-        upperBound: String.Index
-    ) -> String.Index {
-        var index = upperBound
-        while index > lowerBound {
-            let previous = text.index(before: index)
-            guard UnicodeLineBreak.isBreakSpace(text[previous]) else {
-                break
-            }
-            index = previous
-        }
-        return index
-    }
-
-    private static func skippingLeadingWhitespace(
-        in text: String,
-        from start: String.Index
-    ) -> String.Index {
-        var index = start
-        while index < text.endIndex, UnicodeLineBreak.isBreakSpace(text[index]) {
-            index = text.index(after: index)
-        }
-        return index
-    }
-
-    static func truncatedLine(_ line: String, maxWidth: Int?) -> String {
-        guard let maxWidth else {
-            return line + "..."
-        }
-        guard maxWidth > 0 else {
-            return ""
-        }
-        guard maxWidth >= 3 else {
-            return String(repeating: ".", count: maxWidth)
-        }
-
-        return TerminalText.prefix(line, maxWidth: maxWidth - 3) + "..."
-    }
 }
 
 enum ViewResolver {
@@ -3053,9 +2921,13 @@ private struct RenderedScreenProjection {
             return
         }
 
-        for character in run.text {
+        let layout = RunGroup(run.text).layout()
+        for (offset, character) in run.text.enumerated() {
             let text = String(character)
-            let width = TerminalText.columnWidth(text)
+            let width = layout.columns(
+                in: RunIndex(characterOffset: offset)
+                    ..< RunIndex(characterOffset: offset + 1)
+            )
             defer {
                 column += width
             }

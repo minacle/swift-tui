@@ -1,4 +1,5 @@
 import Foundation
+import SwiftTUIRuns
 import Terminal
 
 extension EditableText {
@@ -580,6 +581,8 @@ struct EditableTextMultilineLayout {
 
     let lines: [EditableTextMultilineLine]
 
+    private let runLayout: RunLayout
+
     let maximumWidth: Int?
 
     let alignment: TextAlignment
@@ -589,10 +592,10 @@ struct EditableTextMultilineLayout {
         maxWidth: Int?,
         alignment: TextAlignment = .leading
     ) {
-        let displayLines = TextLineWrapper.wrappedLines(for: text, maxWidth: maxWidth)
+        let runLayout = RunGroup(text).layout(fittingColumns: maxWidth)
+        self.runLayout = runLayout
         self.lines = EditableTextMultilineLayout.lines(
-            from: displayLines,
-            in: text,
+            from: runLayout,
             maxWidth: maxWidth
         )
         self.maximumWidth = maxWidth
@@ -600,7 +603,7 @@ struct EditableTextMultilineLayout {
     }
 
     var width: Int {
-        max(lines.map { TerminalText.columnWidth($0.text) }.max() ?? 0, 1)
+        max(runLayout.size.columns, 1)
     }
 
     var height: Int {
@@ -621,35 +624,23 @@ struct EditableTextMultilineLayout {
 
     func lineAndColumn(at offset: Int) -> (lineIndex: Int, column: Int) {
         let offset = max(offset, 0)
-        let lineIndex = lines.lastIndex {
-            offset >= $0.lowerOffset && offset <= $0.upperOffset
-        } ?? max(lines.count - 1, 0)
-        let line = lines[lineIndex]
-        return (
-            lineIndex,
-            TerminalText.columnWidth(
-                line.text.sliceCharacters(
-                    lowerBound: 0,
-                    upperBound: offset - line.lowerOffset
-                )
-            )
-        )
+        if lines.count > runLayout.lines.count,
+           let trailingLine = lines.last,
+           offset >= trailingLine.lowerOffset
+        {
+            return (lines.count - 1, 0)
+        }
+        let point = runLayout.point(at: RunIndex(characterOffset: offset))
+        return (point.row, point.column)
     }
 
     func offset(onLine lineIndex: Int, nearestColumn column: Int) -> Int {
-        let line = lines[min(max(lineIndex, 0), lines.count - 1)]
-        var currentColumn = 0
-        var offset = line.lowerOffset
-        for character in line.text {
-            let characterWidth = TerminalText.columnWidth(String(character))
-            guard currentColumn + characterWidth <= column else {
-                break
-            }
-
-            currentColumn += characterWidth
-            offset += 1
+        if runLayout.lines.indices.contains(lineIndex) {
+            return runLayout.index(
+                at: Point(column: max(column, 0), row: lineIndex)
+            ).characterOffset
         }
-        return min(offset, line.upperOffset)
+        return lines[min(max(lineIndex, 0), lines.count - 1)].lowerOffset
     }
 
     func offset(onLine lineIndex: Int, nearestRenderedColumn column: Int) -> Int {
@@ -660,8 +651,11 @@ struct EditableTextMultilineLayout {
     }
 
     func horizontalOffset(onLine lineIndex: Int) -> Int {
-        let line = lines[min(max(lineIndex, 0), lines.count - 1)]
-        let padding = max(renderedWidth - TerminalText.columnWidth(line.text), 0)
+        let clampedLineIndex = min(max(lineIndex, 0), lines.count - 1)
+        let lineColumns = runLayout.lines.indices.contains(clampedLineIndex)
+            ? runLayout.lines[clampedLineIndex].columns
+            : 0
+        let padding = max(renderedWidth - lineColumns, 0)
         switch alignment {
         case .leading:
             return 0
@@ -672,60 +666,25 @@ struct EditableTextMultilineLayout {
         }
     }
 
-    private static func mappedLines(
-        from displayLines: [String],
-        in text: String
-    ) -> [EditableTextMultilineLine] {
-        guard !displayLines.isEmpty else {
-            return [EditableTextMultilineLine(text: "", lowerOffset: 0, upperOffset: 0)]
-        }
-
-        var lines: [EditableTextMultilineLine] = []
-        var searchStart = text.startIndex
-        for displayLine in displayLines {
-            let range: Range<String.Index>
-            if displayLine.isEmpty {
-                range = searchStart..<searchStart
-            }
-            else if let found = text.range(
-                of: displayLine,
-                range: searchStart..<text.endIndex
-            ) {
-                range = found
-            }
-            else {
-                range = searchStart..<searchStart
-            }
-
-            let lowerOffset = text.distance(from: text.startIndex, to: range.lowerBound)
-            let upperOffset = text.distance(from: text.startIndex, to: range.upperBound)
-            lines.append(
-                EditableTextMultilineLine(
-                    text: displayLine,
-                    lowerOffset: lowerOffset,
-                    upperOffset: upperOffset
-                )
-            )
-            searchStart = range.upperBound
-            if searchStart < text.endIndex, text[searchStart] == "\n" {
-                searchStart = text.index(after: searchStart)
-            }
-        }
-
-        return lines
-    }
-
     private static func lines(
-        from displayLines: [String],
-        in text: String,
+        from runLayout: RunLayout,
         maxWidth: Int?
     ) -> [EditableTextMultilineLine] {
-        var lines = mappedLines(from: displayLines, in: text)
+        var lines = runLayout.lines.map { line in
+            EditableTextMultilineLine(
+                text: line.runs.map(\.content).joined(),
+                lowerOffset: line.sourceRange.lowerBound.characterOffset,
+                upperOffset: line.sourceRange.upperBound.characterOffset
+            )
+        }
+        if lines.isEmpty {
+            lines = [EditableTextMultilineLine(text: "", lowerOffset: 0, upperOffset: 0)]
+        }
         guard let maxWidth,
               maxWidth > 0,
               let lastLine = lines.last,
               !lastLine.text.isEmpty,
-              TerminalText.columnWidth(lastLine.text) == maxWidth
+              runLayout.lines.last?.columns == maxWidth
         else {
             return lines
         }

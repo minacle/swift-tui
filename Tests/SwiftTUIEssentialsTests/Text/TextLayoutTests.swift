@@ -348,16 +348,6 @@ struct TextLayoutTests {
     }
 
     @Test
-    func `embedded Unicode line-break data resolves representative scalar classes`() {
-        #expect(UnicodeLineBreakClass.lineBreakDataRangeCount == 3654)
-        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x0A)!) == .lineFeed)
-        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x20)!) == .space)
-        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0xA0)!) == .glue)
-        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x200B)!) == .zeroWidthSpace)
-        #expect(UnicodeLineBreakClass.untailoredClass(for: Unicode.Scalar(0x4E00)!) == .ideographic)
-    }
-
-    @Test
     func `a slash provides a wrapping boundary after itself`() {
         let block = ViewResolver.block(
             from: Text("aa/bb"),

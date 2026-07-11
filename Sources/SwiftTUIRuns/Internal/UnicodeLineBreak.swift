@@ -73,6 +73,17 @@ enum UnicodeLineBreakClass: Sendable {
 
 enum UnicodeLineBreak {
 
+    static func containsMandatoryBreak(in text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x000A, 0x000B, 0x000C, 0x000D, 0x0085, 0x2028, 0x2029:
+                true
+            default:
+                false
+            }
+        }
+    }
+
     struct Opportunity: Sendable {
 
         enum Kind: Sendable {
