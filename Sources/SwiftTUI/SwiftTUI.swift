@@ -1,2 +1,2 @@
 @_exported
-public import Terminal
+@_documentation(visibility: internal) public import Terminal
