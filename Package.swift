@@ -23,6 +23,14 @@ let package = Package(
             name: "SwiftTUI",
             targets: ["SwiftTUI"]
         ),
+        .library(
+            name: "SwiftTUIEssentials",
+            targets: ["SwiftTUIEssentials"]
+        ),
+        .library(
+            name: "SwiftTUIControls",
+            targets: ["SwiftTUIControls"]
+        ),
     ],
     dependencies: [
         .package(
@@ -40,7 +48,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "SwiftTUI",
+            name: "SwiftTUIEssentials",
             dependencies: [
                 .product(
                     name: "Terminal",
@@ -53,9 +61,33 @@ let package = Package(
             ],
             swiftSettings: swiftSettings,
         ),
+        .target(
+            name: "SwiftTUIControls",
+            dependencies: ["SwiftTUIEssentials"],
+            swiftSettings: swiftSettings,
+        ),
+        .target(
+            name: "SwiftTUI",
+            dependencies: [
+                "SwiftTUIControls",
+                "SwiftTUIEssentials",
+            ],
+            swiftSettings: swiftSettings,
+        ),
         .testTarget(
-            name: "SwiftTUITests",
-            dependencies: ["SwiftTUI"],
+            name: "SwiftTUIEssentialsTests",
+            dependencies: [
+                "SwiftTUIControls",
+                "SwiftTUIEssentials",
+            ],
+            swiftSettings: swiftSettings,
+        ),
+        .testTarget(
+            name: "SwiftTUIControlsTests",
+            dependencies: [
+                "SwiftTUIControls",
+                "SwiftTUIEssentials",
+            ],
             swiftSettings: swiftSettings,
         ),
     ],

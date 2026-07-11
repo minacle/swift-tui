@@ -34,6 +34,19 @@ Add the `SwiftTUI` product to your executable target:
 )
 ```
 
+The package also provides two narrower products:
+
+- `SwiftTUIEssentials` contains the application runtime, state, environment,
+  layout, rendering, input, navigation, scrolling, text, and `EditableText`
+  primitives. It is sufficient for building a complete application without
+  the standard controls.
+- `SwiftTUIControls` adds `Button`, `TextField`, `SecureField`, and
+  `TextEditor`, and re-exports `SwiftTUIEssentials`.
+
+Use one of them in place of `SwiftTUI` when you want an explicit dependency
+boundary. The `SwiftTUI` product remains the recommended convenience import
+and re-exports both modules.
+
 ## Example
 
 ```swift

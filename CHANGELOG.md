@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added the `SwiftTUIEssentials` and `SwiftTUIControls` library products.
+  `SwiftTUIEssentials` contains the complete application foundation, while
+  `SwiftTUIControls` adds the standard controls and re-exports Essentials.
+- Added the public `EditableText` primitive with single-line and multiline
+  editing, optional selection binding, character masking, placeholder
+  composition, caret navigation, pointer selection, and scrolling.
+
+### Changed
+
+- **Breaking:** Moved `Button`, `ButtonSizing`, `TextField`, `SecureField`,
+  `TextEditor`, and `onSubmit` ownership to `SwiftTUIControls`. The existing
+  `SwiftTUI` product continues to re-export these APIs, but module-qualified
+  names, symbol ownership, symbol graphs, and ABI are not preserved.
+- Changed `Button`, `TextField`, `SecureField`, and `TextEditor` to compose
+  only public `SwiftTUIEssentials` APIs instead of using control-specific
+  renderer and runtime state branches.
+
 ## [0.8.0] - 2026-07-11
 
 ### Added

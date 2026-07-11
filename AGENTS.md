@@ -2,7 +2,8 @@
 
 ## Test organization
 
-- Write tests with Swift Testing under `Tests/SwiftTUITests`.
+- Write tests with Swift Testing under `Tests/SwiftTUIEssentialsTests` or
+  `Tests/SwiftTUIControlsTests`, according to API ownership.
 - Place each test in the domain that owns the behavior: `Application`, `Core`,
   `Environment`, `Input`, `Layout`, `Navigation`, `Rendering`, `State`, `Text`,
   or `Views`.

@@ -7,8 +7,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = (
     REPOSITORY_ROOT
     / "Sources"
-    / "SwiftTUI"
-    / "Runtime"
+    / "SwiftTUIEssentials"
+    / "Public"
     / "Text"
     / "UnicodeLineBreakDataText.swift"
 )
