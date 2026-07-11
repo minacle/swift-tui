@@ -42,16 +42,16 @@ public nonisolated struct ViewSpacing: Sendable {
         edges: Edge.Set = .all
     ) {
         if edges.contains(.top) {
-            top = min(top, other.top)
+            top = max(top, other.top)
         }
         if edges.contains(.leading) {
-            leading = min(leading, other.leading)
+            leading = max(leading, other.leading)
         }
         if edges.contains(.bottom) {
-            bottom = min(bottom, other.bottom)
+            bottom = max(bottom, other.bottom)
         }
         if edges.contains(.trailing) {
-            trailing = min(trailing, other.trailing)
+            trailing = max(trailing, other.trailing)
         }
     }
 
@@ -72,7 +72,8 @@ public nonisolated struct ViewSpacing: Sendable {
 
     /// Returns the preferred distance to an adjacent view along an axis.
     ///
-    /// A zero preference on either shared edge suppresses automatic spacing.
+    /// The result is the smallest distance that satisfies the preferences of
+    /// both views on their shared edges.
     ///
     /// - Parameters:
     ///   - next: The spacing preferences of the adjacent view.
@@ -88,9 +89,6 @@ public nonisolated struct ViewSpacing: Sendable {
         case .vertical:
             current = bottom
             adjacent = next.top
-        }
-        guard current > 0, adjacent > 0 else {
-            return 0
         }
         return max(current, adjacent)
     }

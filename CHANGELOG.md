@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GridRow` and grid-modifier behavior.
 - Added SwiftUI-compatible `ViewSpacing`, `LayoutSubview.spacing`, and
   `Layout.spacing(subviews:cache:)` with terminal-native spacing preferences
-  and propagation through custom and built-in layouts.
+  that preserve the greater requirement across merged and adjacent edges, and
+  propagation through custom and built-in layouts.
 - Added SwiftUI-compatible `LayoutProperties.stackOrientation` and custom
   `Layout.explicitAlignment(of:in:proposal:subviews:cache:)` reporting for
   horizontal, vertical, built-in, and custom alignment guides.

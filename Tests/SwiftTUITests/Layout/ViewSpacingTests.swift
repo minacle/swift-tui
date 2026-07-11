@@ -13,34 +13,37 @@ struct ViewSpacingTests {
     }
 
     @Test
-    func `zero spacing suppresses automatic distance on both axes`() {
+    func `zero spacing leaves an adjacent default preference on both axes`() {
         let spacing = ViewSpacing()
 
-        #expect(spacing.distance(to: .zero, along: .horizontal) == 0)
-        #expect(ViewSpacing.zero.distance(to: spacing, along: .horizontal) == 0)
-        #expect(spacing.distance(to: .zero, along: .vertical) == 0)
-        #expect(ViewSpacing.zero.distance(to: spacing, along: .vertical) == 0)
+        #expect(spacing.distance(to: .zero, along: .horizontal) == 2)
+        #expect(ViewSpacing.zero.distance(to: spacing, along: .horizontal) == 2)
+        #expect(spacing.distance(to: .zero, along: .vertical) == 1)
+        #expect(ViewSpacing.zero.distance(to: spacing, along: .vertical) == 1)
     }
 
     @Test
     func `union changes only the selected edges and preserves the receiver`() {
         let spacing = ViewSpacing()
-        let horizontalZero = spacing.union(.zero, edges: .horizontal)
+        let horizontalSpacing = ViewSpacing.zero.union(
+            spacing,
+            edges: .horizontal
+        )
 
-        #expect(horizontalZero.distance(to: spacing, along: .horizontal) == 0)
-        #expect(horizontalZero.distance(to: spacing, along: .vertical) == 1)
-        #expect(spacing.distance(to: spacing, along: .horizontal) == 2)
+        #expect(horizontalSpacing.distance(to: .zero, along: .horizontal) == 2)
+        #expect(horizontalSpacing.distance(to: .zero, along: .vertical) == 0)
+        #expect(ViewSpacing.zero.distance(to: .zero, along: .horizontal) == 0)
     }
 
     @Test
     func `formUnion mutates only the selected edges`() {
         let spacing = ViewSpacing()
-        var verticalZero = spacing
+        var verticalSpacing = ViewSpacing.zero
 
-        verticalZero.formUnion(.zero, edges: .vertical)
+        verticalSpacing.formUnion(spacing, edges: .vertical)
 
-        #expect(verticalZero.distance(to: spacing, along: .horizontal) == 2)
-        #expect(verticalZero.distance(to: spacing, along: .vertical) == 0)
+        #expect(verticalSpacing.distance(to: .zero, along: .horizontal) == 0)
+        #expect(verticalSpacing.distance(to: .zero, along: .vertical) == 1)
     }
 
     @Test
@@ -96,7 +99,7 @@ struct ViewSpacingTests {
     }
 
     @Test
-    func `ZStack and Grid report their outer child spacing`() {
+    func `ZStack and Grid retain default spacing around zero-spacing children`() {
         let layered = ZStack {
             ZeroSpacingLayout() {
                 Text("A")
@@ -120,7 +123,7 @@ struct ViewSpacingTests {
             }
         )
 
-        #expect(block?.lines == ["ABC"])
+        #expect(block?.lines == ["A  B  C"])
     }
 }
 
