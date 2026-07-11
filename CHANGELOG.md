@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-12
+
 ### Added
 
 - Added the public `SwiftTUIRuns` library product with recursive `Run` and
@@ -419,7 +421,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/minacle/swift-tui/releases/tag/v0.9.0
 [0.8.0]: https://github.com/minacle/swift-tui/releases/tag/v0.8.0
 [0.7.0]: https://github.com/minacle/swift-tui/releases/tag/v0.7.0
 [0.6.0]: https://github.com/minacle/swift-tui/releases/tag/v0.6.0
