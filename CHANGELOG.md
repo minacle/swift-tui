@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added terminal-native `ProposedViewSize.max`, `ProposedViewSize.init(_:)`,
+  and `replacingUnspecifiedDimensions(by:)`, including allocation-safe maximum
+  measurement for fixed, constrained, and flexible custom-layout subviews.
 - Added SwiftUI-compatible `Grid`, `GridRow`, `gridCellColumns(_:)`,
   `gridCellAnchor(_:)`, `gridCellUnsizedAxes(_:)`, and
   `gridColumnAlignment(_:)` for eager two-dimensional terminal-cell layout,
@@ -29,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EnvironmentValues.multilineTextAlignment`, together with the
   `scrollDisabled(_:)`, `truncationMode(_:)`, and
   `multilineTextAlignment(_:)` view modifiers.
+
+### Changed
+
+- **Breaking:** Changed `ProposedViewSize.init(columns:rows:)` to require both
+  arguments explicitly and preserve negative dimensions instead of clamping
+  them to zero.
 
 ### Fixed
 

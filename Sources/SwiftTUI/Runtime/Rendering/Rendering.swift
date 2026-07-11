@@ -882,8 +882,8 @@ nonisolated struct RenderProposal: Equatable, Sendable {
     var rows: Int?
 
     init(columns: Int? = nil, rows: Int? = nil) {
-        self.columns = columns.map { max($0, 0) }
-        self.rows = rows.map { max($0, 0) }
+        self.columns = columns
+        self.rows = rows
     }
 
     init(_ viewport: TerminalViewportSize) {
@@ -903,6 +903,10 @@ nonisolated struct LayoutTraits: Sendable {
     var flexibleAxes: Axis.Set = []
 
     var fillsStackMinorAxis = false
+
+    var maximumColumns: Int? = nil
+
+    var maximumRows: Int? = nil
 
     var priority: Double = 0
 
@@ -933,6 +937,17 @@ nonisolated struct LayoutTraits: Sendable {
     func removingFlexibleAxes(_ axes: Axis.Set) -> LayoutTraits {
         var traits = self
         traits.flexibleAxes.subtract(axes)
+        return traits
+    }
+
+    func settingMaximumSize(columns: Int?, rows: Int?) -> LayoutTraits {
+        var traits = self
+        if let columns {
+            traits.maximumColumns = traits.maximumColumns.map { min($0, columns) } ?? columns
+        }
+        if let rows {
+            traits.maximumRows = traits.maximumRows.map { min($0, rows) } ?? rows
+        }
         return traits
     }
 

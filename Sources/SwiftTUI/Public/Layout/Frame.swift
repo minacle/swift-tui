@@ -226,6 +226,7 @@ struct ConstrainedFrameView<Content: View>: View, LayoutModifierRenderable,
 
     var layoutTraits: LayoutTraits {
         ViewResolver.layoutTraits(from: content)
+            .settingMaximumSize(columns: maxWidth, rows: maxHeight)
     }
 
     init(

@@ -240,7 +240,7 @@ private struct ProposedWrappingLayout: Layout {
         cache: inout ()
     ) -> Size {
         subviews.first?.sizeThatFits(
-            ProposedViewSize(columns: proposal.columns)
+            ProposedViewSize(columns: proposal.columns, rows: nil)
         ) ?? Size()
     }
 
@@ -252,7 +252,7 @@ private struct ProposedWrappingLayout: Layout {
     ) {
         subviews.first?.place(
             at: bounds.origin,
-            proposal: ProposedViewSize(columns: proposal.columns)
+            proposal: ProposedViewSize(columns: proposal.columns, rows: nil)
         )
     }
 }

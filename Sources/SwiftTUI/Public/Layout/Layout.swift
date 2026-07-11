@@ -13,21 +13,42 @@ public nonisolated struct ProposedViewSize: Equatable, Sendable {
 
     /// Creates a proposed size.
     ///
-    /// Negative values are clamped to zero.
-    ///
     /// - Parameters:
     ///   - columns: The proposed width in terminal columns.
     ///   - rows: The proposed height in terminal rows.
-    public init(columns: Int? = nil, rows: Int? = nil) {
-        self.columns = columns.map { max($0, 0) }
-        self.rows = rows.map { max($0, 0) }
+    public init(columns: Int?, rows: Int?) {
+        self.columns = columns
+        self.rows = rows
     }
 
     /// A proposal with both dimensions unspecified.
-    public static let unspecified = ProposedViewSize()
+    public static let unspecified = ProposedViewSize(columns: nil, rows: nil)
 
     /// A proposal with zero columns and zero rows.
     public static let zero = ProposedViewSize(columns: 0, rows: 0)
+
+    /// A proposal with the maximum integer value in both dimensions.
+    public static let max = ProposedViewSize(columns: Int.max, rows: Int.max)
+
+    /// Creates a fully specified proposal from a terminal-cell size.
+    ///
+    /// - Parameter size: The proposed terminal-cell size.
+    public init(_ size: Size) {
+        self.init(columns: size.columns, rows: size.rows)
+    }
+
+    /// Replaces unspecified dimensions with a concrete terminal-cell size.
+    ///
+    /// - Parameter size: The values to use for unspecified dimensions.
+    /// - Returns: A fully specified terminal-cell size.
+    public func replacingUnspecifiedDimensions(
+        by size: Size = Size(columns: 10, rows: 10)
+    ) -> Size {
+        Size(
+            columns: columns ?? size.columns,
+            rows: rows ?? size.rows
+        )
+    }
 }
 
 /// The measured dimensions of a layout subview.
@@ -98,9 +119,43 @@ public nonisolated struct LayoutSubview: Equatable {
     /// - Parameter proposal: The size proposal to pass to the subview.
     /// - Returns: The subview's measured terminal-cell size.
     public func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
-        child.render(proposal.renderProposal, true)?.layoutSize(
-            proposal: proposal.renderProposal
+        let renderProposal = proposal.renderProposal
+        let measurementProposal = renderProposal.replacingMaximumDimensionsWithUnspecified
+        let intrinsicSize = child.render(measurementProposal, true)?.layoutSize(
+            proposal: measurementProposal
         ) ?? Size()
+
+        return Size(
+            columns: measuredLength(
+                proposal: proposal.columns,
+                intrinsic: intrinsicSize.columns,
+                maximum: child.traits.maximumColumns,
+                isFlexible: child.isSpacer
+                    || child.traits.flexibleAxes.contains(.horizontal)
+            ),
+            rows: measuredLength(
+                proposal: proposal.rows,
+                intrinsic: intrinsicSize.rows,
+                maximum: child.traits.maximumRows,
+                isFlexible: child.isSpacer
+                    || child.traits.flexibleAxes.contains(.vertical)
+            )
+        )
+    }
+
+    private func measuredLength(
+        proposal: Int?,
+        intrinsic: Int,
+        maximum: Int?,
+        isFlexible: Bool
+    ) -> Int {
+        guard proposal == Int.max else {
+            return intrinsic
+        }
+        if let maximum {
+            return maximum
+        }
+        return isFlexible ? Int.max : intrinsic
     }
 
     /// Measures this subview and returns layout dimensions.
@@ -550,6 +605,16 @@ private extension ProposedViewSize {
 
     nonisolated var renderProposal: RenderProposal {
         RenderProposal(columns: columns, rows: rows)
+    }
+}
+
+private extension RenderProposal {
+
+    nonisolated var replacingMaximumDimensionsWithUnspecified: RenderProposal {
+        RenderProposal(
+            columns: columns == Int.max ? nil : columns,
+            rows: rows == Int.max ? nil : rows
+        )
     }
 }
 
