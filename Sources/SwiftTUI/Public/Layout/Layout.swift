@@ -1,5 +1,20 @@
 public import Terminal
 
+/// Layout-specific properties of a layout container.
+public nonisolated struct LayoutProperties: Sendable {
+
+    /// The orientation of a stack-like layout container.
+    ///
+    /// A value of `nil` indicates an unknown orientation or a layout that
+    /// isn't one-dimensional.
+    public var stackOrientation: Axis?
+
+    /// Creates a default set of layout properties.
+    public init() {
+        stackOrientation = nil
+    }
+}
+
 /// A proposed terminal-cell size for a view.
 ///
 /// `nil` means the corresponding terminal-cell dimension is unspecified.
@@ -62,10 +77,18 @@ public nonisolated struct ViewDimensions: Equatable, Sendable {
 
     let explicitAlignments: [AlignmentKey: Int]
 
-    init(columns: Int, rows: Int, explicitAlignments: [AlignmentKey: Int] = [:]) {
+    private let explicitAlignmentResolver: ExplicitAlignmentResolver?
+
+    init(
+        columns: Int,
+        rows: Int,
+        explicitAlignments: [AlignmentKey: Int] = [:],
+        explicitAlignmentResolver: ExplicitAlignmentResolver? = nil
+    ) {
         self.columns = columns
         self.rows = rows
         self.explicitAlignments = explicitAlignments
+        self.explicitAlignmentResolver = explicitAlignmentResolver
     }
 
     /// Gets an explicit horizontal guide or its default value.
@@ -81,11 +104,33 @@ public nonisolated struct ViewDimensions: Equatable, Sendable {
     /// Gets an explicitly assigned horizontal guide.
     public subscript(explicit guide: HorizontalAlignment) -> Int? {
         explicitAlignments[guide.key]
+            ?? explicitAlignmentResolver?.resolve(guide.key)
     }
 
     /// Gets an explicitly assigned vertical guide.
     public subscript(explicit guide: VerticalAlignment) -> Int? {
         explicitAlignments[guide.key]
+            ?? explicitAlignmentResolver?.resolve(guide.key)
+    }
+
+    /// Compares dimensions and their already resolved explicit guides.
+    public static func == (lhs: ViewDimensions, rhs: ViewDimensions) -> Bool {
+        lhs.columns == rhs.columns
+            && lhs.rows == rhs.rows
+            && lhs.explicitAlignments == rhs.explicitAlignments
+    }
+}
+
+nonisolated final class ExplicitAlignmentResolver: @unchecked Sendable {
+
+    private let resolveValue: (AlignmentKey) -> Int?
+
+    init(resolveValue: @escaping (AlignmentKey) -> Int?) {
+        self.resolveValue = resolveValue
+    }
+
+    func resolve(_ key: AlignmentKey) -> Int? {
+        resolveValue(key)
     }
 }
 
@@ -110,6 +155,8 @@ public nonisolated struct LayoutSubview: Equatable {
 
     let measurements: LayoutMeasurementStore
 
+    let stackOrientation: Axis?
+
     /// The layout priority assigned to this subview.
     public var priority: Double {
         child.traits.priority
@@ -129,10 +176,21 @@ public nonisolated struct LayoutSubview: Equatable {
     }
 
     private func measurement(
-        in proposal: ProposedViewSize
+        in proposal: ProposedViewSize,
+        requesting guide: AlignmentKey? = nil
     ) -> (size: Size, explicitAlignments: [AlignmentKey: Int]) {
-        measurements.measurement(for: index, proposal: proposal) {
-            uncachedMeasurement(in: proposal)
+        var alignmentKeys = ExplicitAlignmentQueryContext.keys
+        if let guide {
+            alignmentKeys.insert(guide)
+        }
+        return measurements.measurement(
+            for: index,
+            proposal: proposal,
+            alignmentKeys: alignmentKeys
+        ) {
+            ExplicitAlignmentQueryContext.withKeys(alignmentKeys) {
+                uncachedMeasurement(in: proposal)
+            }
         }
     }
 
@@ -153,14 +211,14 @@ public nonisolated struct LayoutSubview: Equatable {
                     proposal: proposal.columns,
                     intrinsic: intrinsicSize.columns,
                     maximum: child.traits.maximumColumns,
-                    isFlexible: child.isSpacer
+                    isFlexible: isSpacerFlexible(on: .horizontal)
                         || child.traits.flexibleAxes.contains(.horizontal)
                 ),
                 rows: measuredLength(
                     proposal: proposal.rows,
                     intrinsic: intrinsicSize.rows,
                     maximum: child.traits.maximumRows,
-                    isFlexible: child.isSpacer
+                    isFlexible: isSpacerFlexible(on: .vertical)
                         || child.traits.flexibleAxes.contains(.vertical)
                 )
             ),
@@ -188,12 +246,25 @@ public nonisolated struct LayoutSubview: Equatable {
     /// - Parameter proposal: The size proposal to pass to the subview.
     /// - Returns: The subview's measured dimensions.
     public func dimensions(in proposal: ProposedViewSize) -> ViewDimensions {
-        let measurement = measurement(in: proposal)
+        let result = measurement(in: proposal)
         return ViewDimensions(
-            columns: measurement.size.columns,
-            rows: measurement.size.rows,
-            explicitAlignments: measurement.explicitAlignments
+            columns: result.size.columns,
+            rows: result.size.rows,
+            explicitAlignments: result.explicitAlignments,
+            explicitAlignmentResolver: ExplicitAlignmentResolver { guide in
+                measurement(
+                    in: proposal,
+                    requesting: guide
+                ).explicitAlignments[guide]
+            }
         )
+    }
+
+    private func isSpacerFlexible(on axis: Axis) -> Bool {
+        guard child.isSpacer else {
+            return false
+        }
+        return stackOrientation == nil || stackOrientation == axis
     }
 
     /// Places this subview within the layout's bounds.
@@ -263,6 +334,9 @@ public nonisolated protocol Layout: Sendable {
     /// The collection type passed to layout methods.
     typealias Subviews = LayoutSubviews
 
+    /// Properties that characterize this layout container.
+    static var layoutProperties: LayoutProperties { get }
+
     /// Returns the size required by the layout.
     ///
     /// - Parameters:
@@ -290,6 +364,24 @@ public nonisolated protocol Layout: Sendable {
         cache: inout Cache
     )
 
+    /// Returns the explicit position of a horizontal alignment guide.
+    func explicitAlignment(
+        of guide: HorizontalAlignment,
+        in bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> Int?
+
+    /// Returns the explicit position of a vertical alignment guide.
+    func explicitAlignment(
+        of guide: VerticalAlignment,
+        in bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> Int?
+
     /// Creates an initial cache for the current child collection.
     ///
     /// - Parameter subviews: The child subviews available to the layout.
@@ -311,6 +403,33 @@ public extension Layout where Cache == Void {
 }
 
 public extension Layout {
+
+    /// The default layout properties, with no stack orientation.
+    nonisolated static var layoutProperties: LayoutProperties {
+        LayoutProperties()
+    }
+
+    /// Uses the explicit horizontal guides supplied by placed subviews.
+    nonisolated func explicitAlignment(
+        of guide: HorizontalAlignment,
+        in bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> Int? {
+        nil
+    }
+
+    /// Uses the explicit vertical guides supplied by placed subviews.
+    nonisolated func explicitAlignment(
+        of guide: VerticalAlignment,
+        in bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout Cache
+    ) -> Int? {
+        nil
+    }
 
     /// Recreates the cache after the layout or its subviews change.
     nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {
@@ -488,7 +607,7 @@ extension LayoutContainer: LayoutRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        StackAxisContext.withAxis(nil) {
+        StackAxisContext.withAxis(L.layoutProperties.stackOrientation) {
             let proposedSize = ProposedViewSize(proposal)
             let placements = LayoutPlacementStore()
             let measurements = runtime?.layoutMeasurementStore(at: path)
@@ -504,7 +623,8 @@ extension LayoutContainer: LayoutRenderable {
                         index: index,
                         child: child,
                         placements: placements,
-                        measurements: measurements
+                        measurements: measurements,
+                        stackOrientation: L.layoutProperties.stackOrientation
                     )
                 }
             )
@@ -561,11 +681,36 @@ extension LayoutContainer: LayoutRenderable {
             cache: &cache
         )
 
-        return placedBlock(
+        var block = placedBlock(
             size: size,
             placements: placements.placements,
             subviews: subviews
         )
+        for key in ExplicitAlignmentQueryContext.keys {
+            let value: Int?
+            switch key.axis {
+            case .horizontal:
+                value = layout.explicitAlignment(
+                    of: HorizontalAlignment(key: key),
+                    in: bounds,
+                    proposal: proposedSize,
+                    subviews: subviews,
+                    cache: &cache
+                ).map { $0 - bounds.origin.column }
+            case .vertical:
+                value = layout.explicitAlignment(
+                    of: VerticalAlignment(key: key),
+                    in: bounds,
+                    proposal: proposedSize,
+                    subviews: subviews,
+                    cache: &cache
+                ).map { $0 - bounds.origin.row }
+            }
+            if let value {
+                block.explicitAlignments[key] = value
+            }
+        }
+        return block
     }
 
     private func placedBlock(
@@ -645,6 +790,8 @@ nonisolated final class LayoutMeasurementStore {
         var index: Int
 
         var proposal: ProposedViewSizeKey
+
+        var alignmentKeys: Set<AlignmentKey>
     }
 
     private struct ProposedViewSizeKey: Hashable {
@@ -669,9 +816,14 @@ nonisolated final class LayoutMeasurementStore {
     func measurement(
         for index: Int,
         proposal: ProposedViewSize,
+        alignmentKeys: Set<AlignmentKey>,
         calculate: () -> Measurement
     ) -> Measurement {
-        let key = Key(index: index, proposal: ProposedViewSizeKey(proposal))
+        let key = Key(
+            index: index,
+            proposal: ProposedViewSizeKey(proposal),
+            alignmentKeys: alignmentKeys
+        )
         if let measurement = measurements[key] {
             return measurement
         }

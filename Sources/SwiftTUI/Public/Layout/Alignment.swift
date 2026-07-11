@@ -48,6 +48,10 @@ public nonisolated struct HorizontalAlignment: Equatable, Sendable {
 
     let key: AlignmentKey
 
+    init(key: AlignmentKey) {
+        self.key = key
+    }
+
     /// Creates a custom horizontal alignment from an alignment identifier.
     public init(_ id: any AlignmentID.Type) {
         key = AlignmentKey(id, axis: .horizontal)
@@ -81,6 +85,10 @@ public nonisolated struct HorizontalAlignment: Equatable, Sendable {
 public nonisolated struct VerticalAlignment: Equatable, Sendable {
 
     let key: AlignmentKey
+
+    init(key: AlignmentKey) {
+        self.key = key
+    }
 
     /// Creates a custom vertical alignment from an alignment identifier.
     public init(_ id: any AlignmentID.Type) {

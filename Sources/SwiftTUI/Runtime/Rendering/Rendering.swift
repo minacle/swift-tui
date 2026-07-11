@@ -1138,6 +1138,19 @@ enum StackAxisContext {
     }
 }
 
+nonisolated enum ExplicitAlignmentQueryContext {
+
+    @TaskLocal
+    static var keys: Set<AlignmentKey> = []
+
+    static func withKeys<Value>(
+        _ additionalKeys: Set<AlignmentKey>,
+        operation: () -> Value
+    ) -> Value {
+        $keys.withValue(keys.union(additionalKeys), operation: operation)
+    }
+}
+
 protocol FlattenableViewContent {
 
     func renderedElements(
@@ -3326,6 +3339,19 @@ enum ZStackRenderer {
         alignment: Alignment,
         proposal: RenderProposal?
     ) -> RenderedBlock? {
+        ExplicitAlignmentQueryContext.withKeys([
+            alignment.horizontal.key,
+            alignment.vertical.key,
+        ]) {
+            unqueriedBlock(children, alignment: alignment, proposal: proposal)
+        }
+    }
+
+    private static func unqueriedBlock(
+        _ children: [StackChild],
+        alignment: Alignment,
+        proposal: RenderProposal?
+    ) -> RenderedBlock? {
         let measuredChildren = children.enumerated().compactMap { index, child -> MeasuredChild? in
             guard let element = child.render(proposal, true),
                   let block = renderedBlock(from: element, proposal: proposal),
@@ -3554,6 +3580,22 @@ enum StackRenderer {
         spacing: Int,
         proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
+        ExplicitAlignmentQueryContext.withKeys([alignment.key]) {
+            unqueriedHorizontal(
+                children,
+                alignment: alignment,
+                spacing: spacing,
+                proposal: proposal
+            )
+        }
+    }
+
+    private static func unqueriedHorizontal(
+        _ children: [StackChild],
+        alignment: VerticalAlignment,
+        spacing: Int,
+        proposal: RenderProposal?
+    ) -> RenderedBlock? {
         let layout = horizontalLayout(from: children, spacing: spacing, proposal: proposal)
         guard !layout.items.isEmpty else {
             return nil
@@ -3634,6 +3676,22 @@ enum StackRenderer {
         alignment: HorizontalAlignment,
         spacing: Int,
         proposal: RenderProposal? = nil
+    ) -> RenderedBlock? {
+        ExplicitAlignmentQueryContext.withKeys([alignment.key]) {
+            unqueriedVertical(
+                children,
+                alignment: alignment,
+                spacing: spacing,
+                proposal: proposal
+            )
+        }
+    }
+
+    private static func unqueriedVertical(
+        _ children: [StackChild],
+        alignment: HorizontalAlignment,
+        spacing: Int,
+        proposal: RenderProposal?
     ) -> RenderedBlock? {
         let layout = verticalLayout(from: children, spacing: spacing, proposal: proposal)
         guard !layout.items.isEmpty else {
