@@ -1,16 +1,16 @@
 import Foundation
 import Observation
 import Testing
-@testable import SwiftTUIControls
+
 @testable import SwiftTUIEssentials
 
-@Suite("Text Editor Layout and Scrolling")
-struct TextEditorLayoutAndScrollingTests {
+@Suite("EditableText Multiline Layout and Scrolling")
+struct EditableTextMultilineLayoutAndScrollingTests {
 
     @Test
-    func `Return at the viewport bottom scrolls the editor and keeps subsequent input visible`() {
+    func `Return at the viewport bottom scrolls the multiline EditableText and keeps subsequent input visible`() {
         let runtime = StateRuntime()
-        let view = TextEditorEditingView()
+        let view = MultilineEditableTextEditingView()
 
         _ = runtime.block(from: view, in: RenderProposal(columns: 3, rows: 2))
         _ = runtime.consumeInvalidation()
@@ -36,9 +36,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a fixed-height editor scrolls after Return and remains editable`() {
+    func `a fixed-height multiline EditableText scrolls after Return and remains editable`() {
         let runtime = StateRuntime()
-        let view = FramedTextEditorEditingView()
+        let view = FramedMultilineEditableTextEditingView()
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -60,9 +60,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height framed editor expands, scrolls, and remains editable after Return`() {
+    func `a max-height framed multiline EditableText expands, scrolls, and remains editable after Return`() {
         let runtime = StateRuntime()
-        let view = MaxHeightFramedTextEditorEditingView()
+        let view = MaxHeightFramedMultilineEditableTextEditingView()
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -86,9 +86,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height editor without a row proposal remains editable`() {
+    func `a max-height multiline EditableText without a row proposal remains editable`() {
         let runtime = StateRuntime()
-        let view = MaxHeightOnlyTextEditorEditingView()
+        let view = MaxHeightOnlyMultilineEditableTextEditingView()
 
         _ = runtime.block(from: view, in: RenderProposal(columns: 3))
         _ = runtime.consumeInvalidation()
@@ -104,9 +104,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `clicking a max-height editor without a row proposal enables typing`() {
+    func `clicking a max-height multiline EditableText without a row proposal enables typing`() {
         let runtime = StateRuntime()
-        let view = MaxHeightOnlyTextEditorClickFocusView()
+        let view = MaxHeightOnlyMultilineEditableTextClickFocusView()
 
         _ = runtime.block(from: view, in: RenderProposal(columns: 3))
         #expect(
@@ -125,9 +125,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height editor below a scroll view accepts click focus in a short viewport`() {
+    func `a max-height multiline EditableText below a scroll view accepts click focus in a short viewport`() {
         let runtime = StateRuntime()
-        let view = MaxHeightConstantTextEditorBelowScrollViewView()
+        let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 8, rows: 6)
 
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -146,9 +146,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height editor below a scroll view accepts click focus in a tall viewport`() {
+    func `a max-height multiline EditableText below a scroll view accepts click focus in a tall viewport`() {
         let runtime = StateRuntime()
-        let view = MaxHeightConstantTextEditorBelowScrollViewView()
+        let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 80, rows: 24)
 
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -170,9 +170,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `Return grows a max-height editor below a scroll view without hiding prior lines`() {
+    func `Return grows a max-height multiline EditableText below a scroll view without hiding prior lines`() {
         let runtime = StateRuntime()
-        let view = MaxHeightConstantTextEditorBelowScrollViewView()
+        let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
             .onTerminate {}
         let proposal = RenderProposal(columns: 80)
 
@@ -226,9 +226,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a prefilled framed editor adds a line at the bottom and accepts more input`() {
+    func `a prefilled framed multiline EditableText adds a line at the bottom and accepts more input`() {
         let runtime = StateRuntime()
-        let view = FramedTextEditorInitialTextView(text: "abcdef")
+        let view = FramedMultilineEditableTextInitialTextView(text: "abcdef")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -250,9 +250,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `wrapped overflow scrolls a framed editor and keeps the caret visible at the insertion point`() {
+    func `wrapped overflow scrolls a framed multiline EditableText and keeps the caret visible at the insertion point`() {
         let runtime = StateRuntime()
-        let view = FramedTextEditorEditingView()
+        let view = FramedMultilineEditableTextEditingView()
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -272,9 +272,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a boxed editor below a scroll view remains editable at its bottom row`() {
+    func `a boxed multiline EditableText below a scroll view remains editable at its bottom row`() {
         let runtime = StateRuntime()
-        let view = TextEditorBelowScrollViewView()
+        let view = MultilineEditableTextBelowScrollViewView()
 
         _ = runtime.block(from: view, in: RenderProposal(columns: 8, rows: 6))
         _ = runtime.consumeInvalidation()
@@ -295,9 +295,9 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `a boxed editor scrolls after filling visible rows and continues accepting input`() {
+    func `a boxed multiline EditableText scrolls after filling visible rows and continues accepting input`() {
         let runtime = StateRuntime()
-        let view = TextEditorBelowScrollViewView()
+        let view = MultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 80, rows: 24)
 
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -322,10 +322,10 @@ struct TextEditorLayoutAndScrollingTests {
     }
 
     @Test
-    func `clicking blank space inside a framed editor requests focus`() {
+    func `clicking blank space inside a framed multiline EditableText requests focus`() {
         let runtime = StateRuntime()
         let focusProbe = FocusBindingProbe<Bool>()
-        let view = FramedTextEditorClickFocusView(focusProbe: focusProbe)
+        let view = FramedMultilineEditableTextClickFocusView(focusProbe: focusProbe)
 
         #expect(runtime.block(from: view)?.lines == ["     ", "     ", "     "])
         #expect(

@@ -1,22 +1,51 @@
 import Foundation
 import Observation
 import Testing
-@testable import SwiftTUIEssentials
-import SwiftTUIControls
 
-struct TextEditorEditingView: View {
+@testable import SwiftTUIEssentials
+
+struct MultilineEditableText: View {
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>?
+
+    init(
+        text: Binding<String>,
+        selection: Binding<TextSelection?>? = nil
+    ) {
+        self.text = text
+        self.selection = selection
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if let selection {
+            EditableText(
+                text: text,
+                selection: selection,
+                lineMode: .multiline
+            )
+        }
+        else {
+            EditableText(text: text, lineMode: .multiline)
+        }
+    }
+}
+
+struct MultilineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .focused($isFocused)
     }
 }
 
-struct SelectionTextEditorView: View {
+struct SelectionMultilineEditableTextView: View {
 
     @State var text: String
 
@@ -29,7 +58,7 @@ struct SelectionTextEditorView: View {
     let selectionProbe: BindingProbe<TextSelection?>
 
     var body: some View {
-        CapturedSelectionTextEditor(
+        CapturedSelectionMultilineEditableText(
             text: $text,
             selection: $selection,
             isFocused: $isFocused,
@@ -39,7 +68,7 @@ struct SelectionTextEditorView: View {
     }
 }
 
-struct CapturedSelectionTextEditor: View {
+struct CapturedSelectionMultilineEditableText: View {
 
     let text: Binding<String>
 
@@ -62,78 +91,78 @@ struct CapturedSelectionTextEditor: View {
     }
 
     var body: some View {
-        TextEditor(text: text, selection: selection)
+        MultilineEditableText(text: text, selection: selection)
             .focused(isFocused)
     }
 }
 
-struct FullScreenBackgroundTextEditorEditingView: View {
+struct FullScreenBackgroundMultilineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .focused($isFocused)
             .background(.red)
     }
 }
 
-struct FramedTextEditorEditingView: View {
+struct FramedMultilineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .frame(width: 3, height: 2, alignment: .topLeading)
             .focused($isFocused)
     }
 }
 
-struct MaxHeightFramedTextEditorEditingView: View {
+struct MaxHeightFramedMultilineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .frame(width: 3, alignment: .topLeading)
             .frame(maxHeight: 2, alignment: .topLeading)
             .focused($isFocused)
     }
 }
 
-struct MaxHeightOnlyTextEditorEditingView: View {
+struct MaxHeightOnlyMultilineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .frame(maxHeight: 2, alignment: .topLeading)
             .focused($isFocused)
     }
 }
 
-struct MaxHeightOnlyTextEditorClickFocusView: View {
+struct MaxHeightOnlyMultilineEditableTextClickFocusView: View {
 
     @State var text = ""
 
     @FocusState var isFocused: Bool
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .frame(maxHeight: 2, alignment: .topLeading)
             .focused($isFocused)
     }
 }
 
-struct MaxHeightConstantTextEditorBelowScrollViewView: View {
+struct MaxHeightConstantMultilineEditableTextBelowScrollViewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
@@ -144,7 +173,7 @@ struct MaxHeightConstantTextEditorBelowScrollViewView: View {
             }
             HStack(spacing: 0) {
                 Box {
-                    TextEditor(text: .constant(""))
+                    MultilineEditableText(text: .constant(""))
                         .frame(maxHeight: 4)
                 }
                 Spacer()
@@ -153,20 +182,20 @@ struct MaxHeightConstantTextEditorBelowScrollViewView: View {
     }
 }
 
-struct FramedTextEditorInitialTextView: View {
+struct FramedMultilineEditableTextInitialTextView: View {
 
     @State var text: String
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .frame(width: 3, height: 2, alignment: .topLeading)
             .focused($isFocused)
     }
 }
 
-struct TextEditorBelowScrollViewView: View {
+struct MultilineEditableTextBelowScrollViewView: View {
 
     @State var text = ""
 
@@ -180,14 +209,14 @@ struct TextEditorBelowScrollViewView: View {
                 }
             }
             Box {
-                TextEditor(text: $text)
+                MultilineEditableText(text: $text)
                     .focused($isFocused)
             }
         }
     }
 }
 
-struct DisabledFocusedTextEditorView: View {
+struct DisabledFocusedMultilineEditableTextView: View {
 
     @State var text = ""
 
@@ -198,7 +227,7 @@ struct DisabledFocusedTextEditorView: View {
     let focusProbe: FocusBindingProbe<Bool>
 
     var body: some View {
-        CapturedDisabledFocusedTextEditor(
+        CapturedDisabledFocusedMultilineEditableText(
             text: $text,
             focus: $isFocused,
             textProbe: textProbe,
@@ -208,7 +237,7 @@ struct DisabledFocusedTextEditorView: View {
     }
 }
 
-struct CapturedDisabledFocusedTextEditor: View {
+struct CapturedDisabledFocusedMultilineEditableText: View {
 
     let text: Binding<String>
 
@@ -227,24 +256,24 @@ struct CapturedDisabledFocusedTextEditor: View {
     }
 
     var body: some View {
-        TextEditor(text: text)
+        MultilineEditableText(text: text)
             .focused(focus)
     }
 }
 
-struct TextEditorInitialTextView: View {
+struct MultilineEditableTextInitialTextView: View {
 
     @State var text: String
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextEditor(text: $text)
+        MultilineEditableText(text: $text)
             .focused($isFocused)
     }
 }
 
-struct PrefixedBoundedTextEditorInitialTextView: View {
+struct PrefixedBoundedMultilineEditableTextInitialTextView: View {
 
     @State var text: String
 
@@ -253,34 +282,14 @@ struct PrefixedBoundedTextEditorInitialTextView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("top")
-            TextEditor(text: $text)
+            MultilineEditableText(text: $text)
                 .focused($isFocused)
                 .frame(width: 4, height: 2, alignment: .leading)
         }
     }
 }
 
-struct TextEditorSubmitView: View {
-
-    @State var text = ""
-
-    @State var submitted = "none"
-
-    @FocusState var isFocused = true
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            TextEditor(text: $text)
-                .focused($isFocused)
-                .onSubmit {
-                    submitted = text
-                }
-            Text(submitted)
-        }
-    }
-}
-
-struct FramedTextEditorClickFocusView: View {
+struct FramedMultilineEditableTextClickFocusView: View {
 
     @State var text = ""
 
@@ -289,7 +298,7 @@ struct FramedTextEditorClickFocusView: View {
     let focusProbe: FocusBindingProbe<Bool>
 
     var body: some View {
-        CapturedFramedTextEditor(
+        CapturedFramedMultilineEditableText(
             text: $text,
             binding: $isFocused,
             focusProbe: focusProbe
@@ -297,7 +306,7 @@ struct FramedTextEditorClickFocusView: View {
     }
 }
 
-struct CapturedFramedTextEditor: View {
+struct CapturedFramedMultilineEditableText: View {
 
     let text: Binding<String>
 
@@ -314,13 +323,13 @@ struct CapturedFramedTextEditor: View {
     }
 
     var body: some View {
-        TextEditor(text: text)
+        MultilineEditableText(text: text)
             .frame(width: 5, height: 3, alignment: .topLeading)
             .focused(binding)
     }
 }
 
-struct CapturedTextEditorView: View {
+struct CapturedMultilineEditableTextView: View {
 
     @State var text: String
 
@@ -329,7 +338,7 @@ struct CapturedTextEditorView: View {
     let probe: BindingProbe<String>
 
     var body: some View {
-        CapturedTextEditor(
+        CapturedMultilineEditableText(
             text: $text,
             isFocused: $isFocused,
             probe: probe
@@ -337,7 +346,7 @@ struct CapturedTextEditorView: View {
     }
 }
 
-struct CapturedTextEditor: View {
+struct CapturedMultilineEditableText: View {
 
     let text: Binding<String>
 
@@ -354,7 +363,7 @@ struct CapturedTextEditor: View {
     }
 
     var body: some View {
-        TextEditor(text: text)
+        MultilineEditableText(text: text)
             .focused(isFocused)
     }
 }

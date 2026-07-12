@@ -420,9 +420,9 @@ struct TerminalScreenRenderingTests {
     }
 
     @Test
-    func `editing a full-screen background TextEditor produces a minimal diff without clearing the screen`() {
+    func `editing a full-screen background EditableText produces a minimal diff without clearing the screen`() {
         let runtime = StateRuntime()
-        let view = FullScreenBackgroundTextEditorEditingView()
+        let view = FullScreenBackgroundMultilineEditableTextEditingView()
         let proposal = RenderProposal(columns: 6, rows: 2)
 
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)

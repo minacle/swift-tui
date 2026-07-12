@@ -1,13 +1,12 @@
 import Testing
 
 @testable import SwiftTUIEssentials
-import SwiftTUIControls
 
-@Suite("Editable Text")
+@Suite("EditableText Basics")
 struct EditableTextTests {
 
     @Test
-    func `single-line editing inserts text and leaves Return unhandled`() {
+    func `single-line EditableText inserts text and leaves Return unhandled`() {
         var text = ""
         let binding = Binding(
             get: { text },
@@ -26,7 +25,7 @@ struct EditableTextTests {
     }
 
     @Test
-    func `an exact-fit single-line editor scrolls to place its end caret after the last visible character`() {
+    func `an exact-fit single-line EditableText scrolls to place its end caret after the last visible character`() {
         let runtime = StateRuntime()
         let view = FocusedEditableText(text: .constant("abc"))
             .frame(width: 3)
@@ -40,7 +39,7 @@ struct EditableTextTests {
     }
 
     @Test
-    func `multiline editing inserts a newline and accepts text on the new line`() {
+    func `multiline EditableText inserts a newline and accepts text on the new line`() {
         var text = "a"
         let binding = Binding(
             get: { text },

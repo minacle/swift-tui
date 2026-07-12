@@ -83,9 +83,9 @@ struct FramePaddingAndFixedSizeTests {
     }
 
     @Test
-    func `padding translates a TextField caret by its top and leading insets`() {
+    func `padding translates an EditableText caret by its top and leading insets`() {
         let runtime = StateRuntime()
-        let view = TextFieldEditingView()
+        let view = SingleLineEditableTextEditingView()
             .padding(EdgeInsets(top: 1, leading: 2, bottom: 0, trailing: 0))
 
         _ = runtime.block(from: view)

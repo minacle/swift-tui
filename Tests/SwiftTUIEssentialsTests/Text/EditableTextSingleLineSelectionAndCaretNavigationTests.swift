@@ -1,11 +1,11 @@
 import Foundation
 import Observation
 import Testing
-@testable import SwiftTUIControls
+
 @testable import SwiftTUIEssentials
 
-@Suite("Single-Line Text Input Selection and Caret Navigation")
-struct SingleLineTextInputSelectionAndCaretNavigationTests {
+@Suite("EditableText Single-Line Selection and Caret Navigation")
+struct EditableTextSingleLineSelectionAndCaretNavigationTests {
 
     @Test
     func `an external Unicode selection is replaced and republished as a caret in updated text`() {
@@ -14,7 +14,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         let emojiEnd = text.index(after: emojiStart)
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
-        let view = SelectionTextFieldView(
+        let view = SelectionSingleLineEditableTextView(
             text: text,
             selection: TextSelection(range: emojiStart..<emojiEnd),
             textProbe: textProbe,
@@ -38,10 +38,10 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `pointer drags and arrow keys publish each text field selection change`() {
+    func `pointer drags and arrow keys publish each single-line EditableText selection change`() {
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
-        let view = SelectionTextFieldView(
+        let view = SelectionSingleLineEditableTextView(
             text: "abcd",
             selection: nil,
             textProbe: textProbe,
@@ -96,7 +96,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         let source = "abcdef"
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
-        let view = SelectionTextFieldView(
+        let view = SelectionSingleLineEditableTextView(
             text: "ab",
             selection: TextSelection(insertionPoint: source.endIndex),
             textProbe: textProbe,
@@ -140,7 +140,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         let upperBound = initialText.index(before: initialText.endIndex)
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
-        let view = SelectionTextFieldView(
+        let view = SelectionSingleLineEditableTextView(
             text: initialText,
             selection: TextSelection(
                 range: lowerBound..<upperBound
@@ -182,9 +182,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `horizontal arrows reposition the text field caret for subsequent insertion`() {
+    func `horizontal arrows reposition the single-line EditableText caret for subsequent insertion`() {
         let runtime = StateRuntime()
-        let view = TextFieldEditingView()
+        let view = SingleLineEditableTextEditingView()
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -215,7 +215,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     @Test
     func `Shift-arrow selection is replaced by the next inserted character`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -241,7 +241,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     @Test
     func `an unmodified arrow collapses selection before subsequent insertion`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -263,7 +263,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     @Test
     func `Backspace removes the complete selected range and restores the caret`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -285,7 +285,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     @Test
     func `clicking a text column positions the caret for subsequent insertion`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -312,7 +312,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         var longPressSelection: TextSelection?
         let runtime = StateRuntime()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
-        let view = TextField(
+        let view = SingleLineEditableText(
             "Label",
             text: Binding(
                 get: { text },
@@ -390,9 +390,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `clicking the reserved trailing cell inserts at the end of the field`() {
+    func `clicking the reserved trailing cell inserts at the end of the single-line EditableText`() {
         let runtime = StateRuntime()
-        let view = ExactFitDelimitedFixedSizeTextFieldView()
+        let view = ExactFitDelimitedFixedSizeSingleLineEditableTextView()
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -420,9 +420,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `dragging across a text field selects the traversed range for replacement`() {
+    func `dragging across a single-line EditableText selects the traversed range for replacement`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -448,9 +448,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `navigationDirection extends a dragged field selection from its command-side endpoint`() {
+    func `navigationDirection extends a dragged single-line EditableText selection from its command-side endpoint`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcdef")
+        let view = SingleLineEditableTextInitialTextView(text: "abcdef")
             .environment(\.textSelectionNavigationBehavior, .navigationDirection)
 
         _ = runtime.block(from: view)
@@ -476,7 +476,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     @Test
     func `the nearest selection-navigation modifier wins over an outer environment value`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcdef")
+        let view = SingleLineEditableTextInitialTextView(text: "abcdef")
             .textSelectionNavigationBehavior(.dragEndpoint)
             .environment(\.textSelectionNavigationBehavior, .navigationDirection)
 
@@ -501,10 +501,10 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `navigationDirection applies command-side extension to secure-field selection`() {
+    func `navigationDirection applies command-side extension to masked single-line EditableText selection`() {
         let runtime = StateRuntime()
         let probe = BindingProbe<String>()
-        let view = SecureFieldEditingView(textProbe: probe)
+        let view = MaskedSingleLineEditableTextEditingView(textProbe: probe)
             .textSelectionNavigationBehavior(.navigationDirection)
 
         _ = runtime.block(from: view)
@@ -649,9 +649,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `dragging beyond a narrow field scrolls the selected endpoint into view`() {
+    func `dragging beyond a narrow single-line EditableText scrolls the selected endpoint into view`() {
         let runtime = StateRuntime()
-        let view = PrefixedNarrowTextFieldInitialTextView(text: "abcdef")
+        let view = PrefixedNarrowSingleLineEditableTextInitialTextView(text: "abcdef")
 
         #expect(renderUntilStable(runtime, view: view) <= 3)
         var block = runtime.block(from: view)
@@ -676,9 +676,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `unpressed pointer motion leaves the text field caret unchanged`() {
+    func `unpressed pointer motion leaves the single-line EditableText caret unchanged`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -698,9 +698,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `pointer-up ends a field drag so later motion cannot move its caret`() {
+    func `pointer-up ends a single-line EditableText drag so later motion cannot move its caret`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "abcd")
+        let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
         _ = runtime.block(from: view)
         _ = runtime.consumeInvalidation()
@@ -730,9 +730,9 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `a scrolled text field containing a wide glyph maps clicked terminal columns to source insertion points`() {
+    func `a scrolled single-line EditableText containing a wide glyph maps clicked terminal columns to source insertion points`() {
         let runtime = StateRuntime()
-        let view = TextFieldInitialTextView(text: "한ABC")
+        let view = SingleLineEditableTextInitialTextView(text: "한ABC")
             .frame(width: 3)
 
         _ = runtime.block(from: view)

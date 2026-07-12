@@ -1,22 +1,104 @@
 import Foundation
 import Observation
 import Testing
-@testable import SwiftTUIEssentials
-import SwiftTUIControls
 
-struct TextFieldEditingView: View {
+@testable import SwiftTUIEssentials
+
+struct SingleLineEditableText<Label: View>: View {
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>?
+
+    let prompt: Text?
+
+    let label: Label
+
+    init(
+        text: Binding<String>,
+        prompt: Text? = nil,
+        @ViewBuilder label: () -> Label
+    ) {
+        self.text = text
+        self.selection = nil
+        self.prompt = prompt
+        self.label = label()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if let selection {
+            EditableText(text: text, selection: selection)
+                .placeholder {
+                    if let prompt {
+                        prompt
+                    }
+                    else {
+                        label
+                    }
+                }
+        }
+        else {
+            EditableText(text: text)
+                .placeholder {
+                    if let prompt {
+                        prompt
+                    }
+                    else {
+                        label
+                    }
+                }
+        }
+    }
+}
+
+extension SingleLineEditableText where Label == Text {
+
+    init(
+        _ title: String,
+        text: Binding<String>,
+        selection: Binding<TextSelection?>? = nil,
+        prompt: Text? = nil
+    ) {
+        self.text = text
+        self.selection = selection
+        self.prompt = prompt
+        self.label = Text(title)
+    }
+}
+
+struct MaskedSingleLineEditableText: View {
+
+    let title: String
+
+    let text: Binding<String>
+
+    init(_ title: String, text: Binding<String>) {
+        self.title = title
+        self.text = text
+    }
+
+    var body: some View {
+        EditableText(text: text, mask: "•")
+            .placeholder {
+                Text(title)
+            }
+    }
+}
+
+struct SingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextField("Name", text: $text)
+        SingleLineEditableText("Name", text: $text)
             .focused($isFocused)
     }
 }
 
-struct SelectionTextFieldView: View {
+struct SelectionSingleLineEditableTextView: View {
 
     @State var text: String
 
@@ -29,7 +111,7 @@ struct SelectionTextFieldView: View {
     let selectionProbe: BindingProbe<TextSelection?>
 
     var body: some View {
-        CapturedSelectionTextField(
+        CapturedSelectionSingleLineEditableText(
             text: $text,
             selection: $selection,
             isFocused: $isFocused,
@@ -39,7 +121,7 @@ struct SelectionTextFieldView: View {
     }
 }
 
-struct CapturedSelectionTextField: View {
+struct CapturedSelectionSingleLineEditableText: View {
 
     let text: Binding<String>
 
@@ -62,7 +144,7 @@ struct CapturedSelectionTextField: View {
     }
 
     var body: some View {
-        TextField(
+        SingleLineEditableText(
             "Name",
             text: text,
             selection: selection,
@@ -72,7 +154,7 @@ struct CapturedSelectionTextField: View {
     }
 }
 
-struct OverlayPlaceholderTextFieldView: View {
+struct OverlayPlaceholderSingleLineEditableTextView: View {
 
     @State var text = ""
 
@@ -80,7 +162,7 @@ struct OverlayPlaceholderTextFieldView: View {
 
     var body: some View {
         ZStack {
-            TextField("Placeholder", text: $text)
+            SingleLineEditableText("Placeholder", text: $text)
                 .focused($isFocused)
             if text.isEmpty {
                 Text("Placeholder")
@@ -90,7 +172,7 @@ struct OverlayPlaceholderTextFieldView: View {
     }
 }
 
-struct NestedOverlaidURLTextFieldEditingView: View {
+struct NestedOverlaidURLSingleLineEditableTextEditingView: View {
 
     @State var urlString = ""
 
@@ -108,7 +190,7 @@ struct NestedOverlaidURLTextFieldEditingView: View {
                     Text("[")
                         .dim()
                     ZStack {
-                        TextField("Enter URL...", text: $urlString)
+                        SingleLineEditableText("Enter URL...", text: $urlString)
                             .focused($isFocused)
                         if urlString.isEmpty {
                             Text("Enter URL...")
@@ -123,7 +205,7 @@ struct NestedOverlaidURLTextFieldEditingView: View {
     }
 }
 
-struct NestedZStackDelimitedTextFieldEditingView: View {
+struct NestedZStackDelimitedSingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
@@ -133,7 +215,7 @@ struct NestedZStackDelimitedTextFieldEditingView: View {
         HStack(spacing: 0) {
             Text("[")
             ZStack {
-                TextField("URL", text: $text)
+                SingleLineEditableText("URL", text: $text)
                     .focused($isFocused)
             }
             Text("]")
@@ -141,7 +223,7 @@ struct NestedZStackDelimitedTextFieldEditingView: View {
     }
 }
 
-struct NestedHStackTextFieldEditingView: View {
+struct NestedHStackSingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
@@ -150,7 +232,7 @@ struct NestedHStackTextFieldEditingView: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                TextField("URL", text: $text)
+                SingleLineEditableText("URL", text: $text)
                     .focused($isFocused)
             }
             Text("X")
@@ -158,7 +240,7 @@ struct NestedHStackTextFieldEditingView: View {
     }
 }
 
-struct NestedSecureFieldEditingView: View {
+struct NestedMaskedSingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
@@ -167,7 +249,7 @@ struct NestedSecureFieldEditingView: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                SecureField("Password", text: $text)
+                MaskedSingleLineEditableText("Password", text: $text)
                     .focused($isFocused)
             }
             Text("X")
@@ -175,7 +257,7 @@ struct NestedSecureFieldEditingView: View {
     }
 }
 
-struct DisabledFocusedTextFieldView: View {
+struct DisabledFocusedSingleLineEditableTextView: View {
 
     @State var text = ""
 
@@ -186,7 +268,7 @@ struct DisabledFocusedTextFieldView: View {
     let focusProbe: FocusBindingProbe<Bool>
 
     var body: some View {
-        CapturedDisabledFocusedTextField(
+        CapturedDisabledFocusedSingleLineEditableText(
             text: $text,
             focus: $isFocused,
             textProbe: textProbe,
@@ -196,7 +278,7 @@ struct DisabledFocusedTextFieldView: View {
     }
 }
 
-struct CapturedDisabledFocusedTextField: View {
+struct CapturedDisabledFocusedSingleLineEditableText: View {
 
     let text: Binding<String>
 
@@ -215,12 +297,12 @@ struct CapturedDisabledFocusedTextField: View {
     }
 
     var body: some View {
-        TextField("Name", text: text)
+        SingleLineEditableText("Name", text: text)
             .focused(focus)
     }
 }
 
-struct SecureFieldEditingView: View {
+struct MaskedSingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
@@ -229,7 +311,7 @@ struct SecureFieldEditingView: View {
     let textProbe: BindingProbe<String>
 
     var body: some View {
-        CapturedSecureField(
+        CapturedMaskedSingleLineEditableText(
             text: $text,
             isFocused: $isFocused,
             textProbe: textProbe
@@ -237,7 +319,7 @@ struct SecureFieldEditingView: View {
     }
 }
 
-struct CapturedSecureField: View {
+struct CapturedMaskedSingleLineEditableText: View {
 
     let text: Binding<String>
 
@@ -254,12 +336,12 @@ struct CapturedSecureField: View {
     }
 
     var body: some View {
-        SecureField("Password", text: text)
+        MaskedSingleLineEditableText("Password", text: text)
             .focused(isFocused)
     }
 }
 
-struct TwoTextFieldsClickFocusView: View {
+struct TwoSingleLineEditableTextsClickFocusView: View {
 
     @State var first = ""
 
@@ -272,7 +354,7 @@ struct TwoTextFieldsClickFocusView: View {
     let textProbe: LabeledStringBindingProbe
 
     var body: some View {
-        CapturedTwoTextFields(
+        CapturedTwoSingleLineEditableTexts(
             field: $field,
             first: $first,
             second: $second,
@@ -282,7 +364,7 @@ struct TwoTextFieldsClickFocusView: View {
     }
 }
 
-struct FramedTextFieldClickFocusView: View {
+struct FramedSingleLineEditableTextClickFocusView: View {
 
     @State var text = ""
 
@@ -291,7 +373,7 @@ struct FramedTextFieldClickFocusView: View {
     let focusProbe: FocusBindingProbe<Bool>
 
     var body: some View {
-        CapturedFramedTextField(
+        CapturedFramedSingleLineEditableText(
             text: $text,
             binding: $isFocused,
             focusProbe: focusProbe
@@ -299,7 +381,7 @@ struct FramedTextFieldClickFocusView: View {
     }
 }
 
-struct CapturedFramedTextField: View {
+struct CapturedFramedSingleLineEditableText: View {
 
     let text: Binding<String>
 
@@ -316,13 +398,13 @@ struct CapturedFramedTextField: View {
     }
 
     var body: some View {
-        TextField("A", text: text)
+        SingleLineEditableText("A", text: text)
             .frame(width: 5, alignment: .leading)
             .focused(binding)
     }
 }
 
-struct CapturedTwoTextFields: View {
+struct CapturedTwoSingleLineEditableTexts: View {
 
     let field: FocusState<FocusField?>.Binding
 
@@ -347,27 +429,27 @@ struct CapturedTwoTextFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TextField("first", text: first)
+            SingleLineEditableText("first", text: first)
                 .focused(field, equals: .first)
-            TextField("second", text: second)
+            SingleLineEditableText("second", text: second)
                 .focused(field, equals: .second)
         }
     }
 }
 
-struct TextFieldInitialTextView: View {
+struct SingleLineEditableTextInitialTextView: View {
 
     @State var text: String
 
     @FocusState var isFocused = true
 
     var body: some View {
-        TextField("Name", text: $text)
+        SingleLineEditableText("Name", text: $text)
             .focused($isFocused)
     }
 }
 
-struct PrefixedNarrowTextFieldInitialTextView: View {
+struct PrefixedNarrowSingleLineEditableTextInitialTextView: View {
 
     @State var text: String
 
@@ -376,26 +458,14 @@ struct PrefixedNarrowTextFieldInitialTextView: View {
     var body: some View {
         HStack(spacing: 0) {
             Text("|")
-            TextField("Name", text: $text)
+            SingleLineEditableText("Name", text: $text)
                 .focused($isFocused)
                 .frame(width: 3, alignment: .leading)
         }
     }
 }
 
-struct SecureFieldInitialTextView: View {
-
-    @State var text: String
-
-    @FocusState var isFocused = true
-
-    var body: some View {
-        SecureField("Password", text: $text)
-            .focused($isFocused)
-    }
-}
-
-struct DelimitedTextFieldView: View {
+struct DelimitedSingleLineEditableTextView: View {
 
     @State var text: String
 
@@ -404,7 +474,7 @@ struct DelimitedTextFieldView: View {
     var body: some View {
         HStack(spacing: 0) {
             Text("[")
-            TextField("Name", text: $text)
+            SingleLineEditableText("Name", text: $text)
                 .focused($isFocused)
                 .frame(width: 32)
             Text("]")
@@ -412,7 +482,7 @@ struct DelimitedTextFieldView: View {
     }
 }
 
-struct ExactFitDelimitedFixedSizeTextFieldView: View {
+struct ExactFitDelimitedFixedSizeSingleLineEditableTextView: View {
 
     @State var text = ""
 
@@ -421,7 +491,7 @@ struct ExactFitDelimitedFixedSizeTextFieldView: View {
     var body: some View {
         HStack(spacing: 0) {
             Text("[")
-            TextField("Name", text: $text)
+            SingleLineEditableText("Name", text: $text)
                 .fixedSize(horizontal: true, vertical: false)
                 .focused($isFocused)
             Text("]")
@@ -429,7 +499,7 @@ struct ExactFitDelimitedFixedSizeTextFieldView: View {
     }
 }
 
-struct FlexibleLabeledTextFieldView: View {
+struct FlexibleLabeledSingleLineEditableTextView: View {
 
     @State var text: String
 
@@ -438,14 +508,14 @@ struct FlexibleLabeledTextFieldView: View {
     var body: some View {
         HStack(spacing: 1) {
             Text("Admin Token")
-            TextField("Admin Token", text: $text)
+            SingleLineEditableText("Admin Token", text: $text)
                 .focused($isFocused)
             Spacer()
         }
     }
 }
 
-struct LabeledTextFieldEditingView: View {
+struct LabeledSingleLineEditableTextEditingView: View {
 
     @State var text = ""
 
@@ -454,48 +524,8 @@ struct LabeledTextFieldEditingView: View {
     var body: some View {
         HStack(spacing: 1) {
             Text("Label:")
-            TextField("Name", text: $text)
+            SingleLineEditableText("Name", text: $text)
                 .focused($isFocused)
-        }
-    }
-}
-
-struct TextFieldSubmitView: View {
-
-    @State var text = ""
-
-    @State var submitted = "none"
-
-    @FocusState var isFocused = true
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TextField("Name", text: $text)
-                .focused($isFocused)
-                .onSubmit {
-                    submitted = text
-                }
-            Text(submitted)
-        }
-    }
-}
-
-struct SecureFieldSubmitView: View {
-
-    @State var text = ""
-
-    @State var submitted = "none"
-
-    @FocusState var isFocused = true
-
-    var body: some View {
-        VStack(spacing: 0) {
-            SecureField("Password", text: $text)
-                .focused($isFocused)
-                .onSubmit {
-                    submitted = text
-                }
-            Text(submitted)
         }
     }
 }
@@ -505,7 +535,7 @@ enum DynamicFocusRow: Hashable {
     case row
 }
 
-struct DynamicTextFieldFocusWithOptionalRowFocusView: View {
+struct DynamicSingleLineEditableTextFocusWithOptionalRowFocusView: View {
 
     @State var isEditing = false
 
@@ -524,7 +554,7 @@ struct DynamicTextFieldFocusWithOptionalRowFocusView: View {
             if isEditing {
                 HStack(spacing: 0) {
                     Text("> ")
-                    TextField("", text: $draft)
+                    SingleLineEditableText("", text: $draft)
                         .focused($editorFocused)
                     Spacer()
                 }
@@ -538,11 +568,11 @@ struct DynamicTextFieldFocusWithOptionalRowFocusView: View {
     }
 }
 
-struct ScrollWrappedDynamicTextFieldFocusView: View {
+struct ScrollWrappedDynamicSingleLineEditableTextFocusView: View {
 
     var body: some View {
         ScrollView(.vertical) {
-            DynamicTextFieldFocusWithOptionalRowFocusView()
+            DynamicSingleLineEditableTextFocusWithOptionalRowFocusView()
         }
     }
 }
