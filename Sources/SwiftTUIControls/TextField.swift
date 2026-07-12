@@ -93,7 +93,7 @@ public nonisolated struct TextField<Label: View>: View {
     }
 }
 
-public extension TextField where Label == Text {
+extension TextField where Label == Text {
 
     /// Creates a text field that uses a title as its fallback placeholder.
     ///
@@ -104,7 +104,7 @@ public extension TextField where Label == Text {
     /// - Parameters:
     ///   - title: The fallback placeholder displayed while `text` is empty.
     ///   - text: A binding that supplies the current value and receives edits.
-    init(_ title: String, text: Binding<String>) {
+    public init(_ title: String, text: Binding<String>) {
         self.init(title, text: text, prompt: nil)
     }
 
@@ -115,7 +115,7 @@ public extension TextField where Label == Text {
     ///   - text: A binding that supplies the current value and receives edits.
     ///   - prompt: Text to display while `text` is empty. Pass `nil` to use
     ///     `title` as the placeholder.
-    init(_ title: String, text: Binding<String>, prompt: Text?) {
+    public init(_ title: String, text: Binding<String>, prompt: Text?) {
         self.init(text: text, prompt: prompt) {
             Text(title)
         }
@@ -142,7 +142,7 @@ public extension TextField where Label == Text {
     ///     range. Its indices refer to the current `text` value.
     ///   - prompt: Text to display while `text` is empty. Pass `nil` to use
     ///     `title` as the placeholder.
-    init(
+    public init(
         _ title: String,
         text: Binding<String>,
         selection: Binding<TextSelection?>,
@@ -228,7 +228,7 @@ public nonisolated struct SecureField<Label: View>: View {
     }
 }
 
-public extension SecureField where Label == Text {
+extension SecureField where Label == Text {
 
     /// Creates a secure field that uses a title as its fallback placeholder.
     ///
@@ -236,7 +236,7 @@ public extension SecureField where Label == Text {
     ///   - title: The fallback placeholder displayed while `text` is empty.
     ///   - text: A binding that supplies the original, unmasked value and
     ///     receives edits.
-    init(_ title: String, text: Binding<String>) {
+    public init(_ title: String, text: Binding<String>) {
         self.init(title, text: text, prompt: nil)
     }
 
@@ -248,7 +248,7 @@ public extension SecureField where Label == Text {
     ///     receives edits.
     ///   - prompt: Text to display while `text` is empty. Pass `nil` to use
     ///     `title` as the placeholder.
-    init(_ title: String, text: Binding<String>, prompt: Text?) {
+    public init(_ title: String, text: Binding<String>, prompt: Text?) {
         self.init(text: text, prompt: prompt) {
             Text(title)
         }
@@ -325,7 +325,7 @@ extension EnvironmentValues {
     }
 }
 
-public extension View {
+extension View {
 
     /// Performs an action when the user submits a text field within this view.
     ///
@@ -340,7 +340,7 @@ public extension View {
     ///   modified subtree. Holding Return can invoke it repeatedly.
     /// - Returns: A view that supplies `action` to descendant single-line text
     ///   fields through the environment.
-    func onSubmit(_ action: @escaping () -> Void) -> some View {
+    public func onSubmit(_ action: @escaping () -> Void) -> some View {
         environment(\.submitAction, SubmitAction(action: action))
     }
 }

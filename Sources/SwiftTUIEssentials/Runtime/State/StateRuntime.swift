@@ -1606,9 +1606,9 @@ extension Optional: OptionalFocusValue {
     }
 }
 
-private extension TapGestureAction {
+extension TapGestureAction {
 
-    func restoringEnvironment(_ environment: EnvironmentValues) -> TapGestureAction {
+    fileprivate func restoringEnvironment(_ environment: EnvironmentValues) -> TapGestureAction {
         switch self {
         case .plain(let action):
             return .plain {
@@ -1626,9 +1626,9 @@ private extension TapGestureAction {
     }
 }
 
-private extension HoverGestureAction {
+extension HoverGestureAction {
 
-    func restoringEnvironment(_ environment: EnvironmentValues) -> HoverGestureAction {
+    fileprivate func restoringEnvironment(_ environment: EnvironmentValues) -> HoverGestureAction {
         switch self {
         case .state(let action):
             return .state { isHovering in

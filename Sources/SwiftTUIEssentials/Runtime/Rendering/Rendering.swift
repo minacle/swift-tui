@@ -982,9 +982,9 @@ private nonisolated struct CompositedCell: Equatable {
     }
 }
 
-private extension [RenderedRun] {
+extension [RenderedRun] {
 
-    nonisolated func mergedAdjacentRuns() -> [RenderedRun] {
+    fileprivate nonisolated func mergedAdjacentRuns() -> [RenderedRun] {
         var runs: [RenderedRun] = []
         for run in self {
             guard let last = runs.last,
@@ -3541,9 +3541,9 @@ enum ZStackRenderer {
     }
 }
 
-private extension RenderedElement {
+extension RenderedElement {
 
-    var block: RenderedBlock? {
+    fileprivate var block: RenderedBlock? {
         guard case .block(let block) = self else {
             return nil
         }
@@ -4642,9 +4642,9 @@ enum StackRenderer {
     }
 }
 
-private extension StackRenderer.MeasuredChild {
+extension StackRenderer.MeasuredChild {
 
-    var isHorizontallyContentFlexible: Bool {
+    fileprivate var isHorizontallyContentFlexible: Bool {
         guard case .block = content else {
             return false
         }
@@ -4652,7 +4652,7 @@ private extension StackRenderer.MeasuredChild {
         return traits.flexibleAxes.contains(.horizontal)
     }
 
-    var isVerticallyContentFlexible: Bool {
+    fileprivate var isVerticallyContentFlexible: Bool {
         guard !suppressesVerticalFlexInParentStack else {
             return false
         }
@@ -4664,7 +4664,7 @@ private extension StackRenderer.MeasuredChild {
         return traits.flexibleAxes.contains(.vertical)
     }
 
-    func isHorizontallyFlexible(usingContentFlex: Bool) -> Bool {
+    fileprivate func isHorizontallyFlexible(usingContentFlex: Bool) -> Bool {
         switch content {
         case .block:
             return traits.flexibleAxes.contains(.horizontal)
@@ -4673,7 +4673,7 @@ private extension StackRenderer.MeasuredChild {
         }
     }
 
-    func isVerticallyFlexible(usingContentFlex: Bool) -> Bool {
+    fileprivate func isVerticallyFlexible(usingContentFlex: Bool) -> Bool {
         guard !suppressesVerticalFlexInParentStack else {
             return false
         }
@@ -4686,13 +4686,13 @@ private extension StackRenderer.MeasuredChild {
         }
     }
 
-    func horizontalMinimum(usingContentFlex: Bool) -> Int? {
+    fileprivate func horizontalMinimum(usingContentFlex: Bool) -> Int? {
         isHorizontallyFlexible(usingContentFlex: usingContentFlex)
             ? content.spacerMinimum ?? 0
             : nil
     }
 
-    func verticalMinimum(usingContentFlex: Bool) -> Int? {
+    fileprivate func verticalMinimum(usingContentFlex: Bool) -> Int? {
         isVerticallyFlexible(usingContentFlex: usingContentFlex)
             ? content.spacerMinimum ?? 0
             : nil
@@ -4700,9 +4700,9 @@ private extension StackRenderer.MeasuredChild {
 
 }
 
-private extension RenderedElement {
+extension RenderedElement {
 
-    var spacing: ViewSpacing {
+    fileprivate var spacing: ViewSpacing {
         switch self {
         case .block(let block):
             return block.spacing
@@ -4711,7 +4711,7 @@ private extension RenderedElement {
         }
     }
 
-    var isSpacer: Bool {
+    fileprivate var isSpacer: Bool {
         guard case .spacer = self else {
             return false
         }
@@ -4719,7 +4719,7 @@ private extension RenderedElement {
         return true
     }
 
-    var horizontalLength: Int {
+    fileprivate var horizontalLength: Int {
         switch self {
         case .block(let block):
             return block.width
@@ -4728,7 +4728,7 @@ private extension RenderedElement {
         }
     }
 
-    var isRenderable: Bool {
+    fileprivate var isRenderable: Bool {
         switch self {
         case .block(let block):
             return block.width > 0 || block.height > 0
@@ -4737,7 +4737,7 @@ private extension RenderedElement {
         }
     }
 
-    var spacerMinimum: Int? {
+    fileprivate var spacerMinimum: Int? {
         guard case .spacer(let minLength) = self else {
             return nil
         }
@@ -4745,7 +4745,7 @@ private extension RenderedElement {
         return minLength
     }
 
-    var verticalLength: Int {
+    fileprivate var verticalLength: Int {
         switch self {
         case .block(let block):
             return block.height

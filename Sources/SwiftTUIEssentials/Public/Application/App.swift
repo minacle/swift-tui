@@ -29,7 +29,7 @@ public protocol App {
     init()
 }
 
-public extension App {
+extension App {
 
     /// Starts the SwiftTUI terminal event loop for this app.
     ///
@@ -38,7 +38,7 @@ public extension App {
     /// the current viewport, dispatches keyboard and pointer input, and prints a
     /// startup error if the terminal session cannot be created. Startup errors
     /// are reported to terminal output rather than propagated to the caller.
-    static func main() {
+    public static func main() {
         do {
             try AppRunner(app: Self()).run()
         }

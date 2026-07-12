@@ -161,9 +161,9 @@ private nonisolated enum LayoutHorizontalMarker: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
+extension HorizontalAlignment {
 
-    nonisolated static let layoutMarker = HorizontalAlignment(LayoutHorizontalMarker.self)
+    fileprivate nonisolated static let layoutMarker = HorizontalAlignment(LayoutHorizontalMarker.self)
 }
 
 private nonisolated enum LayoutVerticalMarker: AlignmentID {
@@ -173,16 +173,16 @@ private nonisolated enum LayoutVerticalMarker: AlignmentID {
     }
 }
 
-private extension VerticalAlignment {
+extension VerticalAlignment {
 
-    nonisolated static let layoutMarker = VerticalAlignment(LayoutVerticalMarker.self)
+    fileprivate nonisolated static let layoutMarker = VerticalAlignment(LayoutVerticalMarker.self)
 }
 
 private nonisolated protocol FixedThreeCellLayout: Layout where Cache == Void {}
 
-private extension FixedThreeCellLayout {
+extension FixedThreeCellLayout {
 
-    nonisolated func sizeThatFits(
+    fileprivate nonisolated func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -190,7 +190,7 @@ private extension FixedThreeCellLayout {
         Size(columns: 3, rows: 3)
     }
 
-    nonisolated func placeSubviews(
+    fileprivate nonisolated func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,
@@ -228,9 +228,9 @@ private nonisolated protocol SpacerProbeLayout: Layout where Cache == Void {
     nonisolated var probe: SpacerDimensionsProbe { get }
 }
 
-private extension SpacerProbeLayout {
+extension SpacerProbeLayout {
 
-    nonisolated func sizeThatFits(
+    fileprivate nonisolated func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -239,7 +239,7 @@ private extension SpacerProbeLayout {
         return Size(columns: 1, rows: 1)
     }
 
-    nonisolated func placeSubviews(
+    fileprivate nonisolated func placeSubviews(
         in bounds: Rect,
         proposal: ProposedViewSize,
         subviews: Subviews,

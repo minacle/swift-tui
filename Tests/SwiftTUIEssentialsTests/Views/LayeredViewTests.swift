@@ -382,8 +382,8 @@ private nonisolated enum LayerMarkerAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
-    nonisolated static let layerMarker = HorizontalAlignment(LayerMarkerAlignment.self)
+extension HorizontalAlignment {
+    fileprivate nonisolated static let layerMarker = HorizontalAlignment(LayerMarkerAlignment.self)
 }
 
 private struct OverlappingLayout: Layout {

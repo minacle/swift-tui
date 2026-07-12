@@ -247,6 +247,6 @@ private nonisolated enum FrameMarkerAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
-    nonisolated static let frameMarker = HorizontalAlignment(FrameMarkerAlignment.self)
+extension HorizontalAlignment {
+    fileprivate nonisolated static let frameMarker = HorizontalAlignment(FrameMarkerAlignment.self)
 }

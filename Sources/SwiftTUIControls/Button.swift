@@ -149,7 +149,7 @@ private struct ButtonBody<Label: View>: View {
     }
 }
 
-public extension Button where Label == Text {
+extension Button where Label == Text {
 
     /// Creates a button with a plain string label.
     ///
@@ -160,7 +160,7 @@ public extension Button where Label == Text {
     ///   - title: The string to render as the button label.
     ///   - action: The synchronous action to run each time the button is
     ///     activated.
-    init(_ title: String, action: @escaping () -> Void) {
+    public init(_ title: String, action: @escaping () -> Void) {
         self.init(title: title, action: action)
     }
 
@@ -183,19 +183,19 @@ public extension Button where Label == Text {
         deprecated,
         message: "Localize with String.init(localized:...) and pass the resulting String."
     )
-    init(_ titleKey: LocalizedStringKey, action: @escaping () -> Void) {
+    public init(_ titleKey: LocalizedStringKey, action: @escaping () -> Void) {
         self.init(title: titleKey.key, action: action)
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// The preferred sizing behavior of buttons in the view hierarchy.
     ///
     /// Descendant ``Button`` values read this environment value while laying
     /// out their labels. The default is ``ButtonSizing/automatic``, and the
     /// nearest value in the environment hierarchy takes precedence.
-    nonisolated var buttonSizing: ButtonSizing {
+    public nonisolated var buttonSizing: ButtonSizing {
         get {
             self[ButtonSizingKey.self]
         }
@@ -205,7 +205,7 @@ public extension EnvironmentValues {
     }
 }
 
-public extension View {
+extension View {
 
     /// Sets the preferred sizing behavior of buttons in this view hierarchy.
     ///
@@ -215,7 +215,7 @@ public extension View {
     /// - Parameter sizing: The horizontal sizing behavior to apply to the
     ///   modified button or descendant buttons.
     /// - Returns: A view that supplies `sizing` through its environment.
-    nonisolated func buttonSizing(_ sizing: ButtonSizing) -> some View {
+    public nonisolated func buttonSizing(_ sizing: ButtonSizing) -> some View {
         environment(\.buttonSizing, sizing)
     }
 }

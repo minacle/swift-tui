@@ -403,10 +403,10 @@ public enum VerticalScrollIndicatorAttachmentKey: ViewAttachmentKey {
     public typealias Context = ScrollIndicatorConfiguration
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// The visibility applied to horizontal scroll-indicator attachments.
-    nonisolated var horizontalScrollIndicatorVisibility: ScrollIndicatorVisibility {
+    public nonisolated var horizontalScrollIndicatorVisibility: ScrollIndicatorVisibility {
         get {
             self[HorizontalScrollIndicatorVisibilityKey.self]
         }
@@ -416,7 +416,7 @@ public extension EnvironmentValues {
     }
 
     /// The visibility applied to vertical scroll-indicator attachments.
-    nonisolated var verticalScrollIndicatorVisibility: ScrollIndicatorVisibility {
+    public nonisolated var verticalScrollIndicatorVisibility: ScrollIndicatorVisibility {
         get {
             self[VerticalScrollIndicatorVisibilityKey.self]
         }
@@ -729,7 +729,7 @@ protocol ScrollPositionModifierRenderable {
     ) -> RenderedElement?
 }
 
-public extension View {
+extension View {
 
     /// Flashes scroll indicators when scrollable descendants first appear.
     ///
@@ -741,7 +741,7 @@ public extension View {
     /// - Parameter onAppear: Whether descendant indicators flash after this
     ///   hierarchy first appears.
     /// - Returns: A view that supplies the appearance flash request.
-    func scrollIndicatorsFlash(onAppear: Bool) -> some View {
+    public func scrollIndicatorsFlash(onAppear: Bool) -> some View {
         ScrollIndicatorsFlashOnAppearView(content: self, flashes: onAppear)
     }
 
@@ -752,7 +752,7 @@ public extension View {
     ///
     /// - Parameter value: The value whose changes request a flash.
     /// - Returns: A view that supplies the value-driven flash request.
-    func scrollIndicatorsFlash<Value: Equatable>(trigger value: Value) -> some View {
+    public func scrollIndicatorsFlash<Value: Equatable>(trigger value: Value) -> some View {
         ScrollIndicatorsFlashTriggerView(content: self, value: value)
     }
 
@@ -766,7 +766,7 @@ public extension View {
     /// - Parameter id: The stable, hashable identity to assign to this subtree.
     /// - Returns: A view whose state path and rendered scroll-target region use
     ///   the supplied identity.
-    func id<ID>(_ id: ID) -> some View where ID: Hashable {
+    public func id<ID>(_ id: ID) -> some View where ID: Hashable {
         IdentifiedView(content: self, id: AnyHashable(id))
     }
 
@@ -781,7 +781,7 @@ public extension View {
     /// - Parameter position: The requested and resolved scroll position.
     /// - Returns: A view that supplies the binding to scrollable descendants in
     ///   its modified subtree.
-    func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
+    public func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
         ScrollPositionView(content: self, position: position)
     }
 
@@ -796,7 +796,7 @@ public extension View {
     /// - Parameter disabled: `true` to block user wheel input in the subtree;
     ///   `false` to preserve the inherited setting.
     /// - Returns: A view with the transformed scrolling environment.
-    nonisolated func scrollDisabled(_ disabled: Bool) -> some View {
+    public nonisolated func scrollDisabled(_ disabled: Bool) -> some View {
         TransformedEnvironmentView(
             content: self,
             keyPath: \.isScrollEnabled,

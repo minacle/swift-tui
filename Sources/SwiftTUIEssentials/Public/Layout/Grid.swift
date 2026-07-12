@@ -176,7 +176,7 @@ private nonisolated struct GridColumnAlignmentView<Content: View>: View,
     }
 }
 
-public extension View {
+extension View {
 
     /// Tells a cell in a grid row to span the specified number of columns.
     ///
@@ -186,7 +186,7 @@ public extension View {
     ///
     /// - Parameter count: The number of columns occupied by the cell.
     /// - Returns: A view with the requested grid-column span.
-    nonisolated func gridCellColumns(_ count: Int) -> some View {
+    public nonisolated func gridCellColumns(_ count: Int) -> some View {
         GridCellColumnsView(content: self, count: max(count, 1))
     }
 
@@ -200,7 +200,7 @@ public extension View {
     /// - Parameter anchor: The unit point used to position the view within its
     ///   allocated cell rectangle.
     /// - Returns: A view with the requested grid-cell anchor.
-    nonisolated func gridCellAnchor(_ anchor: UnitPoint) -> some View {
+    public nonisolated func gridCellAnchor(_ anchor: UnitPoint) -> some View {
         GridCellAnchorView(content: self, anchor: anchor)
     }
 
@@ -213,7 +213,7 @@ public extension View {
     ///
     /// - Parameter axes: The axes on which the cell keeps its natural proposal.
     /// - Returns: A view excluded from flexible grid expansion on those axes.
-    nonisolated func gridCellUnsizedAxes(_ axes: Axis.Set) -> some View {
+    public nonisolated func gridCellUnsizedAxes(_ axes: Axis.Set) -> some View {
         GridCellUnsizedAxesView(content: self, axes: axes)
     }
 
@@ -226,7 +226,7 @@ public extension View {
     ///
     /// - Parameter guide: The horizontal guide used by the containing column.
     /// - Returns: A view that proposes this guide for its grid column.
-    nonisolated func gridColumnAlignment(_ guide: HorizontalAlignment) -> some View {
+    public nonisolated func gridColumnAlignment(_ guide: HorizontalAlignment) -> some View {
         GridColumnAlignmentView(content: self, alignment: guide)
     }
 }

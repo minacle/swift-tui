@@ -116,40 +116,40 @@ public enum RunGroupBuilder {
 }
 
 /// Supplies value-preserving inherited-attribute modifiers for run groups.
-public extension RunGroup {
+extension RunGroup {
 
     /// Returns a group whose descendants inherit the given foreground color.
-    func foregroundColor<C>(_ color: C) -> RunGroup where C: Terminal.SGR.Color {
+    public func foregroundColor<C>(_ color: C) -> RunGroup where C: Terminal.SGR.Color {
         modifying { $0.foregroundColor = AnyColor(color) }
     }
 
     /// Returns a group whose descendants inherit the given background color.
-    func backgroundColor<C>(_ color: C) -> RunGroup where C: Terminal.SGR.Color {
+    public func backgroundColor<C>(_ color: C) -> RunGroup where C: Terminal.SGR.Color {
         modifying { $0.backgroundColor = AnyColor(color) }
     }
 
     /// Returns a group that explicitly enables or disables inherited bold text.
-    func bold(_ isActive: Bool = true) -> RunGroup {
+    public func bold(_ isActive: Bool = true) -> RunGroup {
         modifying { $0.isBold = isActive }
     }
 
     /// Returns a group that explicitly enables or disables inherited dim text.
-    func dim(_ isActive: Bool = true) -> RunGroup {
+    public func dim(_ isActive: Bool = true) -> RunGroup {
         modifying { $0.isDim = isActive }
     }
 
     /// Returns a group that explicitly enables or disables inherited italic text.
-    func italic(_ isActive: Bool = true) -> RunGroup {
+    public func italic(_ isActive: Bool = true) -> RunGroup {
         modifying { $0.isItalic = isActive }
     }
 
     /// Returns a group that explicitly enables or disables inherited underlining.
-    func underline(_ isActive: Bool = true) -> RunGroup {
+    public func underline(_ isActive: Bool = true) -> RunGroup {
         modifying { $0.isUnderline = isActive }
     }
 
     /// Returns a group that explicitly enables or disables inherited strikethrough.
-    func strikethrough(_ isActive: Bool = true) -> RunGroup {
+    public func strikethrough(_ isActive: Bool = true) -> RunGroup {
         modifying { $0.isStrikethrough = isActive }
     }
 

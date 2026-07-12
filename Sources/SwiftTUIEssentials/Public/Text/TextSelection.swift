@@ -116,23 +116,23 @@ public nonisolated struct DisabledTextSelectability: TextSelectability {
     }
 }
 
-public extension TextSelectability where Self == EnabledTextSelectability {
+extension TextSelectability where Self == EnabledTextSelectability {
 
     /// A selectability value that enables text selection.
-    static var enabled: EnabledTextSelectability {
+    public static var enabled: EnabledTextSelectability {
         EnabledTextSelectability()
     }
 }
 
-public extension TextSelectability where Self == DisabledTextSelectability {
+extension TextSelectability where Self == DisabledTextSelectability {
 
     /// A selectability value that disables text selection.
-    static var disabled: DisabledTextSelectability {
+    public static var disabled: DisabledTextSelectability {
         DisabledTextSelectability()
     }
 }
 
-public extension View {
+extension View {
 
     /// Controls whether static descendant text registers pointer-selection
     /// regions.
@@ -146,7 +146,7 @@ public extension View {
     /// - Parameter selectability: A value whose type determines whether static
     ///   text selection is enabled.
     /// - Returns: A view with the selection setting applied to descendants.
-    nonisolated func textSelection<S>(_ selectability: S) -> some View
+    public nonisolated func textSelection<S>(_ selectability: S) -> some View
     where S: TextSelectability {
         EnvironmentValueView(
             content: self,
@@ -160,7 +160,7 @@ public extension View {
     ///
     /// - Parameter behavior: The navigation behavior to apply to editable text.
     /// - Returns: A view with the updated text-selection navigation behavior.
-    nonisolated func textSelectionNavigationBehavior(
+    public nonisolated func textSelectionNavigationBehavior(
         _ behavior: TextSelectionNavigationBehavior
     ) -> some View {
         EnvironmentValueView(
@@ -179,13 +179,13 @@ public extension View {
     /// - Parameter style: The selected-text foreground color, or `nil` to keep
     ///   each character's existing foreground.
     /// - Returns: A view with the selected-text foreground override.
-    func textSelectionForegroundStyle<S>(_ style: S?) -> some View
+    public func textSelectionForegroundStyle<S>(_ style: S?) -> some View
     where S: ShapeStyle {
         environment(\.textSelectionForegroundStyle, style.map(AnyShapeStyle.init))
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// The behavior used when keyboard navigation continues a pointer selection.
     ///
@@ -193,7 +193,7 @@ public extension EnvironmentValues {
     /// ``TextSelectionNavigationBehavior/navigationDirection``. Non-Apple
     /// builds such as Linux default to
     /// ``TextSelectionNavigationBehavior/dragEndpoint``.
-    nonisolated var textSelectionNavigationBehavior: TextSelectionNavigationBehavior {
+    public nonisolated var textSelectionNavigationBehavior: TextSelectionNavigationBehavior {
         get {
             self[TextSelectionNavigationBehaviorKey.self]
         }
@@ -206,7 +206,7 @@ public extension EnvironmentValues {
     ///
     /// The default is `nil`, which preserves each selected character's
     /// foreground color.
-    nonisolated var textSelectionForegroundStyle: AnyShapeStyle? {
+    public nonisolated var textSelectionForegroundStyle: AnyShapeStyle? {
         get {
             self[TextSelectionForegroundStyleKey.self]
         }
@@ -435,9 +435,9 @@ final class TextSelectionState {
     }
 }
 
-private extension TextSelection {
+extension TextSelection {
 
-    func characterOffsets(in text: String) -> Range<Int>? {
+    fileprivate func characterOffsets(in text: String) -> Range<Int>? {
         let range: Range<String.Index>
         switch indices {
         case .selection(let selection):

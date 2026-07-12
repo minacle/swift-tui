@@ -473,12 +473,12 @@ public nonisolated struct LayoutSubviews: Equatable, RandomAccessCollection, @un
     }
 }
 
-public extension LayoutSubview {
+extension LayoutSubview {
 
     /// Compares proxies by their child index within the current layout pass.
     ///
     /// Equality has no meaning across distinct layout passes or containers.
-    nonisolated static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
+    public nonisolated static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
         lhs.index == rhs.index
     }
 }
@@ -633,19 +633,19 @@ public nonisolated protocol Layout: Sendable {
     func updateCache(_ cache: inout Cache, subviews: Subviews)
 }
 
-public extension Layout where Cache == Void {
+extension Layout where Cache == Void {
 
     /// Creates the empty cache used by layouts whose `Cache` is `Void`.
     ///
     /// - Parameter subviews: The current pass's child proxies. The default
     ///   implementation does not inspect or retain them.
-    nonisolated func makeCache(subviews: Subviews) {}
+    public nonisolated func makeCache(subviews: Subviews) {}
 }
 
-public extension Layout {
+extension Layout {
 
     /// The default layout properties, with an unknown stack orientation.
-    nonisolated static var layoutProperties: LayoutProperties {
+    public nonisolated static var layoutProperties: LayoutProperties {
         LayoutProperties()
     }
 
@@ -659,7 +659,7 @@ public extension Layout {
     /// - Returns: A spacing value containing the maximum of the default and
     ///   every subview preference on each edge. It therefore remains at least
     ///   two columns horizontally and one row vertically.
-    nonisolated func spacing(
+    public nonisolated func spacing(
         subviews: Subviews,
         cache: inout Cache
     ) -> ViewSpacing {
@@ -674,7 +674,7 @@ public extension Layout {
     /// to remain available to ancestors.
     ///
     /// - Returns: Always `nil`.
-    nonisolated func explicitAlignment(
+    public nonisolated func explicitAlignment(
         of guide: HorizontalAlignment,
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -690,7 +690,7 @@ public extension Layout {
     /// to remain available to ancestors.
     ///
     /// - Returns: Always `nil`.
-    nonisolated func explicitAlignment(
+    public nonisolated func explicitAlignment(
         of guide: VerticalAlignment,
         in bounds: Rect,
         proposal: ProposedViewSize,
@@ -708,7 +708,7 @@ public extension Layout {
     /// - Parameters:
     ///   - cache: The cache value to replace.
     ///   - subviews: The current pass's children used to create the replacement.
-    nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {
+    public nonisolated func updateCache(_ cache: inout Cache, subviews: Subviews) {
         cache = makeCache(subviews: subviews)
     }
 
@@ -720,7 +720,7 @@ public extension Layout {
     ///
     /// - Parameter content: A builder that creates the direct layout children.
     /// - Returns: A view backed by this custom layout value.
-    func callAsFunction<Content: View>(
+    public func callAsFunction<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> some View {
         LayoutContainer(layout: self, content: content())
@@ -881,7 +881,7 @@ nonisolated struct TagValueView<Content: View, Value: Hashable>: View,
     }
 }
 
-public extension View {
+extension View {
 
     /// Sets the priority that custom layouts can read for this child.
     ///
@@ -892,7 +892,7 @@ public extension View {
     /// - Parameter value: The priority value exposed through
     ///   ``LayoutSubview/priority``. The value is stored without normalization.
     /// - Returns: A view with the given layout priority.
-    func layoutPriority(_ value: Double) -> some View {
+    public func layoutPriority(_ value: Double) -> some View {
         LayoutPriorityView(content: self, priority: value)
     }
 
@@ -906,7 +906,7 @@ public extension View {
     ///
     /// - Parameter value: The relative z-axis ordering for this view.
     /// - Returns: A view with the given z-index.
-    func zIndex(_ value: Double) -> some View {
+    public func zIndex(_ value: Double) -> some View {
         ZIndexView(content: self, zIndex: value)
     }
 
@@ -921,7 +921,7 @@ public extension View {
     ///   - key: The concrete layout value key type.
     ///   - value: The value to associate with this view.
     /// - Returns: A view with the specified layout value.
-    func layoutValue<K: LayoutValueKey>(
+    public func layoutValue<K: LayoutValueKey>(
         key: K.Type,
         value: K.Value
     ) -> some View {
@@ -939,7 +939,7 @@ public extension View {
     ///   - keyPath: A writable key path selecting the container value to update.
     ///   - value: The value to associate with this view.
     /// - Returns: A view with the specified container value.
-    nonisolated func containerValue<Value>(
+    public nonisolated func containerValue<Value>(
         _ keyPath: WritableKeyPath<ContainerValues, Value>,
         _ value: Value
     ) -> some View {
@@ -959,7 +959,7 @@ public extension View {
     ///     `Optional<Value>.self`. The default is `true`; pass `false` when an
     ///     optional lookup must not match this nonoptional tag.
     /// - Returns: A view with the specified tag.
-    nonisolated func tag<Value: Hashable>(
+    public nonisolated func tag<Value: Hashable>(
         _ tag: Value,
         includeOptional: Bool = true
     ) -> some View {
@@ -1346,20 +1346,20 @@ struct LayoutPlacement {
     var proposal: ProposedViewSize
 }
 
-private extension ProposedViewSize {
+extension ProposedViewSize {
 
-    init(_ proposal: RenderProposal?) {
+    fileprivate init(_ proposal: RenderProposal?) {
         self.init(columns: proposal?.columns, rows: proposal?.rows)
     }
 
-    nonisolated var renderProposal: RenderProposal {
+    fileprivate nonisolated var renderProposal: RenderProposal {
         RenderProposal(columns: columns, rows: rows)
     }
 }
 
-private extension RenderProposal {
+extension RenderProposal {
 
-    nonisolated var replacingMaximumDimensionsWithUnspecified: RenderProposal {
+    fileprivate nonisolated var replacingMaximumDimensionsWithUnspecified: RenderProposal {
         RenderProposal(
             columns: columns == Int.max ? nil : columns,
             rows: rows == Int.max ? nil : rows
@@ -1367,9 +1367,9 @@ private extension RenderProposal {
     }
 }
 
-private extension RenderedElement {
+extension RenderedElement {
 
-    nonisolated func layoutSize(proposal: RenderProposal) -> Size {
+    fileprivate nonisolated func layoutSize(proposal: RenderProposal) -> Size {
         switch self {
         case .block(let block):
             return Size(columns: block.width, rows: block.height)
@@ -1381,7 +1381,7 @@ private extension RenderedElement {
         }
     }
 
-    nonisolated func renderedBlock(proposal: RenderProposal) -> RenderedBlock? {
+    fileprivate nonisolated func renderedBlock(proposal: RenderProposal) -> RenderedBlock? {
         switch self {
         case .block(let block):
             return block

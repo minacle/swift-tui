@@ -284,7 +284,7 @@ private struct ScrollIndicatorsView<Content: View>: View {
     }
 }
 
-public extension View {
+extension View {
 
     /// Installs the standard scroll indicators on selected scrollable axes.
     ///
@@ -308,7 +308,7 @@ public extension View {
     ///     reserve terminal cells.
     ///   - axes: The scrollable axes to configure. The default configures both.
     /// - Returns: A view with standard indicator attachments and visibility.
-    func scrollIndicators(
+    public func scrollIndicators(
         _ visibility: ScrollIndicatorVisibility,
         axes: Axis.Set = [.vertical, .horizontal]
     ) -> some View {

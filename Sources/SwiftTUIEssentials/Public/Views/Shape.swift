@@ -192,7 +192,7 @@ struct SizedShape<Content: Shape>: Shape {
     let size: Size
 }
 
-public extension Shape {
+extension Shape {
 
     /// Constrains this shape's drawing rectangle without changing its layout
     /// bounds.
@@ -203,7 +203,7 @@ public extension Shape {
     ///
     /// - Parameter size: The drawing extent in terminal columns and rows.
     /// - Returns: A shape that uses `size` for rasterization only.
-    func size(_ size: Size) -> some Shape {
+    public func size(_ size: Size) -> some Shape {
         SizedShape(shape: self, size: size)
     }
 
@@ -216,7 +216,7 @@ public extension Shape {
     ///   - height: The drawing extent in terminal rows. A nonpositive value
     ///     draws no fill.
     /// - Returns: A shape that uses the supplied extent for rasterization only.
-    func size(width: Int, height: Int) -> some Shape {
+    public func size(width: Int, height: Int) -> some Shape {
         size(Size(columns: width, rows: height))
     }
 
@@ -226,7 +226,7 @@ public extension Shape {
     ///
     /// - Parameter offset: The terminal-column and row translation.
     /// - Returns: An offset shape sharing this shape's geometry.
-    func offset(_ offset: Point) -> OffsetShape<Self> {
+    public func offset(_ offset: Point) -> OffsetShape<Self> {
         OffsetShape(shape: self, offset: offset)
     }
 
@@ -236,7 +236,7 @@ public extension Shape {
     ///   - x: The terminal-column translation. The default is `0`.
     ///   - y: The terminal-row translation. The default is `0`.
     /// - Returns: An offset shape clipped to its eventual layout bounds.
-    func offset(x: Int = 0, y: Int = 0) -> OffsetShape<Self> {
+    public func offset(x: Int = 0, y: Int = 0) -> OffsetShape<Self> {
         offset(Point(column: x, row: y))
     }
 
@@ -248,7 +248,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
+    public func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         FillShapeView(shape: self, style: content, fillStyle: style, background: EmptyView())
     }
 
@@ -259,7 +259,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
+    public func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
@@ -270,7 +270,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
+    public func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
@@ -281,7 +281,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
+    public func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         fill(AnyColor(content), style: style)
     }
 
@@ -293,7 +293,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill(
+    public func fill(
         _ content: DefaultColor,
         style: FillStyle = FillStyle()
     ) -> FillShapeView<Self, EmptyView> {
@@ -307,7 +307,7 @@ public extension Shape {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view containing this fill over an empty background.
-    func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView>
+    public func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView>
     where S: Color & ShapeStyle {
         fill(AnyColor(content), style: style)
     }
@@ -320,12 +320,12 @@ public extension Shape {
     /// - Parameter style: Fill preferences to retain; they don't currently
     ///   alter rectangle output.
     /// - Returns: A shape view that resolves its color during rendering.
-    func fill(style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
+    public func fill(style: FillStyle = FillStyle()) -> FillShapeView<Self, EmptyView> {
         FillShapeView(shape: self, style: nil, fillStyle: style, background: EmptyView())
     }
 }
 
-public extension ShapeView {
+extension ShapeView {
 
     /// Adds a type-erased terminal-color fill above this shape view.
     ///
@@ -335,7 +335,7 @@ public extension ShapeView {
     ///     rectangle output.
     /// - Returns: A shape view that composites this view first and the new fill
     ///   second.
-    func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
+    public func fill(_ content: AnyColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         FillShapeView(shape: shape, style: content, fillStyle: style, background: self)
     }
 
@@ -346,7 +346,7 @@ public extension ShapeView {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view with the new fill composited last.
-    func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
+    public func fill(_ content: Color16, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
@@ -357,7 +357,7 @@ public extension ShapeView {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view with the new fill composited last.
-    func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
+    public func fill(_ content: Color256, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
@@ -368,7 +368,7 @@ public extension ShapeView {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view with the new fill composited last.
-    func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
+    public func fill(_ content: TrueColor, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         fill(AnyColor(content), style: style)
     }
 
@@ -379,7 +379,7 @@ public extension ShapeView {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view with the new fill composited last.
-    func fill(
+    public func fill(
         _ content: DefaultColor,
         style: FillStyle = FillStyle()
     ) -> FillShapeView<Content, Self> {
@@ -393,7 +393,7 @@ public extension ShapeView {
     ///   - style: Fill preferences to retain; they don't currently alter
     ///     rectangle output.
     /// - Returns: A shape view with the new fill composited last.
-    func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self>
+    public func fill<S>(_ content: S, style: FillStyle = FillStyle()) -> FillShapeView<Content, Self>
     where S: Color & ShapeStyle {
         fill(AnyColor(content), style: style)
     }
@@ -407,7 +407,7 @@ public extension ShapeView {
     /// - Parameter style: Fill preferences to retain; they don't currently
     ///   alter rectangle output.
     /// - Returns: A shape view with a foreground-resolved layer composited last.
-    func fill(style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
+    public func fill(style: FillStyle = FillStyle()) -> FillShapeView<Content, Self> {
         FillShapeView(shape: shape, style: nil, fillStyle: style, background: self)
     }
 }

@@ -101,9 +101,9 @@ struct OverlayView<Content: View, Overlay: View>: View,
     }
 }
 
-private extension RenderedBlock {
+extension RenderedBlock {
 
-    func fillingBackground(_ backgroundStyle: AnyColor) -> RenderedBlock {
+    fileprivate func fillingBackground(_ backgroundStyle: AnyColor) -> RenderedBlock {
         guard width > 0, height > 0 else {
             return self
         }
@@ -171,7 +171,7 @@ private extension RenderedBlock {
         )
     }
 
-    func appendBackgroundRun(
+    fileprivate func appendBackgroundRun(
         row: Int,
         column: Int,
         width: Int,
@@ -193,7 +193,7 @@ private extension RenderedBlock {
         )
     }
 
-    func append(_ run: RenderedRun, to runs: inout [RenderedRun]) {
+    fileprivate func append(_ run: RenderedRun, to runs: inout [RenderedRun]) {
         guard let last = runs.last,
               last.row == run.row,
               last.column + last.width == run.column,
@@ -291,7 +291,7 @@ enum LayerModifierRenderer {
     }
 }
 
-public extension View {
+extension View {
 
     /// Sets the view's background to a terminal shape style.
     ///
@@ -301,7 +301,7 @@ public extension View {
     ///
     /// - Parameter style: A 16-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
-    func background(_ style: Color16) -> some View {
+    public func background(_ style: Color16) -> some View {
         background(AnyColor(style))
     }
 
@@ -313,7 +313,7 @@ public extension View {
     ///
     /// - Parameter style: A 256-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
-    func background(_ style: Color256) -> some View {
+    public func background(_ style: Color256) -> some View {
         background(AnyColor(style))
     }
 
@@ -325,7 +325,7 @@ public extension View {
     ///
     /// - Parameter style: A true-color terminal SGR style.
     /// - Returns: A view with the given background style behind it.
-    func background(_ style: TrueColor) -> some View {
+    public func background(_ style: TrueColor) -> some View {
         background(AnyColor(style))
     }
 
@@ -337,7 +337,7 @@ public extension View {
     ///
     /// - Parameter style: The terminal default color reset style.
     /// - Returns: A view with the given background style behind it.
-    func background(_ style: DefaultColor) -> some View {
+    public func background(_ style: DefaultColor) -> some View {
         background(AnyColor(style))
     }
 
@@ -349,7 +349,7 @@ public extension View {
     ///
     /// - Parameter style: A type-erased terminal SGR color style.
     /// - Returns: A view with the given background style behind it.
-    func background(_ style: AnyColor) -> some View {
+    public func background(_ style: AnyColor) -> some View {
         BackgroundStyleView(content: self, style: style)
     }
 
@@ -361,7 +361,7 @@ public extension View {
     ///
     /// - Parameter style: A terminal shape style.
     /// - Returns: A view with the given background style behind it.
-    func background<S>(_ style: S) -> some View where S: ShapeStyle {
+    public func background<S>(_ style: S) -> some View where S: ShapeStyle {
         BackgroundStyleView(content: self, style: style._swiftTUIAnyColor)
     }
 
@@ -380,7 +380,7 @@ public extension View {
     ///   - content: A builder evaluated immediately to create the background
     ///     views.
     /// - Returns: A view with the given background content.
-    func background<Background: View>(
+    public func background<Background: View>(
         alignment: Alignment = .center,
         @ViewBuilder content: () -> Background
     ) -> some View {
@@ -404,7 +404,7 @@ public extension View {
     ///   - alignment: The alignment used to place the overlay stack.
     ///   - content: A builder evaluated immediately to create the overlay views.
     /// - Returns: A view with the given overlay content.
-    func overlay<Overlay: View>(
+    public func overlay<Overlay: View>(
         alignment: Alignment = .center,
         @ViewBuilder content: () -> Overlay
     ) -> some View {

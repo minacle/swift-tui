@@ -1,7 +1,7 @@
-public extension Edge {
+extension Edge {
 
     /// An option set of edges in a terminal-cell rectangle.
-    nonisolated struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
+    public nonisolated struct Set: OptionSet, ExpressibleByArrayLiteral, Sendable {
 
         /// The bit mask that stores the selected edges.
         public let rawValue: Int
@@ -607,7 +607,7 @@ extension LayoutModifierRenderable {
     }
 }
 
-public extension View {
+extension View {
 
     /// Adds padding to specific terminal-cell edges of this view.
     ///
@@ -623,7 +623,7 @@ public extension View {
     ///   - length: The number of terminal cells to add to each selected edge.
     ///     `nil` uses one cell and negative values are clamped to zero.
     /// - Returns: A view padded on the selected edges.
-    func padding(_ edges: Edge.Set = .all, _ length: Int? = nil) -> some View {
+    public func padding(_ edges: Edge.Set = .all, _ length: Int? = nil) -> some View {
         PaddingView(
             content: self,
             insets: EdgeInsets(edges: edges, length: max(length ?? 1, 0))
@@ -635,7 +635,7 @@ public extension View {
     /// - Parameter length: The number of terminal cells to add on every edge.
     ///   Negative values are clamped to zero.
     /// - Returns: A view padded on all edges.
-    func padding(_ length: Int) -> some View {
+    public func padding(_ length: Int) -> some View {
         padding(.all, length)
     }
 
@@ -646,7 +646,7 @@ public extension View {
     ///
     /// - Parameter insets: The explicit insets to add around the view.
     /// - Returns: A view padded by the given insets.
-    func padding(_ insets: EdgeInsets) -> some View {
+    public func padding(_ insets: EdgeInsets) -> some View {
         PaddingView(content: self, insets: insets)
     }
 
@@ -672,7 +672,7 @@ public extension View {
     ///   - alignment: The guides used to place or clip the child. The default
     ///     centers it on both axes.
     /// - Returns: A view rendered within the requested frame.
-    func frame(
+    public func frame(
         width: Int? = nil,
         height: Int? = nil,
         alignment: Alignment = .center
@@ -717,7 +717,7 @@ public extension View {
     ///   - alignment: The guides used to place or clip the child. The default
     ///     centers it on both axes.
     /// - Returns: A view rendered within the resolved constrained frame.
-    func frame(
+    public func frame(
         minWidth: Int? = nil,
         idealWidth: Int? = nil,
         maxWidth: Int? = nil,
@@ -745,7 +745,7 @@ public extension View {
     /// own explicit constraints.
     ///
     /// - Returns: A view that ignores proposed columns and rows while measuring.
-    func fixedSize() -> some View {
+    public func fixedSize() -> some View {
         fixedSize(horizontal: true, vertical: true)
     }
 
@@ -759,7 +759,7 @@ public extension View {
     ///   - vertical: Whether to ignore the parent's proposed row count.
     /// - Returns: A view that removes the selected proposal dimensions while
     ///   measuring its content.
-    func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
+    public func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
         FixedSizeView(content: self, horizontal: horizontal, vertical: vertical)
     }
 }

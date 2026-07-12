@@ -23,10 +23,10 @@ public nonisolated protocol ShapeStyle: Sendable {
 
 /// Supplies the standard color-to-``AnyColor`` conversion for terminal color
 /// shape styles.
-public extension ShapeStyle where Self: Color {
+extension ShapeStyle where Self: Color {
 
     /// Erases this terminal color for SwiftTUI styling operations.
-    nonisolated var _swiftTUIAnyColor: AnyColor {
+    public nonisolated var _swiftTUIAnyColor: AnyColor {
         AnyColor(self)
     }
 }
@@ -48,11 +48,11 @@ extension AnyColor: ShapeStyle {
 }
 
 /// Provides named factories for type-erased terminal colors.
-public extension AnyColor {
+extension AnyColor {
 
     /// A type-erased default terminal color.
     @_disfavoredOverload
-    static var `default`: Self {
+    public static var `default`: Self {
         Self(DefaultColor.default)
     }
 
@@ -60,7 +60,7 @@ public extension AnyColor {
     ///
     /// - Parameter color: The 16-color terminal SGR color to erase.
     /// - Returns: A type-erased terminal SGR color.
-    static func color16(_ color: Color16) -> Self {
+    public static func color16(_ color: Color16) -> Self {
         Self(color)
     }
 
@@ -68,7 +68,7 @@ public extension AnyColor {
     ///
     /// - Parameter rawValue: The 256-color terminal SGR index to erase.
     /// - Returns: A type-erased terminal SGR color.
-    static func color256(_ rawValue: UInt8) -> Self {
+    public static func color256(_ rawValue: UInt8) -> Self {
         Self(Color256(rawValue: rawValue))
     }
 
@@ -76,7 +76,7 @@ public extension AnyColor {
     ///
     /// - Parameter color: The 256-color terminal SGR color to erase.
     /// - Returns: A type-erased terminal SGR color.
-    static func color256(_ color: Color256) -> Self {
+    public static func color256(_ color: Color256) -> Self {
         Self(color)
     }
 
@@ -87,7 +87,7 @@ public extension AnyColor {
     ///   - green: The green channel value.
     ///   - blue: The blue channel value.
     /// - Returns: A type-erased terminal SGR color.
-    static func trueColor(red: UInt8, green: UInt8, blue: UInt8) -> Self {
+    public static func trueColor(red: UInt8, green: UInt8, blue: UInt8) -> Self {
         Self(TrueColor(red: red, green: green, blue: blue))
     }
 
@@ -95,7 +95,7 @@ public extension AnyColor {
     ///
     /// - Parameter color: The true-color terminal SGR color to erase.
     /// - Returns: A type-erased terminal SGR color.
-    static func trueColor(_ color: TrueColor) -> Self {
+    public static func trueColor(_ color: TrueColor) -> Self {
         Self(color)
     }
 }
@@ -178,11 +178,11 @@ public enum SwiftTUIAlignmentAttribute: AttributedStringKey {
 }
 
 /// Adds SwiftTUI terminal styling keys to Foundation attributed-string scopes.
-public extension AttributeScopes {
+extension AttributeScopes {
 
     /// The Foundation attribute scope containing SwiftTUI's supported terminal
     /// foreground, background, and paragraph-alignment keys.
-    struct SwiftTUIAttributes: AttributeScope {
+    public struct SwiftTUIAttributes: AttributeScope {
 
         /// The key-path member for a run's terminal foreground color.
         public let foregroundColor: SwiftTUIForegroundColorAttribute
@@ -195,14 +195,14 @@ public extension AttributeScopes {
     }
 
     /// The SwiftTUI attributed-string scope type used by dynamic lookup.
-    var swiftTUI: SwiftTUIAttributes.Type {
+    public var swiftTUI: SwiftTUIAttributes.Type {
         SwiftTUIAttributes.self
     }
 }
 
 /// Enables dynamic-member access to keys in the SwiftTUI attributed-string
 /// scope.
-public extension AttributeDynamicLookup {
+extension AttributeDynamicLookup {
 
     /// Resolves a SwiftTUI scope member to its attributed-string key type.
     ///
@@ -210,7 +210,7 @@ public extension AttributeDynamicLookup {
     ///   ``AttributeScopes/SwiftTUIAttributes``.
     /// - Returns: The key value used by Foundation's attributed-string dynamic
     ///   member lookup.
-    nonisolated subscript<T: AttributedStringKey>(
+    public nonisolated subscript<T: AttributedStringKey>(
         dynamicMember keyPath: KeyPath<AttributeScopes.SwiftTUIAttributes, T>
     ) -> T {
         self[T.self]
@@ -337,14 +337,14 @@ public nonisolated struct Text: View, Equatable, Sendable {
     }
 }
 
-public extension Text {
+extension Text {
 
     /// Determines where SwiftTUI removes characters around a truncation marker.
     ///
     /// The marker is three ASCII period characters (`...`), not U+2026. When
     /// fewer than three columns are available, SwiftTUI emits only the number
     /// of periods that fit.
-    nonisolated enum TruncationMode: Equatable, Hashable, Sendable {
+    public nonisolated enum TruncationMode: Equatable, Hashable, Sendable {
 
         /// Remove characters from the beginning, keeping the line's tail.
         case head
@@ -564,7 +564,7 @@ struct LineLimitView<Content: View>: View, LayoutModifierRenderable,
     }
 }
 
-public extension View {
+extension View {
 
     /// Sets the inherited base foreground color for this view's descendants.
     ///
@@ -574,7 +574,7 @@ public extension View {
     ///
     /// - Parameter style: A 16-color terminal SGR style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle(_ style: Color16) -> some View {
+    public func foregroundStyle(_ style: Color16) -> some View {
         foregroundStyle(AnyColor(style))
     }
 
@@ -586,7 +586,7 @@ public extension View {
     ///
     /// - Parameter style: A 256-color terminal SGR style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle(_ style: Color256) -> some View {
+    public func foregroundStyle(_ style: Color256) -> some View {
         foregroundStyle(AnyColor(style))
     }
 
@@ -598,7 +598,7 @@ public extension View {
     ///
     /// - Parameter style: A true-color terminal SGR style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle(_ style: TrueColor) -> some View {
+    public func foregroundStyle(_ style: TrueColor) -> some View {
         foregroundStyle(AnyColor(style))
     }
 
@@ -610,7 +610,7 @@ public extension View {
     ///
     /// - Parameter style: The terminal default color reset style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle(_ style: DefaultColor) -> some View {
+    public func foregroundStyle(_ style: DefaultColor) -> some View {
         foregroundStyle(AnyColor(style))
     }
 
@@ -622,7 +622,7 @@ public extension View {
     ///
     /// - Parameter style: A terminal SGR color style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle<S>(_ style: S) -> some View
+    public func foregroundStyle<S>(_ style: S) -> some View
     where S: Color & ShapeStyle {
         foregroundStyle(AnyColor(style))
     }
@@ -637,7 +637,7 @@ public extension View {
     /// - Parameter style: A 16-color terminal SGR style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle(_ style: Color16) -> some View {
+    public func backgroundStyle(_ style: Color16) -> some View {
         _backgroundStyle(style)
     }
 
@@ -651,7 +651,7 @@ public extension View {
     /// - Parameter style: A 256-color terminal SGR style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle(_ style: Color256) -> some View {
+    public func backgroundStyle(_ style: Color256) -> some View {
         _backgroundStyle(style)
     }
 
@@ -665,7 +665,7 @@ public extension View {
     /// - Parameter style: A true-color terminal SGR style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle(_ style: TrueColor) -> some View {
+    public func backgroundStyle(_ style: TrueColor) -> some View {
         _backgroundStyle(style)
     }
 
@@ -679,7 +679,7 @@ public extension View {
     /// - Parameter style: The terminal default color reset style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle(_ style: DefaultColor) -> some View {
+    public func backgroundStyle(_ style: DefaultColor) -> some View {
         _backgroundStyle(style)
     }
 
@@ -692,7 +692,7 @@ public extension View {
     /// - Parameter style: A terminal SGR color style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle<S>(_ style: S) -> some View
+    public func backgroundStyle<S>(_ style: S) -> some View
     where S: Color & ShapeStyle {
         _backgroundStyle(style)
     }
@@ -705,7 +705,7 @@ public extension View {
     ///
     /// - Parameter style: A type-erased terminal SGR color style.
     /// - Returns: A view whose descendants inherit the given base foreground.
-    func foregroundStyle(_ style: AnyColor) -> some View {
+    public func foregroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
             $0.foregroundStyle = style
         }
@@ -720,7 +720,7 @@ public extension View {
     /// - Parameter style: A type-erased terminal SGR color style.
     /// - Returns: A view that renders descendant text with the given style.
     @available(*, deprecated, renamed: "background(_:)")
-    func backgroundStyle(_ style: AnyColor) -> some View {
+    public func backgroundStyle(_ style: AnyColor) -> some View {
         _backgroundStyle(style)
     }
 
@@ -759,7 +759,7 @@ public extension View {
     /// - Parameter tint: A 16-color terminal SGR style, or `nil` to clear the
     ///   tint and selected-text background.
     /// - Returns: A view with the updated tint environment.
-    func tint(_ tint: Color16?) -> some View {
+    public func tint(_ tint: Color16?) -> some View {
         self.tint(tint.map { AnyColor($0) })
     }
 
@@ -771,7 +771,7 @@ public extension View {
     /// - Parameter tint: A 256-color terminal SGR style, or `nil` to clear the
     ///   tint and selected-text background.
     /// - Returns: A view with the updated tint environment.
-    func tint(_ tint: Color256?) -> some View {
+    public func tint(_ tint: Color256?) -> some View {
         self.tint(tint.map { AnyColor($0) })
     }
 
@@ -783,7 +783,7 @@ public extension View {
     /// - Parameter tint: A true-color terminal SGR style, or `nil` to clear the
     ///   tint and selected-text background.
     /// - Returns: A view with the updated tint environment.
-    func tint(_ tint: TrueColor?) -> some View {
+    public func tint(_ tint: TrueColor?) -> some View {
         self.tint(tint.map { AnyColor($0) })
     }
 
@@ -795,7 +795,7 @@ public extension View {
     /// - Parameter tint: The default color reset style, or `nil` to clear the
     ///   tint and selected-text background.
     /// - Returns: A view with the updated tint environment.
-    func tint(_ tint: DefaultColor?) -> some View {
+    public func tint(_ tint: DefaultColor?) -> some View {
         self.tint(tint.map { AnyColor($0) })
     }
 
@@ -814,7 +814,7 @@ public extension View {
     /// - Parameter isActive: Pass `true` to enable bold SGR styling, or `false`
     ///   to clear the inherited bold flag.
     /// - Returns: A view with the updated text style environment.
-    func bold(_ isActive: Bool = true) -> some View {
+    public func bold(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isBold = isActive
         }
@@ -825,7 +825,7 @@ public extension View {
     /// - Parameter isActive: Pass `true` to enable dim SGR styling, or `false`
     ///   to clear dim styling for descendant text.
     /// - Returns: A view with the updated text style environment.
-    func dim(_ isActive: Bool = true) -> some View {
+    public func dim(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isDim = isActive
         }
@@ -840,7 +840,7 @@ public extension View {
     /// - Parameter isActive: Pass `true` to enable italic SGR styling, or
     ///   `false` to clear the inherited italic flag.
     /// - Returns: A view with the updated text style environment.
-    func italic(_ isActive: Bool = true) -> some View {
+    public func italic(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isItalic = isActive
         }
@@ -851,7 +851,7 @@ public extension View {
     /// - Parameter isActive: Pass `true` to enable underline SGR styling, or
     ///   `false` to clear underline styling for descendant text.
     /// - Returns: A view with the updated text style environment.
-    func underline(_ isActive: Bool = true) -> some View {
+    public func underline(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isUnderline = isActive
         }
@@ -866,7 +866,7 @@ public extension View {
     /// - Parameter isActive: Pass `true` to enable strikethrough SGR styling,
     ///   or `false` to clear the inherited strikethrough flag.
     /// - Returns: A view with the updated text style environment.
-    func strikethrough(_ isActive: Bool = true) -> some View {
+    public func strikethrough(_ isActive: Bool = true) -> some View {
         transformEnvironment(\.textStyle) {
             $0.isStrikethrough = isActive
         }
@@ -878,7 +878,7 @@ public extension View {
     ///   `nil` to remove an inherited limit.
     /// - Returns: A view that applies the line limit to descendant text.
     /// - Precondition: `number == nil || number! >= 1`.
-    func lineLimit(_ number: Int?) -> some View {
+    public func lineLimit(_ number: Int?) -> some View {
         lineLimit(number, reservesSpace: false)
     }
 
@@ -891,7 +891,7 @@ public extension View {
     ///     that many rows even when the text uses fewer rows.
     /// - Returns: A view that applies the line limit to descendant text.
     /// - Precondition: `number == nil || number! >= 1`.
-    func lineLimit(_ number: Int?, reservesSpace: Bool) -> some View {
+    public func lineLimit(_ number: Int?, reservesSpace: Bool) -> some View {
         if let number {
             precondition(number >= 1, "lineLimit must be greater than zero.")
         }
@@ -911,7 +911,7 @@ public extension View {
     /// - Parameter mode: The location from which to remove text around the
     ///   ASCII-period marker.
     /// - Returns: A view with the specified truncation mode.
-    nonisolated func truncationMode(_ mode: Text.TruncationMode) -> some View {
+    public nonisolated func truncationMode(_ mode: Text.TruncationMode) -> some View {
         EnvironmentValueView(
             content: self,
             keyPath: \.truncationMode,
@@ -930,7 +930,7 @@ public extension View {
     ///
     /// - Parameter alignment: The alignment to apply to text lines.
     /// - Returns: A view with the specified multiline text alignment.
-    nonisolated func multilineTextAlignment(_ alignment: TextAlignment) -> some View {
+    public nonisolated func multilineTextAlignment(_ alignment: TextAlignment) -> some View {
         EnvironmentValueView(
             content: self,
             keyPath: \.multilineTextAlignment,
@@ -939,13 +939,13 @@ public extension View {
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// The maximum number of terminal rows that text can occupy.
     ///
     /// A value less than one is treated as one. The default value is `nil`,
     /// which allows text to use as many rows as it needs.
-    nonisolated var lineLimit: Int? {
+    public nonisolated var lineLimit: Int? {
         get {
             textLineLimit.number
         }
@@ -960,7 +960,7 @@ public extension EnvironmentValues {
     /// The mode used to truncate the last visible line of text.
     ///
     /// The default is ``Text/TruncationMode/tail``.
-    nonisolated var truncationMode: Text.TruncationMode {
+    public nonisolated var truncationMode: Text.TruncationMode {
         get {
             self[TruncationModeKey.self]
         }
@@ -973,7 +973,7 @@ public extension EnvironmentValues {
     /// alignment override.
     ///
     /// The default is ``TextAlignment/leading``.
-    nonisolated var multilineTextAlignment: TextAlignment {
+    public nonisolated var multilineTextAlignment: TextAlignment {
         get {
             self[MultilineTextAlignmentKey.self]
         }

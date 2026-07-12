@@ -161,7 +161,7 @@ protocol LifecycleModifierRenderable {
     ) -> RenderedElement?
 }
 
-public extension View {
+extension View {
 
     /// Adds an action to perform when this view first appears at an identity.
     ///
@@ -171,7 +171,7 @@ public extension View {
     ///
     /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
     /// - Returns: A view with an appear handler attached.
-    func onAppear(perform action: (() -> Void)? = nil) -> some View {
+    public func onAppear(perform action: (() -> Void)? = nil) -> some View {
         LifecycleView(
             content: self,
             phase: .appear,
@@ -189,7 +189,7 @@ public extension View {
     ///
     /// - Parameter action: The action to perform. Passing `nil` installs a no-op.
     /// - Returns: A view with a disappear handler attached.
-    func onDisappear(perform action: (() -> Void)? = nil) -> some View {
+    public func onDisappear(perform action: (() -> Void)? = nil) -> some View {
         LifecycleView(
             content: self,
             phase: .disappear,
@@ -217,7 +217,7 @@ public extension View {
     ///   - action: The escaping asynchronous operation. Its inherited actor
     ///     isolation remains authoritative for execution.
     /// - Returns: A view with a rendered-hierarchy-scoped task attached.
-    nonisolated func task(
+    public nonisolated func task(
         name: String? = nil,
         priority: TaskPriority = .userInitiated,
         file: String = #fileID,
@@ -254,7 +254,7 @@ public extension View {
     ///   - line: Currently ignored; no source-line metadata is retained.
     ///   - action: The escaping asynchronous operation to run.
     /// - Returns: A view with a rendered-hierarchy-scoped task attached.
-    nonisolated func task(
+    public nonisolated func task(
         name: String? = nil,
         executorPreference taskExecutor: any TaskExecutor,
         priority: TaskPriority = .userInitiated,
@@ -293,7 +293,7 @@ public extension View {
     ///   - action: The escaping asynchronous operation. Its inherited actor
     ///     isolation remains authoritative for execution.
     /// - Returns: A view with an identity-scoped task attached.
-    nonisolated func task<ID: Equatable>(
+    public nonisolated func task<ID: Equatable>(
         id value: ID,
         name: String? = nil,
         priority: TaskPriority = .userInitiated,
@@ -334,7 +334,7 @@ public extension View {
     ///   - line: Currently ignored; no source-line metadata is retained.
     ///   - action: The escaping asynchronous operation to run.
     /// - Returns: A view with an identity-scoped task attached.
-    nonisolated func task<ID: Equatable>(
+    public nonisolated func task<ID: Equatable>(
         id value: ID,
         name: String? = nil,
         executorPreference taskExecutor: any TaskExecutor,

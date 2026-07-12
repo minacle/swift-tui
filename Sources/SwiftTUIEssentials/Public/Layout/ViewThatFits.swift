@@ -127,9 +127,9 @@ extension ViewThatFits: ViewThatFitsRenderable, LayoutTraitRenderable {
     }
 }
 
-private extension RenderedElement {
+extension RenderedElement {
 
-    func fits(in proposal: RenderProposal?, axes: Axis.Set) -> Bool {
+    fileprivate func fits(in proposal: RenderProposal?, axes: Axis.Set) -> Bool {
         let size = measuredSize(proposal: proposal)
 
         if axes.contains(.horizontal),
@@ -147,7 +147,7 @@ private extension RenderedElement {
         return true
     }
 
-    func measuredSize(proposal: RenderProposal?) -> Size {
+    fileprivate func measuredSize(proposal: RenderProposal?) -> Size {
         switch self {
         case .block(let block):
             Size(columns: block.width, rows: block.height)
@@ -159,7 +159,7 @@ private extension RenderedElement {
         }
     }
 
-    func renderedBlock(proposal: RenderProposal?) -> RenderedBlock? {
+    fileprivate func renderedBlock(proposal: RenderProposal?) -> RenderedBlock? {
         switch self {
         case .block(let block):
             return block

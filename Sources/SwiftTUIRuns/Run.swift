@@ -101,40 +101,40 @@ public struct Run: Equatable, Sendable {
 }
 
 /// Supplies value-preserving terminal-attribute modifiers for runs.
-public extension Run {
+extension Run {
 
     /// Returns a run with an explicit foreground color.
-    func foregroundColor<C>(_ color: C) -> Run where C: Terminal.SGR.Color {
+    public func foregroundColor<C>(_ color: C) -> Run where C: Terminal.SGR.Color {
         modifying { $0.foregroundColor = AnyColor(color) }
     }
 
     /// Returns a run with an explicit background color.
-    func backgroundColor<C>(_ color: C) -> Run where C: Terminal.SGR.Color {
+    public func backgroundColor<C>(_ color: C) -> Run where C: Terminal.SGR.Color {
         modifying { $0.backgroundColor = AnyColor(color) }
     }
 
     /// Returns a run that explicitly enables or disables bold text.
-    func bold(_ isActive: Bool = true) -> Run {
+    public func bold(_ isActive: Bool = true) -> Run {
         modifying { $0.isBold = isActive }
     }
 
     /// Returns a run that explicitly enables or disables dim text.
-    func dim(_ isActive: Bool = true) -> Run {
+    public func dim(_ isActive: Bool = true) -> Run {
         modifying { $0.isDim = isActive }
     }
 
     /// Returns a run that explicitly enables or disables italic text.
-    func italic(_ isActive: Bool = true) -> Run {
+    public func italic(_ isActive: Bool = true) -> Run {
         modifying { $0.isItalic = isActive }
     }
 
     /// Returns a run that explicitly enables or disables underlining.
-    func underline(_ isActive: Bool = true) -> Run {
+    public func underline(_ isActive: Bool = true) -> Run {
         modifying { $0.isUnderline = isActive }
     }
 
     /// Returns a run that explicitly enables or disables strikethrough.
-    func strikethrough(_ isActive: Bool = true) -> Run {
+    public func strikethrough(_ isActive: Bool = true) -> Run {
         modifying { $0.isStrikethrough = isActive }
     }
 

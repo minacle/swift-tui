@@ -314,14 +314,14 @@ public struct RunLayout: Equatable, Sendable {
 }
 
 /// Measures and lays out recursive run groups.
-public extension RunGroup {
+extension RunGroup {
 
     /// Measures the group's intrinsic terminal-cell requirements.
     ///
     /// - Returns: Metrics computed with SwiftTUIRuns' fixed Unicode width and
     ///   emergency-wrapping policy.
     /// - Complexity: O(n), where n is the number of characters.
-    func measure() -> RunMetrics {
+    public func measure() -> RunMetrics {
         let content = flattenedRuns().map(\.content).joined()
         var minimumContentColumns = 0
         var totalColumns = 0
@@ -359,7 +359,7 @@ public extension RunGroup {
     /// - Returns: Visual lines and placed run fragments with source mapping.
     /// - Complexity: O(n + b), where n is the number of characters and b is
     ///   the number of examined Unicode line-break opportunities.
-    func layout(fittingColumns columns: Int? = nil) -> RunLayout {
+    public func layout(fittingColumns columns: Int? = nil) -> RunLayout {
         let flattened = flattenedContent()
         let wrappedLines = RunLineWrapper.wrappedLines(
             for: flattened.content,

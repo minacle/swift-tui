@@ -454,7 +454,7 @@ public enum HoverPhase: Equatable, Sendable {
 }
 
 
-public extension View {
+extension View {
 
     /// Performs an action when this view recognizes a tap gesture.
     ///
@@ -469,7 +469,7 @@ public extension View {
     ///   - action: The action to perform.
     /// - Returns: A view with a tap gesture handler attached.
     /// - Precondition: `count >= 1`.
-    func onTapGesture(
+    public func onTapGesture(
         count: Int = 1,
         perform action: @escaping () -> Void
     ) -> some View {
@@ -494,7 +494,7 @@ public extension View {
     ///   - action: The action to perform with the tap location.
     /// - Returns: A view with a tap gesture handler attached.
     /// - Precondition: `count >= 1`.
-    func onTapGesture(
+    public func onTapGesture(
         count: Int = 1,
         coordinateSpace: CoordinateSpace = .local,
         perform action: @escaping (Point) -> Void
@@ -516,7 +516,7 @@ public extension View {
     ///
     /// - Parameter action: The action to perform for a matching pointer press.
     /// - Returns: A view with a pointer-press handler attached.
-    nonisolated func onPointerPress(
+    public nonisolated func onPointerPress(
         action: @escaping () -> PointerPress.Result
     ) -> some View {
         onPointerPress(.left, phases: .down, coordinateSpace: .local) {
@@ -542,7 +542,7 @@ public extension View {
     ///   - coordinateSpace: The frame of reference for reported locations.
     ///   - action: The action to invoke synchronously for every drag phase.
     /// - Returns: A view with a pointer-drag handler attached.
-    nonisolated func onPointerDrag(
+    public nonisolated func onPointerDrag(
         _ button: PointerButton = .left,
         coordinateSpace: CoordinateSpace = .local,
         perform action: @escaping (PointerDrag) -> Void
@@ -576,7 +576,7 @@ public extension View {
     ///   - action: The action to perform for matching pointer presses.
     /// - Returns: A view with a pointer-press handler attached.
     @_disfavoredOverload
-    nonisolated func onPointerPress(
+    public nonisolated func onPointerPress(
         phases: PointerPress.Phases = .down,
         buttons: Set<PointerButton> = [.left],
         coordinateSpace: CoordinateSpace = .local,
@@ -602,7 +602,7 @@ public extension View {
     ///   - button: The pointer button to match.
     ///   - action: The action to perform for a matching pointer press.
     /// - Returns: A view with a pointer-press handler attached.
-    nonisolated func onPointerPress(
+    public nonisolated func onPointerPress(
         _ button: PointerButton,
         action: @escaping () -> PointerPress.Result
     ) -> some View {
@@ -624,7 +624,7 @@ public extension View {
     ///     locations. The default is ``CoordinateSpace/local``.
     ///   - action: The action to perform for matching pointer presses.
     /// - Returns: A view with a pointer-press handler attached.
-    nonisolated func onPointerPress(
+    public nonisolated func onPointerPress(
         _ button: PointerButton,
         phases: PointerPress.Phases,
         coordinateSpace: CoordinateSpace = .local,
@@ -649,7 +649,7 @@ public extension View {
     ///     locations. The default is ``CoordinateSpace/local``.
     ///   - action: The action to perform for matching pointer presses.
     /// - Returns: A view with a pointer-press handler attached.
-    nonisolated func onPointerPress(
+    public nonisolated func onPointerPress(
         buttons: Set<PointerButton>,
         phases: PointerPress.Phases = .down,
         coordinateSpace: CoordinateSpace = .local,
@@ -672,7 +672,7 @@ public extension View {
     ///
     /// - Parameter action: The action to perform with the current hover state.
     /// - Returns: A view with a hover handler attached.
-    func onHover(perform action: @escaping (Bool) -> Void) -> some View {
+    public func onHover(perform action: @escaping (Bool) -> Void) -> some View {
         HoverGestureView(
             content: self,
             handler: HoverGestureHandler(
@@ -694,7 +694,7 @@ public extension View {
     ///   - coordinateSpace: The coordinate space for active hover locations.
     ///   - action: The action to perform with each hover phase.
     /// - Returns: A view with a continuous hover handler attached.
-    func onContinuousHover(
+    public func onContinuousHover(
         coordinateSpace: CoordinateSpace = .local,
         perform action: @escaping (HoverPhase) -> Void
     ) -> some View {
@@ -726,7 +726,7 @@ public extension View {
     ///     matching pointer-down and `false` on release, cancellation, or
     ///     movement beyond the allowed extent.
     /// - Returns: A view with a long-press gesture handler attached.
-    func onLongPressGesture(
+    public func onLongPressGesture(
         minimumDuration: Double = 0.5,
         maximumDistance: Size = .zero,
         perform action: @escaping () -> Void,
@@ -759,7 +759,7 @@ public extension View {
     /// - Returns: A view that registers the named space at its rendered bounds.
     /// - Precondition: `name` was created with ``CoordinateSpace/named(_:)``;
     ///   passing ``CoordinateSpace/local`` or ``CoordinateSpace/global`` traps.
-    func coordinateSpace(_ name: CoordinateSpace) -> some View {
+    public func coordinateSpace(_ name: CoordinateSpace) -> some View {
         precondition(name.name != nil, "coordinateSpace(_:) requires a named coordinate space.")
 
         return CoordinateSpaceView(content: self, coordinateSpace: name)
@@ -774,7 +774,7 @@ public extension View {
     ///     Return ``KeyPress/Result/handled`` to stop ancestor and global
     ///     propagation.
     /// - Returns: A view with a focused key handler attached.
-    nonisolated func onKeyPress(
+    public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
         action: @escaping () -> KeyPress.Result
     ) -> some View {
@@ -793,7 +793,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    nonisolated func onKeyPress(
+    public nonisolated func onKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
     ) -> some View {
@@ -817,7 +817,7 @@ public extension View {
     ///   - phases: The key phases to match. An empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    nonisolated func onKeyPress(
+    public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -834,7 +834,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    nonisolated func onKeyPress(
+    public nonisolated func onKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -861,7 +861,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a focused key handler attached.
-    nonisolated func onKeyPress(
+    public nonisolated func onKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -890,7 +890,7 @@ public extension View {
     ///   - action: The action to perform for matching key-down or repeat events.
     ///     Return ``KeyPress/Result/handled`` to stop later global handlers.
     /// - Returns: A view with a global key handler attached.
-    func onGlobalKeyPress(
+    public func onGlobalKeyPress(
         _ key: KeyEquivalent,
         action: @escaping () -> KeyPress.Result
     ) -> some View {
@@ -909,7 +909,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a global key handler attached.
-    func onGlobalKeyPress(
+    public func onGlobalKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
     ) -> some View {
@@ -933,7 +933,7 @@ public extension View {
     ///   - phases: The key phases to match. An empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a global key handler attached.
-    func onGlobalKeyPress(
+    public func onGlobalKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -950,7 +950,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a global key handler attached.
-    func onGlobalKeyPress(
+    public func onGlobalKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -977,7 +977,7 @@ public extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a global key handler attached.
-    func onGlobalKeyPress(
+    public func onGlobalKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result

@@ -259,9 +259,9 @@ private nonisolated enum OptionalCountContainerValueKey: ContainerValueKey {
     static let defaultValue: Int? = 9
 }
 
-private extension ContainerValues {
+extension ContainerValues {
 
-    nonisolated var rank: Int {
+    fileprivate nonisolated var rank: Int {
         get {
             self[RankContainerValueKey.self]
         }
@@ -270,7 +270,7 @@ private extension ContainerValues {
         }
     }
 
-    nonisolated var metadata: ContainerMetadata {
+    fileprivate nonisolated var metadata: ContainerMetadata {
         get {
             self[MetadataContainerValueKey.self]
         }
@@ -279,7 +279,7 @@ private extension ContainerValues {
         }
     }
 
-    nonisolated var optionalCount: Int? {
+    fileprivate nonisolated var optionalCount: Int? {
         get {
             self[OptionalCountContainerValueKey.self]
         }

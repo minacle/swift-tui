@@ -62,9 +62,9 @@ extension KeyPress {
     }
 }
 
-private extension KeyEquivalent {
+extension KeyEquivalent {
 
-    var isTextInputPrintableCharacter: Bool {
+    fileprivate var isTextInputPrintableCharacter: Bool {
         switch self {
         case .upArrow, .downArrow, .leftArrow, .rightArrow,
                 .clear, .delete, .deleteForward, .end, .escape,

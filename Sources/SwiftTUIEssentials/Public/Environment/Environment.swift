@@ -243,14 +243,14 @@ public nonisolated struct EnvironmentValues {
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// Indicates whether descendants can register user-interaction handlers.
     ///
     /// The default is `true`. ``View/disabled(_:)`` combines its value with the
     /// inherited setting, so a descendant can't re-enable interaction beneath
     /// a disabled ancestor by applying `disabled(false)`.
-    nonisolated var isEnabled: Bool {
+    public nonisolated var isEnabled: Bool {
         get {
             self[IsEnabledKey.self]
         }
@@ -264,7 +264,7 @@ public extension EnvironmentValues {
     ///
     /// SwiftTUI maintains this read-only value while resolving a focused view.
     /// It defaults to `false` outside that scope.
-    internal(set) nonisolated var isFocused: Bool {
+    public internal(set) nonisolated var isFocused: Bool {
         get {
             self[IsFocusedKey.self]
         }
@@ -278,7 +278,7 @@ public extension EnvironmentValues {
     /// SwiftTUI sets this read-only value inside an active navigation
     /// destination, including value-, Boolean-, item-, and explicitly pushed
     /// destinations. It defaults to `false` elsewhere.
-    internal(set) nonisolated var isPresented: Bool {
+    public internal(set) nonisolated var isPresented: Bool {
         get {
             self[IsPresentedKey.self]
         }
@@ -291,7 +291,7 @@ public extension EnvironmentValues {
     ///
     /// The default is `true`. This setting controls interaction; it doesn't
     /// remove the scroll view or change its current scroll position.
-    nonisolated var isScrollEnabled: Bool {
+    public nonisolated var isScrollEnabled: Bool {
         get {
             self[IsScrollEnabledKey.self]
         }
@@ -304,7 +304,7 @@ public extension EnvironmentValues {
     ///
     /// The default action discards text until the root app runner installs a
     /// terminal clipboard service.
-    nonisolated var copy: CopyAction {
+    public nonisolated var copy: CopyAction {
         get {
             self[CopyActionKey.self]
         }
@@ -317,7 +317,7 @@ public extension EnvironmentValues {
     ///
     /// The default action returns `nil` until the root app runner installs a
     /// terminal clipboard service.
-    nonisolated var paste: PasteAction {
+    public nonisolated var paste: PasteAction {
         get {
             self[PasteActionKey.self]
         }
@@ -329,7 +329,7 @@ public extension EnvironmentValues {
     /// An action that pops the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
-    var pop: PopAction {
+    public var pop: PopAction {
         get {
             self[PopActionKey.self]
         }
@@ -341,7 +341,7 @@ public extension EnvironmentValues {
     /// An action that dismisses the current presentation.
     ///
     /// The default action does nothing outside a dismissible presentation.
-    internal(set) var dismiss: DismissAction {
+    public internal(set) var dismiss: DismissAction {
         get {
             self[DismissActionKey.self]
         }
@@ -353,7 +353,7 @@ public extension EnvironmentValues {
     /// An action that pushes a value or destination onto the current navigation stack.
     ///
     /// The default action does nothing outside a navigation stack.
-    var push: PushAction {
+    public var push: PushAction {
         get {
             self[PushActionKey.self]
         }
@@ -365,7 +365,7 @@ public extension EnvironmentValues {
     /// An action that terminates the running SwiftTUI app.
     ///
     /// The default action does nothing until the root app runner installs one.
-    var terminate: TerminateAction {
+    public var terminate: TerminateAction {
         get {
             self[TerminateActionKey.self]
         }
@@ -377,7 +377,7 @@ public extension EnvironmentValues {
     /// An action that opens a URL.
     ///
     /// The default action discards URLs and performs no system side effects.
-    var openURL: OpenURLAction {
+    public var openURL: OpenURLAction {
         get {
             self[OpenURLActionKey.self]
         }
@@ -879,7 +879,7 @@ extension EnvironmentModifierRenderable {
     }
 }
 
-public extension View {
+extension View {
 
     /// Adds a condition that controls whether users can interact with this view.
     ///
@@ -888,7 +888,7 @@ public extension View {
     ///   setting; it doesn't override a disabled ancestor.
     /// - Returns: A view whose descendants register interaction only while the
     ///   inherited environment and this modifier are both enabled.
-    nonisolated func disabled(_ disabled: Bool) -> some View {
+    public nonisolated func disabled(_ disabled: Bool) -> some View {
         TransformedEnvironmentView(
             content: self,
             keyPath: \.isEnabled,
@@ -908,7 +908,7 @@ public extension View {
     ///   - keyPath: A writable key path into ``EnvironmentValues``.
     ///   - value: The value to expose to descendant views.
     /// - Returns: A view with the updated environment value.
-    nonisolated func environment<Value>(
+    public nonisolated func environment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         _ value: Value
     ) -> some View {
@@ -927,7 +927,7 @@ public extension View {
     ///
     /// - Parameter object: The observable object to expose to descendant views.
     /// - Returns: A view with the observable object in its environment.
-    func environment<Value>(
+    public func environment<Value>(
         _ object: Value
     ) -> some View where Value: AnyObject & Observable {
         TypedEnvironmentObjectView(content: self, object: object)
@@ -945,7 +945,7 @@ public extension View {
     ///   - transform: A closure that mutates the environment value before
     ///     descendant views are resolved.
     /// - Returns: A view with the transformed environment value.
-    func transformEnvironment<Value>(
+    public func transformEnvironment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         transform: @escaping (inout Value) -> Void
     ) -> some View {
@@ -972,7 +972,7 @@ public extension View {
     ///
     /// - Parameter action: The action to run for a termination request.
     /// - Returns: A view with a termination handler attached.
-    func onTerminate(perform action: @escaping () -> Void) -> some View {
+    public func onTerminate(perform action: @escaping () -> Void) -> some View {
         OnTerminateView(
             content: self,
             actionPath: StateContext.currentPath,
@@ -992,7 +992,7 @@ public extension View {
     ///
     /// - Parameter action: The action to run with the incoming URL.
     /// - Returns: A view with an incoming URL handler attached.
-    func onOpenURL(perform action: @escaping (URL) -> Void) -> some View {
+    public func onOpenURL(perform action: @escaping (URL) -> Void) -> some View {
         OnOpenURLView(
             content: self,
             actionPath: StateContext.currentPath,

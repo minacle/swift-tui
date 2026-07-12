@@ -147,7 +147,7 @@ enum EdgeInsetRenderer {
     }
 }
 
-public extension View {
+extension View {
 
     /// Places content beside an edge of this view and reduces the space
     /// proposed to this view by the content's size.
@@ -172,7 +172,7 @@ public extension View {
     ///     Multiple builder children are grouped into that region.
     /// - Returns: A view with the supplemental content placed beside the
     ///   selected edge.
-    func edgeInset<Inset: View>(
+    public func edgeInset<Inset: View>(
         _ edge: Edge,
         spacing: Int = 0,
         @ViewBuilder content: () -> Inset

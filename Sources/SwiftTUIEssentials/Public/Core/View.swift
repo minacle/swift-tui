@@ -23,13 +23,13 @@ public protocol View {
     var body: Body { get }
 }
 
-public extension View where Body == Never {
+extension View where Body == Never {
 
     /// A body implementation for primitive views.
     ///
     /// Primitive views are resolved directly by SwiftTUI and must not evaluate
     /// their `body`.
-    var body: Never {
+    public var body: Never {
         fatalError("Primitive SwiftTUI views do not have a body.")
     }
 }
@@ -272,7 +272,7 @@ extension ForEach: View where Content: View {
     public typealias Body = Never
 }
 
-public extension ForEach where Content: View {
+extension ForEach where Content: View {
 
     /// Creates child views from identified collection data.
     ///
@@ -282,7 +282,7 @@ public extension ForEach where Content: View {
     ///   - content: A view builder that creates a view for each element.
     /// - Precondition: Every element produces a unique value at `id` during a
     ///   render pass.
-    init(
+    public init(
         _ data: Data,
         id: KeyPath<Data.Element, ID>,
         @ViewBuilder content: @escaping (Data.Element) -> Content
@@ -294,7 +294,7 @@ public extension ForEach where Content: View {
     }
 }
 
-public extension ForEach
+extension ForEach
 where Data.Element: Identifiable, ID == Data.Element.ID, Content: View {
 
     /// Creates child views from identifiable collection data.
@@ -303,7 +303,7 @@ where Data.Element: Identifiable, ID == Data.Element.ID, Content: View {
     ///   - data: A random-access collection whose elements are `Identifiable`.
     ///   - content: A view builder that creates a view for each element.
     /// - Precondition: Every element has a unique `id` during a render pass.
-    init(
+    public init(
         _ data: Data,
         @ViewBuilder content: @escaping (Data.Element) -> Content
     ) {
@@ -311,14 +311,14 @@ where Data.Element: Identifiable, ID == Data.Element.ID, Content: View {
     }
 }
 
-public extension ForEach where Data == Range<Int>, ID == Int, Content: View {
+extension ForEach where Data == Range<Int>, ID == Int, Content: View {
 
     /// Creates child views for each integer in a range.
     ///
     /// - Parameters:
     ///   - data: The range of integer values to render.
     ///   - content: A view builder that creates a view for each value.
-    init(
+    public init(
         _ data: Range<Int>,
         @ViewBuilder content: @escaping (Int) -> Content
     ) {

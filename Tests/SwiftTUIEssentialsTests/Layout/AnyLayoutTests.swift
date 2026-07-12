@@ -173,9 +173,9 @@ private nonisolated enum AnyLayoutMarkerAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
+extension HorizontalAlignment {
 
-    nonisolated static let anyLayoutMarker = HorizontalAlignment(
+    fileprivate nonisolated static let anyLayoutMarker = HorizontalAlignment(
         AnyLayoutMarkerAlignment.self
     )
 }

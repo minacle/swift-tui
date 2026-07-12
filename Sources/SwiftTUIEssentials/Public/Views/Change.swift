@@ -147,7 +147,7 @@ protocol ChangeModifierRenderable {
     ) -> RenderedElement?
 }
 
-public extension View {
+extension View {
 
     /// Runs an action when a value changes and, optionally, on registration.
     ///
@@ -164,7 +164,7 @@ public extension View {
     ///   - action: The escaping action to run after a detected change or the
     ///     requested initial registration.
     /// - Returns: A view with a change handler attached.
-    func onChange<Value: Equatable>(
+    public func onChange<Value: Equatable>(
         of value: Value,
         initial: Bool = false,
         _ action: @escaping () -> Void
@@ -195,7 +195,7 @@ public extension View {
     ///     values after a detected change, or with the initial value in both
     ///     positions for a requested initial registration.
     /// - Returns: A view with a change handler attached.
-    func onChange<Value: Equatable>(
+    public func onChange<Value: Equatable>(
         of value: Value,
         initial: Bool = false,
         _ action: @escaping (Value, Value) -> Void

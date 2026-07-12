@@ -90,14 +90,14 @@ private nonisolated struct ViewAttachmentEntry<Context> {
     let content: @MainActor (Context) -> AnyView
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
 
     /// The view factories installed for descendant containers.
     ///
     /// Consumers request a factory by its ``ViewAttachmentKey``. The default
     /// value is empty, and each `viewAttachment(_:content:)` modifier replaces
     /// the inherited factory only for its key.
-    internal(set) nonisolated var viewAttachments: ViewAttachments {
+    public internal(set) nonisolated var viewAttachments: ViewAttachments {
         get {
             self[ViewAttachmentsKey.self]
         }
@@ -114,7 +114,7 @@ private struct ViewAttachmentsKey: EnvironmentKey {
     }
 }
 
-public extension View {
+extension View {
 
     /// Installs a lazily created view for a descendant container.
     ///
@@ -128,7 +128,7 @@ public extension View {
     ///   - key: The semantic attachment point to install.
     ///   - content: A builder that receives context from the consumer.
     /// - Returns: A view that exposes the attachment to its descendants.
-    func viewAttachment<Key: ViewAttachmentKey, Attachment: View>(
+    public func viewAttachment<Key: ViewAttachmentKey, Attachment: View>(
         _ key: Key.Type,
         @ViewBuilder content: @escaping @MainActor (Key.Context) -> Attachment
     ) -> some View {
@@ -143,7 +143,7 @@ public extension View {
     ///   - key: The semantic attachment point to install.
     ///   - content: A builder evaluated when a descendant requests the view.
     /// - Returns: A view that exposes the attachment to its descendants.
-    func viewAttachment<Key: ViewAttachmentKey, Attachment: View>(
+    public func viewAttachment<Key: ViewAttachmentKey, Attachment: View>(
         _ key: Key.Type,
         @ViewBuilder content: @escaping @MainActor () -> Attachment
     ) -> some View where Key.Context == Void {

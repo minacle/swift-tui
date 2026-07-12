@@ -293,7 +293,7 @@ private struct VerticalAlignmentGuideView<Content: View>: View,
     }
 }
 
-public extension View {
+extension View {
 
     /// Assigns an explicit horizontal alignment guide to this view.
     ///
@@ -310,7 +310,7 @@ public extension View {
     ///   - computeValue: A closure that returns a local terminal-column
     ///     coordinate from the measured dimensions.
     /// - Returns: A view that reports the explicit guide to its parent layout.
-    func alignmentGuide(
+    public func alignmentGuide(
         _ guide: HorizontalAlignment,
         computeValue: @escaping @Sendable (ViewDimensions) -> Int
     ) -> some View {
@@ -336,7 +336,7 @@ public extension View {
     ///   - computeValue: A closure that returns a local terminal-row coordinate
     ///     from the measured dimensions.
     /// - Returns: A view that reports the explicit guide to its parent layout.
-    func alignmentGuide(
+    public func alignmentGuide(
         _ guide: VerticalAlignment,
         computeValue: @escaping @Sendable (ViewDimensions) -> Int
     ) -> some View {

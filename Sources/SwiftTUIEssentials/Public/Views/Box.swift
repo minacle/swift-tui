@@ -37,13 +37,13 @@ public nonisolated struct Box<Content: View>: View, BoxRenderable,
     }
 }
 
-public extension Box where Content == EmptyView {
+extension Box where Content == EmptyView {
 
     /// Creates a regular-line box with no interior content.
     ///
     /// Without a finite proposal, the result is two columns by two rows. Narrow
     /// or short proposals collapse the border to tee or cross glyphs.
-    init() {
+    public init() {
         self.init {
             EmptyView()
         }
@@ -82,12 +82,12 @@ public nonisolated struct RoundedBox<Content: View>: View, BoxRenderable,
     }
 }
 
-public extension RoundedBox where Content == EmptyView {
+extension RoundedBox where Content == EmptyView {
 
     /// Creates a rounded-corner box with no interior content.
     ///
     /// Without a finite proposal, the result is two columns by two rows.
-    init() {
+    public init() {
         self.init {
             EmptyView()
         }
@@ -124,12 +124,12 @@ public nonisolated struct HeavyBox<Content: View>: View, BoxRenderable,
     }
 }
 
-public extension HeavyBox where Content == EmptyView {
+extension HeavyBox where Content == EmptyView {
 
     /// Creates a heavy-line box with no interior content.
     ///
     /// Without a finite proposal, the result is two columns by two rows.
-    init() {
+    public init() {
         self.init {
             EmptyView()
         }
@@ -166,12 +166,12 @@ public nonisolated struct DoubleBox<Content: View>: View, BoxRenderable,
     }
 }
 
-public extension DoubleBox where Content == EmptyView {
+extension DoubleBox where Content == EmptyView {
 
     /// Creates a double-line box with no interior content.
     ///
     /// Without a finite proposal, the result is two columns by two rows.
-    init() {
+    public init() {
         self.init {
             EmptyView()
         }

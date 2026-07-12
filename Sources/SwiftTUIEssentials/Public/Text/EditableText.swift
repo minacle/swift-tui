@@ -185,7 +185,7 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
     }
 }
 
-public extension EditableText {
+extension EditableText {
 
     /// Displays placeholder text while single-line editable text is empty.
     ///
@@ -203,7 +203,7 @@ public extension EditableText {
     /// - Parameter content: A view builder that creates trusted or
     ///   caller-sanitized placeholder content.
     /// - Returns: Editable text that displays the placeholder when empty.
-    nonisolated func placeholder<Placeholder: View>(
+    public nonisolated func placeholder<Placeholder: View>(
         @ViewBuilder content: () -> Placeholder
     ) -> some View {
         EditableTextPlaceholder(content: self, placeholder: content())

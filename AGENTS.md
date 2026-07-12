@@ -3,6 +3,7 @@
 ## Access control
 
 - Never use the `package` access modifier under any circumstances.
+- Never apply an access modifier to an `extension` declaration.
 
 ## Documentation comments
 

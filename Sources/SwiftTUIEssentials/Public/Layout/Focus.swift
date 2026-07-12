@@ -173,9 +173,9 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
     }
 }
 
-private extension RenderedBlock {
+extension RenderedBlock {
 
-    mutating func setFocusFrame(_ frame: RenderedRect, at path: [Int]) {
+    fileprivate mutating func setFocusFrame(_ frame: RenderedRect, at path: [Int]) {
         if let index = focusRegions.firstIndex(where: { $0.path == path }) {
             focusRegions[index].frame = frame
         }
@@ -219,7 +219,7 @@ protocol FocusModifierRenderable {
     ) -> RenderedElement?
 }
 
-public extension View {
+extension View {
 
     /// Specifies whether this view can receive focus.
     ///
@@ -236,7 +236,7 @@ public extension View {
     /// - Parameter isFocusable: `true` to register a focus candidate; `false`
     ///   to make this interaction path ineligible. The default is `true`.
     /// - Returns: A view with the requested focus eligibility.
-    func focusable(_ isFocusable: Bool = true) -> some View {
+    public func focusable(_ isFocusable: Bool = true) -> some View {
         FocusableView(content: self, isFocusable: isFocusable)
     }
 
@@ -252,7 +252,7 @@ public extension View {
     /// - Parameter condition: The binding that is `true` exactly while this
     ///   view owns focus.
     /// - Returns: A view registered for focus and synchronized with the binding.
-    func focused(_ condition: FocusState<Bool>.Binding) -> some View {
+    public func focused(_ condition: FocusState<Bool>.Binding) -> some View {
         FocusedView(content: self, attachment: condition.focusAttachment())
     }
 
@@ -272,7 +272,7 @@ public extension View {
     ///     candidates use the same value, the first rendered candidate receives
     ///     a programmatic request.
     /// - Returns: A view registered for focus and associated with `value`.
-    func focused<Value>(
+    public func focused<Value>(
         _ binding: FocusState<Value?>.Binding,
         equals value: Value
     ) -> some View where Value: Hashable {

@@ -185,9 +185,9 @@ struct RenderedTerminalViewport: Equatable, Sendable {
     var block: RenderedBlock?
 }
 
-private extension RootScene {
+extension RootScene {
 
-    func renderedBlock(
+    fileprivate func renderedBlock(
         in proposal: RenderProposal,
         using runtime: StateRuntime,
         termination: TerminationController,

@@ -77,9 +77,9 @@ protocol HiddenModifierRenderable {
     ) -> RenderedElement?
 }
 
-private extension RenderedBlock {
+extension RenderedBlock {
 
-    func hidden() -> RenderedBlock {
+    fileprivate func hidden() -> RenderedBlock {
         RenderedBlock(
             runs: [],
             width: width,
@@ -89,7 +89,7 @@ private extension RenderedBlock {
     }
 }
 
-public extension View {
+extension View {
 
     /// Hides this view while preserving its terminal-cell layout footprint.
     ///
@@ -100,7 +100,7 @@ public extension View {
     /// presentation modifier, not a security or work-suppression boundary.
     ///
     /// - Returns: A hidden view.
-    func hidden() -> some View {
+    public func hidden() -> some View {
         HiddenView(content: self)
     }
 }

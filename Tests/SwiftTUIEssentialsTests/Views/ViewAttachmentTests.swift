@@ -72,9 +72,9 @@ private struct AttachmentReader<Key: ViewAttachmentKey>: View {
     }
 }
 
-private extension AttachmentReader where Key.Context == Void {
+extension AttachmentReader where Key.Context == Void {
 
-    init() {
+    fileprivate init() {
         context = ()
     }
 }
@@ -87,8 +87,8 @@ private struct AttachmentMarkerKey: EnvironmentKey {
     nonisolated static let defaultValue = "default"
 }
 
-private extension EnvironmentValues {
-    var attachmentMarker: String {
+extension EnvironmentValues {
+    fileprivate var attachmentMarker: String {
         get { self[AttachmentMarkerKey.self] }
         set { self[AttachmentMarkerKey.self] = newValue }
     }

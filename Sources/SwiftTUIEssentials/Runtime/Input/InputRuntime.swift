@@ -1866,9 +1866,9 @@ final class InputRuntime {
     }
 }
 
-private extension PointerEvent.Button {
+extension PointerEvent.Button {
 
-    var pointerPressButton: PointerButton? {
+    fileprivate var pointerPressButton: PointerButton? {
         switch self {
         case .left:
             return .left
@@ -1883,7 +1883,7 @@ private extension PointerEvent.Button {
         }
     }
 
-    var isScrollWheel: Bool {
+    fileprivate var isScrollWheel: Bool {
         switch self {
         case .wheelUp, .wheelDown, .wheelLeft, .wheelRight:
             return true
@@ -1893,9 +1893,9 @@ private extension PointerEvent.Button {
     }
 }
 
-private extension PointerEvent.Phase {
+extension PointerEvent.Phase {
 
-    var pointerPressPhase: PointerPress.Phases? {
+    fileprivate var pointerPressPhase: PointerPress.Phases? {
         switch self {
         case .down:
             return .down
@@ -1907,9 +1907,9 @@ private extension PointerEvent.Phase {
     }
 }
 
-private extension HoverGestureAction {
+extension HoverGestureAction {
 
-    var isContinuous: Bool {
+    fileprivate var isContinuous: Bool {
         switch self {
         case .state:
             return false

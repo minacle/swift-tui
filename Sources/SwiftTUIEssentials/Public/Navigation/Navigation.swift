@@ -32,7 +32,7 @@ public nonisolated struct LocalizedStringKey: Equatable, Hashable, Sendable,
     }
 }
 
-public extension Text {
+extension Text {
 
     /// Creates text from a localized string key.
     ///
@@ -42,7 +42,7 @@ public extension Text {
         deprecated,
         message: "Localize with String.init(localized:...) and pass the resulting String."
     )
-    init(_ key: LocalizedStringKey) {
+    public init(_ key: LocalizedStringKey) {
         self.init(content: key.key)
     }
 }
@@ -340,7 +340,7 @@ public struct NavigationLink<Label: View, Destination: View>: View {
     }
 }
 
-public extension NavigationLink where Label == Text {
+extension NavigationLink where Label == Text {
 
     /// Creates a navigation link with a plain string label.
     ///
@@ -352,7 +352,7 @@ public extension NavigationLink where Label == Text {
     /// - Parameters:
     ///   - title: The string to render as the link label.
     ///   - destination: A view builder that creates the destination to push.
-    init(
+    public init(
         _ title: String,
         @ViewBuilder destination: @escaping () -> Destination
     ) {
@@ -379,7 +379,7 @@ public extension NavigationLink where Label == Text {
         deprecated,
         message: "Localize with String.init(localized:...) and pass the resulting String."
     )
-    init(
+    public init(
         _ titleKey: LocalizedStringKey,
         @ViewBuilder destination: @escaping () -> Destination
     ) {
@@ -387,7 +387,7 @@ public extension NavigationLink where Label == Text {
     }
 }
 
-public extension NavigationLink where Destination == Never {
+extension NavigationLink where Destination == Never {
 
     /// Creates a link that pushes a value for destination lookup.
     ///
@@ -395,7 +395,7 @@ public extension NavigationLink where Destination == Never {
     ///   - value: The value to append to the containing stack's path, or `nil`
     ///     to render a noninteractive, nonfocusable label.
     ///   - label: A view builder evaluated immediately to create the label.
-    init<Value>(
+    public init<Value>(
         value: Value?,
         @ViewBuilder label: () -> Label
     ) where Value: Decodable, Value: Encodable, Value: Hashable {
@@ -404,7 +404,7 @@ public extension NavigationLink where Destination == Never {
     }
 }
 
-public extension NavigationLink where Label == Text, Destination == Never {
+extension NavigationLink where Label == Text, Destination == Never {
 
     /// Creates a value link with a plain string label.
     ///
@@ -417,7 +417,7 @@ public extension NavigationLink where Label == Text, Destination == Never {
     ///   - title: The string to render as the link label.
     ///   - value: The value to append to the navigation path, or `nil` to make
     ///     the link inactive.
-    init<Value>(
+    public init<Value>(
         _ title: String,
         value: Value?
     ) where Value: Decodable, Value: Encodable, Value: Hashable {
@@ -446,7 +446,7 @@ public extension NavigationLink where Label == Text, Destination == Never {
         deprecated,
         message: "Localize with String.init(localized:...) and pass the resulting String."
     )
-    init<Value>(
+    public init<Value>(
         _ titleKey: LocalizedStringKey,
         value: Value?
     ) where Value: Decodable, Value: Encodable, Value: Hashable {
@@ -454,7 +454,7 @@ public extension NavigationLink where Label == Text, Destination == Never {
     }
 }
 
-public extension View {
+extension View {
 
     /// Registers a value destination with the nearest containing navigation stack.
     ///
@@ -467,7 +467,7 @@ public extension View {
     ///   - destination: A view builder that creates a destination for a value.
     /// - Returns: A view that registers the destination while a containing
     ///   navigation stack collects this subtree.
-    func navigationDestination<Value, Destination>(
+    public func navigationDestination<Value, Destination>(
         for data: Value.Type,
         @ViewBuilder destination: @escaping (Value) -> Destination
     ) -> some View where Value: Hashable, Destination: View {
@@ -490,7 +490,7 @@ public extension View {
     ///   - destination: An escaping builder evaluated while the destination is
     ///     rendered.
     /// - Returns: A view that presents the destination while the binding is `true`.
-    func navigationDestination<Destination>(
+    public func navigationDestination<Destination>(
         isPresented: Binding<Bool>,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View where Destination: View {
@@ -514,7 +514,7 @@ public extension View {
     ///   - destination: An escaping builder evaluated with the current non-`nil`
     ///     item while the destination is rendered.
     /// - Returns: A view that presents the destination while the item binding is non-`nil`.
-    func navigationDestination<Item, Destination>(
+    public func navigationDestination<Item, Destination>(
         item: Binding<Item?>,
         @ViewBuilder destination: @escaping (Item) -> Destination
     ) -> some View where Item: Hashable, Destination: View {

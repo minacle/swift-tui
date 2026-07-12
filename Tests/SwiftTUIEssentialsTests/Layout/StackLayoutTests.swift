@@ -323,8 +323,8 @@ private nonisolated enum StackMarkerAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
-    nonisolated static let marker = HorizontalAlignment(StackMarkerAlignment.self)
+extension HorizontalAlignment {
+    fileprivate nonisolated static let marker = HorizontalAlignment(StackMarkerAlignment.self)
 }
 
 private nonisolated enum StackVerticalMarkerAlignment: AlignmentID {
@@ -333,6 +333,6 @@ private nonisolated enum StackVerticalMarkerAlignment: AlignmentID {
     }
 }
 
-private extension VerticalAlignment {
-    nonisolated static let marker = VerticalAlignment(StackVerticalMarkerAlignment.self)
+extension VerticalAlignment {
+    fileprivate nonisolated static let marker = VerticalAlignment(StackVerticalMarkerAlignment.self)
 }

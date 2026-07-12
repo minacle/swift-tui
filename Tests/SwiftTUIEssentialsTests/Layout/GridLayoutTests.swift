@@ -433,8 +433,8 @@ private nonisolated enum GridMarkerAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
-    nonisolated static let gridMarker = HorizontalAlignment(GridMarkerAlignment.self)
+extension HorizontalAlignment {
+    fileprivate nonisolated static let gridMarker = HorizontalAlignment(GridMarkerAlignment.self)
 }
 
 private nonisolated enum GridRowMarkerAlignment: AlignmentID {
@@ -443,8 +443,8 @@ private nonisolated enum GridRowMarkerAlignment: AlignmentID {
     }
 }
 
-private extension VerticalAlignment {
-    nonisolated static let gridRowMarker = VerticalAlignment(GridRowMarkerAlignment.self)
+extension VerticalAlignment {
+    fileprivate nonisolated static let gridRowMarker = VerticalAlignment(GridRowMarkerAlignment.self)
 }
 
 private struct GridCaretOffsetTextFieldView: View {

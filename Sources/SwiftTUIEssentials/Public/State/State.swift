@@ -160,10 +160,10 @@ public struct State<Value> {
     }
 }
 
-public extension State where Value: ExpressibleByNilLiteral {
+extension State where Value: ExpressibleByNilLiteral {
 
     /// Creates state whose initial value is `nil`.
-    init() {
+    public init() {
         self.init(wrappedValue: nil)
     }
 }
@@ -316,12 +316,12 @@ extension FocusState: DynamicStateProperty {
     }
 }
 
-public extension FocusState {
+extension FocusState {
 
     /// A projected property wrapper that connects a ``FocusState`` value to a
     /// focusable view.
     @propertyWrapper
-    struct Binding {
+    public struct Binding {
 
         let cell: FocusCell<Value>
 

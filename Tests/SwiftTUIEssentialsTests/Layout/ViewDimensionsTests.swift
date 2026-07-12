@@ -132,8 +132,8 @@ private nonisolated enum OneThirdAlignment: AlignmentID {
     }
 }
 
-private extension HorizontalAlignment {
-    nonisolated static let oneThird = HorizontalAlignment(OneThirdAlignment.self)
+extension HorizontalAlignment {
+    fileprivate nonisolated static let oneThird = HorizontalAlignment(OneThirdAlignment.self)
 }
 
 private nonisolated enum VerticalOneThirdAlignment: AlignmentID {
@@ -142,8 +142,8 @@ private nonisolated enum VerticalOneThirdAlignment: AlignmentID {
     }
 }
 
-private extension VerticalAlignment {
-    nonisolated static let oneThird = VerticalAlignment(VerticalOneThirdAlignment.self)
+extension VerticalAlignment {
+    fileprivate nonisolated static let oneThird = VerticalAlignment(VerticalOneThirdAlignment.self)
 }
 
 private nonisolated final class ViewDimensionsProbe: @unchecked Sendable {
