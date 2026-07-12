@@ -642,7 +642,7 @@ final class InputRuntime {
 
     private var coordinateSpaceRegions: [RenderedCoordinateSpaceRegion] = []
 
-    private var rootFrame = TextFrame(text: "", row: 1, column: 1)
+    private var rootFrame = RenderedTerminalFrame(text: "", row: 1, column: 1)
 
     private var pressedTapTarget: [Int]?
 
@@ -746,7 +746,7 @@ final class InputRuntime {
         self.coordinateSpaceRegions = coordinateSpaceRegions
     }
 
-    func updateRootFrame(_ frame: TextFrame) {
+    func updateRootFrame(_ frame: RenderedTerminalFrame) {
         self.rootFrame = frame
     }
 

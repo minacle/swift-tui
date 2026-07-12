@@ -34,7 +34,7 @@ struct ShapeRenderingTests {
 
     @Test
     func `a filled rectangle emits a foreground-color SGR sequence around its full-block cells`() {
-        let output = TextRenderer.screen(
+        let output = TerminalScreenRenderer.screen(
             for: ViewResolver.block(
                 from: Rectangle()
                     .fill(.red)

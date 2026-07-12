@@ -109,7 +109,7 @@ struct AppRunner<Application: App> {
                 return RenderedTerminalViewport(viewport: viewport, block: nil)
             }
 
-            runtime.updateRenderedFrame(TextRenderer.frame(for: block, in: viewport))
+            runtime.updateRenderedFrame(TerminalScreenRenderer.frame(for: block, in: viewport))
             guard !runtime.consumeInvalidation() else {
                 continue
             }
@@ -128,7 +128,7 @@ struct AppRunner<Application: App> {
         in viewport: TerminalViewportSize,
         previousRender: RenderedTerminalViewport?
     ) {
-        TerminalControl.write(TextRenderer.redraw(
+        TerminalControl.write(TerminalScreenRenderer.redraw(
             from: previousRender?.block,
             previousViewport: previousRender?.viewport,
             to: block,

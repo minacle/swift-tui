@@ -91,6 +91,10 @@ rendering them because text APIs preserve terminal control characters.
 - ``ViewThatFits``
 - ``GeometryReader``
 
+### Rendering model
+
+- <doc:RenderingPipeline>
+
 ### Text, shapes, and decoration
 
 - ``Text``

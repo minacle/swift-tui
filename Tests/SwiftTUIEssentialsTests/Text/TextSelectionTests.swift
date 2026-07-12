@@ -195,7 +195,7 @@ struct TextSelectionTests {
         _ = runtime.block(from: view)
         _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
         _ = runtime.dispatch(PointerEvent(button: .left, column: 2, row: 1, phase: .motion))
-        let output = TextRenderer.screen(
+        let output = TerminalScreenRenderer.screen(
             for: runtime.block(from: view)!,
             in: TerminalViewportSize(columns: 1, rows: 1)
         )

@@ -948,7 +948,7 @@ final class StateRuntime {
         return handled ? .handled : .ignored
     }
 
-    func updateRenderedFrame(_ frame: TextFrame) {
+    func updateRenderedFrame(_ frame: RenderedTerminalFrame) {
         input.updateRootFrame(frame)
     }
 

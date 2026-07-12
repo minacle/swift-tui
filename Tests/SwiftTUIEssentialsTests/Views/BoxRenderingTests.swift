@@ -232,7 +232,7 @@ struct BoxRenderingTests {
 
     @Test
     func `box border terminal output emits only foreground, background, and dim SGR styles`() {
-        let output = TextRenderer.screen(
+        let output = TerminalScreenRenderer.screen(
             for: ViewResolver.block(
                 from: Box()
                     .frame(width: 1, height: 1)
