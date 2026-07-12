@@ -1,5 +1,9 @@
 # SwiftTUI Repository Instructions
 
+## Access control
+
+- Never use the `package` access modifier under any circumstances.
+
 ## Documentation comments
 
 - Write documentation comments in English for every `public` or `open`
