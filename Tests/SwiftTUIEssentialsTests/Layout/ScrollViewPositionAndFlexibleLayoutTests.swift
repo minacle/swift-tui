@@ -73,7 +73,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 1), phase: .down)
             ) == .handled
         )
         #expect(runtime.consumeInvalidation())
@@ -123,7 +123,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
             ) == .handled
         )
         _ = runtime.consumeInvalidation()
@@ -439,7 +439,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.consumeInvalidation())
@@ -458,7 +458,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 11, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 10, row: 1), phase: .down)
             ) == .handled
         )
         #expect(runtime.consumeInvalidation())
@@ -810,7 +810,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(runtime.block(from: view)?.lines == ["focus", "A    ", "B    "])
         _ = runtime.consumeInvalidation()
 
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 2)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 2)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.lines == ["focus", "B    ", "C    "])
     }
@@ -835,7 +835,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let runtime = StateRuntime()
 
         #expect(runtime.block(from: scrollView)?.lines == ["A", "B"])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
 
         #expect(position.point == ScrollPoint(y: 1))
         #expect(runtime.consumeInvalidation())
@@ -866,7 +866,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(block?.lines == ["A", "B"])
         #expect(block?.scrollRegions == [])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1, expecting: .ignored)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1, expecting: .ignored)
 
         #expect(position.point == nil)
         #expect(!runtime.consumeInvalidation())
@@ -890,7 +890,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
 
         #expect(block?.lines == ["B", "C"])
         #expect(block?.scrollRegions == [])
-        dispatchWheel(to: runtime, button: .wheelUp, column: 1, row: 1, expecting: .ignored)
+        dispatchWheel(to: runtime, direction: .up, column: 1, row: 1, expecting: .ignored)
         #expect(!runtime.consumeInvalidation())
     }
 
@@ -907,7 +907,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let runtime = StateRuntime()
 
         #expect(runtime.block(from: scrollView)?.lines == ["A", "B"])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: scrollView)?.lines == ["B", "C"])
@@ -922,7 +922,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let runtime = StateRuntime()
 
         #expect(runtime.block(from: scrollView)?.lines == ["ABC"])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: scrollView)?.lines == ["BCD"])
@@ -947,7 +947,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
             RenderedRect(x: 0, y: 0, width: 3, height: 4),
         ])
 
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 4)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 4)
 
         #expect(position.point == ScrollPoint(x: 1))
         #expect(runtime.consumeInvalidation())
@@ -966,18 +966,18 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let runtime = StateRuntime()
 
         #expect(runtime.block(from: scrollView)?.lines == ["ABC"])
-        dispatchWheel(to: runtime, button: .wheelRight, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .right, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: scrollView)?.lines == ["BCD"])
 
-        dispatchWheel(to: runtime, button: .wheelLeft, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .left, column: 1, row: 1)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: scrollView)?.lines == ["ABC"])
 
         dispatchWheel(
             to: runtime,
-            button: .wheelDown,
+            direction: .down,
             column: 1,
             row: 1,
             modifiers: .shift
@@ -1005,7 +1005,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let runtime = StateRuntime()
 
         #expect(runtime.block(from: scrollView)?.lines == ["A", "B"])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: scrollView)?.lines == ["B", "C"])
@@ -1045,7 +1045,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
                 in: RenderProposal(columns: 5, rows: 2)
             )?.lines == ["top  ", "ABC  "]
         )
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 2)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 2)
 
         #expect(innerPosition.point == ScrollPoint(x: 1))
         #expect(outerPosition.point == nil)
@@ -1073,7 +1073,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(runtime.block(from: scrollView)?.lines == ["A", "B"])
         dispatchWheel(
             to: runtime,
-            button: .wheelDown,
+            direction: .down,
             column: 2,
             row: 1,
             expecting: .ignored

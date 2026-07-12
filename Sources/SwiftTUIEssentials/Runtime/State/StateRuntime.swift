@@ -854,9 +854,9 @@ final class StateRuntime {
         return input.dispatchGlobal(keyPress, perform: performKeyPress)
     }
 
-    func dispatch(_ pointerEvent: PointerEvent, at date: Date = Date()) -> KeyPress.Result {
+    func dispatch(_ pointerPress: PointerPress, at date: Date = Date()) -> KeyPress.Result {
         input.dispatch(
-            pointerEvent,
+            pointerPress,
             at: date,
             perform: { path, operation in
                 withView(at: path, perform: operation)
@@ -870,9 +870,29 @@ final class StateRuntime {
                     invalidated = true
                 }
                 return result.handled
+            }
+        )
+    }
+
+    func dispatch(_ pointerMotion: PointerMotion, at date: Date = Date()) -> KeyPress.Result {
+        input.dispatch(
+            pointerMotion,
+            at: date,
+            perform: { path, operation in
+                withView(at: path, perform: operation)
+            }
+        )
+    }
+
+    func dispatch(_ pointerScroll: PointerScroll, at date: Date = Date()) -> KeyPress.Result {
+        input.dispatch(
+            pointerScroll,
+            at: date,
+            perform: { path, operation in
+                withView(at: path, perform: operation)
             },
-            scroll: { path, pointerEvent in
-                dispatchScroll(pointerEvent, at: path)
+            scroll: { path, pointerScroll in
+                dispatchScroll(pointerScroll, at: path)
             }
         )
     }
@@ -1355,11 +1375,11 @@ final class StateRuntime {
     }
 
     private func dispatchScroll(
-        _ pointerEvent: PointerEvent,
+        _ pointerScroll: PointerScroll,
         at path: [Int]
     ) -> KeyPress.Result {
         guard var state = scrollViewStates[path],
-              let delta = scrollDelta(for: pointerEvent, axes: state.axes) else {
+              let delta = scrollDelta(for: pointerScroll, axes: state.axes) else {
             return .ignored
         }
 
@@ -1387,40 +1407,38 @@ final class StateRuntime {
     }
 
     private func scrollDelta(
-        for pointerEvent: PointerEvent,
+        for pointerScroll: PointerScroll,
         axes: Axis.Set
     ) -> (x: Int, y: Int)? {
-        switch pointerEvent.button {
-        case .wheelUp:
+        switch pointerScroll.direction {
+        case .up:
             if axes.contains(.horizontal)
-                && (pointerEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                && (pointerScroll.modifiers.contains(.shift) || !axes.contains(.vertical)) {
                 return (x: -1, y: 0)
             }
             guard axes.contains(.vertical) else {
                 return nil
             }
             return (x: 0, y: -1)
-        case .wheelDown:
+        case .down:
             if axes.contains(.horizontal)
-                && (pointerEvent.modifiers.contains(.shift) || !axes.contains(.vertical)) {
+                && (pointerScroll.modifiers.contains(.shift) || !axes.contains(.vertical)) {
                 return (x: 1, y: 0)
             }
             guard axes.contains(.vertical) else {
                 return nil
             }
             return (x: 0, y: 1)
-        case .wheelLeft:
+        case .left:
             guard axes.contains(.horizontal) else {
                 return nil
             }
             return (x: -1, y: 0)
-        case .wheelRight:
+        case .right:
             guard axes.contains(.horizontal) else {
                 return nil
             }
             return (x: 1, y: 0)
-        default:
-            return nil
         }
     }
 

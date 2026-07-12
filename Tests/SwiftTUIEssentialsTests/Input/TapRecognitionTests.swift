@@ -293,17 +293,17 @@ struct TapRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .right, column: 1, row: 1, phase: .down)
+                PointerPress(button: .right, location: Point(column: 0, row: 0), phase: .down)
             ) == .ignored
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up)
             ) == .ignored
         )
 

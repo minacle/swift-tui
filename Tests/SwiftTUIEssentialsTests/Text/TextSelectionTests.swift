@@ -125,8 +125,8 @@ struct TextSelectionTests {
         .textSelectionForegroundStyle(Optional(Color16.white))
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 2, row: 0), modifiers: []))
 
         #expect(runtime.block(from: view)?.runs == [
             RenderedRun(
@@ -159,12 +159,12 @@ struct TextSelectionTests {
         _ = runtime.block(from: view)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
             ) == .handled
         )
 
@@ -193,8 +193,8 @@ struct TextSelectionTests {
             .textSelectionForegroundStyle(Optional(Color16.white))
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 2, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 1, row: 0), modifiers: []))
         let output = TerminalScreenRenderer.screen(
             for: runtime.block(from: view)!,
             in: TerminalViewportSize(columns: 1, rows: 1)
@@ -216,8 +216,8 @@ struct TextSelectionTests {
             .textSelection(.enabled)
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 2, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 1, row: 0), modifiers: []))
 
         #expect(runtime.block(from: view)?.runs.first?.style == TextStyle(
             foregroundStyle: AnyColor(Color16.yellow),
@@ -235,8 +235,8 @@ struct TextSelectionTests {
             .textSelectionForegroundStyle(Optional(Color16.white))
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 2, row: 0), modifiers: []))
 
         #expect(runtime.block(from: view)?.runs == [
             RenderedRun(
@@ -252,8 +252,8 @@ struct TextSelectionTests {
         let view = Text("한a\nbc").textSelection(.enabled)
 
         _ = runtime.block(from: view, in: RenderProposal(columns: 4))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 2, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 2, row: 1), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: []))
 
         #expect(runtime.block(from: view, in: RenderProposal(columns: 4))?.runs == [
             RenderedRun(
@@ -278,12 +278,12 @@ struct TextSelectionTests {
         .textSelection(.enabled)
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 2, row: 0), modifiers: []))
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
 
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 6, row: 1, phase: .motion))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 3, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 5, row: 0), modifiers: []))
 
         #expect(runtime.block(from: view)?.runs == [
             RenderedRun(text: "ab"),
@@ -302,7 +302,7 @@ struct TextSelectionTests {
         _ = disabledRuntime.block(from: disabled)
         #expect(
             disabledRuntime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .ignored
         )
 
@@ -311,7 +311,7 @@ struct TextSelectionTests {
         _ = hiddenRuntime.block(from: hidden)
         #expect(
             hiddenRuntime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .ignored
         )
     }
@@ -328,9 +328,9 @@ struct TextSelectionTests {
             .environment(\.openURL, OpenURLAction { opened.append($0); return .handled })
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .motion))
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .up))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
+        _ = runtime.dispatch(PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: []))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 3, row: 0), phase: .up))
         #expect(opened.isEmpty)
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
 
@@ -354,14 +354,14 @@ struct TextSelectionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up)
             ) == .handled
         )
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == nil)
@@ -373,10 +373,10 @@ struct TextSelectionTests {
         let view = Button("Run") {}.textSelection(.enabled)
 
         _ = runtime.block(from: view)
-        _ = runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down))
+        _ = runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down))
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 2, row: 0), modifiers: [])
             ) == .ignored
         )
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == nil)

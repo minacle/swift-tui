@@ -107,6 +107,11 @@ rendering them because text APIs preserve terminal control characters.
 
 ### Input and navigation
 
+- ``InputEvent``
+- ``KeyEvent``
+- ``PointerEvent``
+- ``KeyPressEvent``
+- ``PointerPressEvent``
 - ``KeyPress``
 - ``PointerPress``
 - ``NavigationStack``

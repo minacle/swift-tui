@@ -87,7 +87,13 @@ struct TerminalIOAndControlTests {
         )
         #expect(
             terminal.readInput(timeout: 0)
-                == .pointer(PointerEvent(button: .left, column: 2, row: 3, phase: .down))
+                == .pointerPress(
+                    PointerPress(
+                        button: .left,
+                        location: Point(column: 1, row: 2),
+                        phase: .down
+                    )
+                )
         )
     }
 

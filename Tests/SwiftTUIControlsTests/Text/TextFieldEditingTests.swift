@@ -360,7 +360,7 @@ struct TextFieldEditingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 1), phase: .down)
             ) == .handled
         )
         #expect(focusProbe.binding?.wrappedValue == .second)
@@ -383,7 +383,7 @@ struct TextFieldEditingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 5, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 4, row: 0), phase: .down)
             ) == .handled
         )
         #expect(focusProbe.binding?.wrappedValue == true)

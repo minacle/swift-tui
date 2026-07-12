@@ -12,9 +12,9 @@ struct PointerDragTests {
             .onPointerDrag { probe.values.append($0) }
 
         _ = runtime.block(from: view)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 8, row: 4, phase: .motion)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 8, row: 4, phase: .up)) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)) == .handled)
+        #expect(runtime.dispatch(PointerMotion(button: .left, location: Point(column: 7, row: 3), modifiers: [])) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 7, row: 3), phase: .up)) == .handled)
 
         #expect(probe.values.map(\.phase) == [.began, .changed, .ended])
         #expect(probe.values.map(\.startLocation) == [Point(column: 0, row: 0), Point(column: 0, row: 0), Point(column: 0, row: 0)])
@@ -27,8 +27,8 @@ struct PointerDragTests {
         let probe = PointerDragProbe()
         _ = runtime.block(from: Text("A").onPointerDrag { probe.values.append($0) })
 
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .right, column: 1, row: 1, phase: .down)) == .ignored)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .right, location: Point(column: 0, row: 0), phase: .down)) == .ignored)
 
         #expect(probe.values.map(\.phase) == [.began, .cancelled])
     }
@@ -54,7 +54,7 @@ struct PointerDragTests {
         let runtime = StateRuntime()
         let probe = PointerDragProbe()
         _ = runtime.block(from: Text("A").onPointerDrag { probe.values.append($0) })
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down)) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)) == .handled)
 
         _ = runtime.block(from: Text("replacement"))
 

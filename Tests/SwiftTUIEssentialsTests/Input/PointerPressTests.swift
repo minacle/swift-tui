@@ -21,22 +21,22 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
             ) == .ignored
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .right, column: 1, row: 1, phase: .down)
+                PointerPress(button: .right, location: Point(column: 0, row: 0), phase: .down)
             ) == .ignored
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
             ) == .ignored
         )
         #expect(pointerProbe.names == ["default"])
@@ -56,12 +56,12 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
             ) == .handled
         )
         #expect(
@@ -89,12 +89,12 @@ struct PointerPressTests {
         #expect(focusProbe.binding?.wrappedValue == false)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .right, column: 1, row: 1, phase: .down)
+                PointerPress(button: .right, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .middle, column: 1, row: 1, phase: .down)
+                PointerPress(button: .middle, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
@@ -133,10 +133,9 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(
+                PointerPress(
                     button: .left,
-                    column: 4,
-                    row: 2,
+                    location: Point(column: 3, row: 1),
                     modifiers: [.shift, .control],
                     phase: .down
                 )
@@ -144,21 +143,21 @@ struct PointerPressTests {
         )
         #expect(
             pointerProbe.events == [
-                PointerPressEvent(
+                RecordedPointerPress(
                     name: "named",
                     button: .left,
                     location: Point(column: 1, row: 1),
                     modifiers: [.shift, .control],
                     phase: .down
                 ),
-                PointerPressEvent(
+                RecordedPointerPress(
                     name: "global",
                     button: .left,
                     location: Point(column: 3, row: 1),
                     modifiers: [.shift, .control],
                     phase: .down
                 ),
-                PointerPressEvent(
+                RecordedPointerPress(
                     name: "local",
                     button: .left,
                     location: Point(column: 1, row: 0),
@@ -189,7 +188,7 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(pointerProbe.names == ["child", "parent"])
@@ -215,7 +214,7 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(pointerProbe.names == ["child"])
@@ -239,12 +238,12 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
             ) == .handled
         )
         #expect(pointerProbe.names == ["up"])
@@ -269,12 +268,12 @@ struct PointerPressTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
             ) == .handled
         )
         #expect(pointerProbe.names == ["up"])
@@ -289,7 +288,7 @@ struct PointerPressTests {
         #expect(runtime.block(from: view)?.text == "0")
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
 

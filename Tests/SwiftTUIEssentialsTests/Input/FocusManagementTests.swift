@@ -101,7 +101,7 @@ struct FocusManagementTests {
         #expect(runtime.block(from: view)?.text == "unfocused")
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.consumeInvalidation())
@@ -278,7 +278,7 @@ struct FocusManagementTests {
         #expect(probe.binding?.wrappedValue == false)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(probe.binding?.wrappedValue == true)
@@ -295,7 +295,7 @@ struct FocusManagementTests {
         #expect(probe.binding?.wrappedValue == false)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(probe.binding?.wrappedValue == true)
@@ -311,14 +311,14 @@ struct FocusManagementTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 1), phase: .down)
             ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == false)
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
             ) == .handled
         )
         #expect(probe.binding?.wrappedValue == true)
@@ -334,7 +334,7 @@ struct FocusManagementTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(probe.binding?.wrappedValue == true)
@@ -350,7 +350,7 @@ struct FocusManagementTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == false)
@@ -371,7 +371,7 @@ struct FocusManagementTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
@@ -380,7 +380,7 @@ struct FocusManagementTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date
             ) == .handled
         )

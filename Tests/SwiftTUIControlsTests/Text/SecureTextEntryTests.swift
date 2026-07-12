@@ -119,7 +119,7 @@ struct SecureTextEntryTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -152,12 +152,12 @@ struct SecureTextEntryTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
             ) == .handled
         )
         #expect(runtime.block(from: view)?.runs == [

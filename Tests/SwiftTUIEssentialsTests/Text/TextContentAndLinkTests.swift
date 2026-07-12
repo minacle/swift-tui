@@ -328,13 +328,13 @@ struct TextContentAndLinkTests {
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date
             ) == .ignored
         )

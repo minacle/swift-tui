@@ -52,7 +52,7 @@ struct TextEditorSelectionAndHitTestingTests {
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
@@ -167,7 +167,7 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -207,7 +207,7 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
             ) == .handled
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 0..<4)
@@ -215,7 +215,7 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up)
             ) == .handled
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 1..<1)
@@ -237,12 +237,12 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 2, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 2, row: 1), modifiers: [])
             ) == .handled
         )
         #expect(runtime.block(from: view, in: proposal)?.caret == nil)
@@ -338,12 +338,12 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 3, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 2), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
             ) == .handled
         )
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -366,7 +366,7 @@ struct TextEditorSelectionAndHitTestingTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)

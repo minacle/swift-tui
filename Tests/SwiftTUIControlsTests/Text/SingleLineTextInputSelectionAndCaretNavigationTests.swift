@@ -293,7 +293,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -342,7 +342,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
@@ -350,7 +350,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         #expect(runtime.block(from: view)?.caret == nil)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.1)
             ) == .handled
         )
@@ -369,7 +369,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down),
                 at: date.addingTimeInterval(1)
             ) == .handled
         )
@@ -381,7 +381,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
         #expect(selectionCharacterOffsets(longPressSelection, in: text) == 1..<3)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .up),
                 at: date.addingTimeInterval(1.6)
             ) == .handled
         )
@@ -408,7 +408,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 5, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 4, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -430,12 +430,12 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
             ) == .handled
         )
         #expect(runtime.block(from: view)?.caret == nil)
@@ -660,12 +660,12 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 3, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
             ) == .handled
         )
         #expect(renderUntilStable(runtime, view: view) <= 3)
@@ -686,7 +686,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
             ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -708,17 +708,17 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .motion)
+                PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
             ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -743,7 +743,7 @@ struct SingleLineTextInputSelectionAndCaretNavigationTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)

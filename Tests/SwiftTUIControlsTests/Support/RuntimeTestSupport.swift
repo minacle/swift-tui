@@ -22,13 +22,21 @@ func dispatchClick(
 ) {
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: column, row: row, phase: .down),
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .down
+            ),
             at: date
         ) == result
     )
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: column, row: row, phase: .up),
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .up
+            ),
             at: date
         ) == result
     )
@@ -43,30 +51,27 @@ func dispatchSelectionDrag(
 ) {
     #expect(
         runtime.dispatch(
-            PointerEvent(
+            PointerPress(
                 button: .left,
-                column: fromColumn,
-                row: fromRow,
+                location: Point(column: fromColumn - 1, row: fromRow - 1),
                 phase: .down
             )
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            PointerEvent(
+            PointerMotion(
                 button: .left,
-                column: toColumn,
-                row: toRow,
-                phase: .motion
+                location: Point(column: toColumn - 1, row: toRow - 1),
+                modifiers: []
             )
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            PointerEvent(
+            PointerPress(
                 button: .left,
-                column: toColumn,
-                row: toRow,
+                location: Point(column: toColumn - 1, row: toRow - 1),
                 phase: .up
             )
         ) == .handled
@@ -75,7 +80,7 @@ func dispatchSelectionDrag(
 
 func dispatchWheel(
     to runtime: StateRuntime,
-    button: PointerEvent.Button,
+    direction: PointerScroll.Direction,
     column: Int,
     row: Int,
     modifiers: EventModifiers = [],
@@ -83,12 +88,10 @@ func dispatchWheel(
 ) {
     #expect(
         runtime.dispatch(
-            PointerEvent(
-                button: button,
-                column: column,
-                row: row,
-                modifiers: modifiers,
-                phase: .down
+            PointerScroll(
+                direction: direction,
+                location: Point(column: column - 1, row: row - 1),
+                modifiers: modifiers
             )
         ) == result
     )
@@ -98,12 +101,16 @@ func dispatchHover(
     to runtime: StateRuntime,
     column: Int,
     row: Int,
-    button: PointerEvent.Button = .other(3),
+    button: PointerButton? = nil,
     expecting result: KeyPress.Result = .handled
 ) {
     #expect(
         runtime.dispatch(
-            PointerEvent(button: button, column: column, row: row, phase: .motion)
+            PointerMotion(
+                button: button,
+                location: Point(column: column - 1, row: row - 1),
+                modifiers: []
+            )
         ) == result
     )
 }

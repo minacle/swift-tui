@@ -1,6 +1,62 @@
 public import Foundation
 public import Terminal
 
+/// A declarative matcher for a family of input values.
+///
+/// An input event describes which values an input system can recognize. The
+/// associated ``Value`` is the value produced by recognition,
+/// while ``Body`` supports composing an event from another event. Primitive
+/// events use `Never` as their body.
+public nonisolated protocol InputEvent<Value> {
+
+    /// The value produced when the event is recognized.
+    associatedtype Value
+
+    /// The event that defines this event's recognition behavior.
+    associatedtype Body: InputEvent
+
+    /// The event's declarative composition.
+    ///
+    /// Primitive events receive the default implementation whose body is
+    /// `Never`; callers must not evaluate that implementation.
+    var body: Body { get }
+}
+
+/// A declarative matcher whose recognized values originate from keyboard
+/// input.
+public nonisolated protocol KeyEvent<Value>: InputEvent {
+
+    /// The keyboard value produced when the event is recognized.
+    associatedtype Value
+}
+
+/// A declarative matcher whose recognized values originate from pointer
+/// input.
+public nonisolated protocol PointerEvent<Value>: InputEvent {
+
+    /// The pointer value produced when the event is recognized.
+    associatedtype Value
+}
+
+extension InputEvent where Body == Never {
+
+    /// Marks a primitive event as having no composed body.
+    ///
+    /// - Precondition: This property must not be evaluated.
+    public nonisolated var body: Never {
+        fatalError("Primitive events do not have a body.")
+    }
+}
+
+extension Never: InputEvent {
+
+    /// The uninhabited value produced by an uninhabited event.
+    public typealias Value = Never
+
+    /// The uninhabited event's body type.
+    public typealias Body = Never
+}
+
 /// A frame of reference for zero-based terminal-cell coordinates reported by
 /// pointer input APIs.
 ///
@@ -382,6 +438,216 @@ public nonisolated struct PointerPress: Equatable, Sendable {
         self.location = location
         self.modifiers = modifiers
         self.phase = phase
+    }
+}
+
+/// A primitive keyboard matcher for normalized key-press values.
+///
+/// Use the initializers to describe all keys, one key, a set of keys, or text
+/// whose Unicode scalars belong to a character set. This value stores
+/// recognition configuration only; existing `onKeyPress` and
+/// `onGlobalKeyPress` modifiers don't consume it yet.
+///
+/// ```swift
+/// let submit = KeyPressEvent(.return)
+/// let digits = KeyPressEvent(characters: .decimalDigits)
+/// ```
+public nonisolated struct KeyPressEvent: KeyEvent, Equatable, Sendable {
+
+    /// The key-domain constraint applied by a key-press matcher.
+    public nonisolated enum Filter: Equatable, Sendable {
+
+        /// Matches every normalized key.
+        case any
+
+        /// Matches normalized keys contained in a set.
+        ///
+        /// An empty set never matches.
+        ///
+        /// - Parameter keys: The normalized keys accepted by the matcher.
+        case keys(Set<KeyEquivalent>)
+
+        /// Matches a nonempty text payload when every Unicode scalar belongs
+        /// to a character set.
+        ///
+        /// - Parameter characters: The character set accepted by the matcher.
+        case characters(CharacterSet)
+    }
+
+    /// The key-press value produced by this matcher.
+    public typealias Value = KeyPress
+
+    /// The uninhabited body of this primitive matcher.
+    public typealias Body = Never
+
+    /// The key-domain constraint applied during recognition.
+    public let filter: Filter
+
+    /// The key phases accepted during recognition.
+    ///
+    /// An empty set never matches.
+    public let phases: KeyPress.Phases
+
+    /// Creates a matcher for every normalized key in the selected phases.
+    ///
+    /// - Parameter phases: The accepted phases. The default accepts key-down
+    ///   and repeat input; an empty set never matches.
+    public init(phases: KeyPress.Phases = [.down, .repeat]) {
+        filter = .any
+        self.phases = phases
+    }
+
+    /// Creates a matcher for one normalized key in the selected phases.
+    ///
+    /// - Parameters:
+    ///   - key: The normalized key to accept.
+    ///   - phases: The accepted phases. The default accepts key-down and
+    ///     repeat input; an empty set never matches.
+    public init(
+        _ key: KeyEquivalent,
+        phases: KeyPress.Phases = [.down, .repeat]
+    ) {
+        filter = .keys([key])
+        self.phases = phases
+    }
+
+    /// Creates a matcher for a set of normalized keys in the selected phases.
+    ///
+    /// - Parameters:
+    ///   - keys: The normalized keys to accept. An empty set never matches.
+    ///   - phases: The accepted phases. The default accepts key-down and
+    ///     repeat input; an empty set never matches.
+    public init(
+        keys: Set<KeyEquivalent>,
+        phases: KeyPress.Phases = [.down, .repeat]
+    ) {
+        filter = .keys(keys)
+        self.phases = phases
+    }
+
+    /// Creates a matcher for text composed only of accepted Unicode scalars.
+    ///
+    /// - Parameters:
+    ///   - characters: The character set that must contain every Unicode
+    ///     scalar in a nonempty input payload.
+    ///   - phases: The accepted phases. The default accepts key-down and
+    ///     repeat input; an empty set never matches.
+    public init(
+        characters: CharacterSet,
+        phases: KeyPress.Phases = [.down, .repeat]
+    ) {
+        filter = .characters(characters)
+        self.phases = phases
+    }
+
+    func matches(_ keyPress: KeyPress) -> Bool {
+        guard phases.contains(keyPress.phase) else {
+            return false
+        }
+
+        switch filter {
+        case .any:
+            return true
+        case .keys(let keys):
+            return keys.contains(keyPress.key)
+        case .characters(let characters):
+            return !keyPress.characters.isEmpty
+                && keyPress.characters.unicodeScalars.allSatisfy {
+                    characters.contains($0)
+                }
+        }
+    }
+}
+
+/// A primitive pointer matcher for pointer-button press values.
+///
+/// The matcher stores its button and phase constraints together with the
+/// coordinate space requested for a recognized ``PointerPress``. Existing
+/// `onPointerPress` modifiers don't consume this value yet.
+///
+/// ```swift
+/// let primaryPress = PointerPressEvent()
+/// let release = PointerPressEvent(.right, phases: .up)
+/// ```
+public nonisolated struct PointerPressEvent: PointerEvent, Equatable, Sendable {
+
+    /// The pointer-press value produced by this matcher.
+    public typealias Value = PointerPress
+
+    /// The uninhabited body of this primitive matcher.
+    public typealias Body = Never
+
+    /// The pointer buttons accepted during recognition.
+    ///
+    /// An empty set never matches.
+    public let buttons: Set<PointerButton>
+
+    /// The pointer-press phases accepted during recognition.
+    ///
+    /// An empty set never matches.
+    public let phases: PointerPress.Phases
+
+    /// The coordinate space requested for recognized pointer locations.
+    public let coordinateSpace: CoordinateSpace
+
+    /// Creates a matcher for pointer buttons and phases.
+    ///
+    /// - Parameters:
+    ///   - phases: The accepted phases. The default accepts pointer-down only;
+    ///     an empty set never matches.
+    ///   - buttons: The accepted buttons. The default contains the primary
+    ///     button; an empty set never matches.
+    ///   - coordinateSpace: The coordinate space requested for recognized
+    ///     locations. The default is ``CoordinateSpace/local``.
+    @_disfavoredOverload
+    public init(
+        phases: PointerPress.Phases = .down,
+        buttons: Set<PointerButton> = [.left],
+        coordinateSpace: CoordinateSpace = .local
+    ) {
+        self.buttons = buttons
+        self.phases = phases
+        self.coordinateSpace = coordinateSpace
+    }
+
+    /// Creates a matcher for one pointer button and the selected phases.
+    ///
+    /// - Parameters:
+    ///   - button: The pointer button to accept.
+    ///   - phases: The accepted phases. The default accepts pointer-down only;
+    ///     an empty set never matches.
+    ///   - coordinateSpace: The coordinate space requested for recognized
+    ///     locations. The default is ``CoordinateSpace/local``.
+    public init(
+        _ button: PointerButton,
+        phases: PointerPress.Phases = .down,
+        coordinateSpace: CoordinateSpace = .local
+    ) {
+        buttons = [button]
+        self.phases = phases
+        self.coordinateSpace = coordinateSpace
+    }
+
+    /// Creates a matcher for a set of pointer buttons and selected phases.
+    ///
+    /// - Parameters:
+    ///   - buttons: The accepted buttons. An empty set never matches.
+    ///   - phases: The accepted phases. The default accepts pointer-down only;
+    ///     an empty set never matches.
+    ///   - coordinateSpace: The coordinate space requested for recognized
+    ///     locations. The default is ``CoordinateSpace/local``.
+    public init(
+        buttons: Set<PointerButton>,
+        phases: PointerPress.Phases = .down,
+        coordinateSpace: CoordinateSpace = .local
+    ) {
+        self.buttons = buttons
+        self.phases = phases
+        self.coordinateSpace = coordinateSpace
+    }
+
+    func matches(_ pointerPress: PointerPress) -> Bool {
+        buttons.contains(pointerPress.button) && phases.contains(pointerPress.phase)
     }
 }
 

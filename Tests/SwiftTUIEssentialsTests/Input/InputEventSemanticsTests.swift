@@ -29,10 +29,9 @@ struct InputEventSemanticsTests {
         let key: KeyEquivalent = "a"
         let modifiers: EventModifiers = [.shift, .control]
         let phases: KeyPress.Phases = [.down, .repeat]
-        let pointer = PointerEvent(
+        let pointer = PointerPress(
             button: .left,
-            column: 2,
-            row: 3,
+            location: Point(column: 1, row: 2),
             modifiers: .shift,
             phase: .down
         )
@@ -59,8 +58,7 @@ struct InputEventSemanticsTests {
             ).location == Point(column: 1, row: 2)
         )
         #expect(pointer.button == .left)
-        #expect(pointer.column == 2)
-        #expect(pointer.row == 3)
+        #expect(pointer.location == Point(column: 1, row: 2))
         #expect(pointer.modifiers == .shift)
         #expect(pointer.phase == .down)
     }
@@ -280,19 +278,30 @@ struct InputEventSemanticsTests {
     func `the terminal parser decodes SGR pointer buttons, phases, modifiers, motion, and coordinates while rejecting malformed input`() {
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<0;12;3M".utf8))
-                == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .down))
+                == .pointerPress(
+                    PointerPress(
+                        button: .left,
+                        location: Point(column: 11, row: 2),
+                        phase: .down
+                    )
+                )
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<0;12;3m".utf8))
-                == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .up))
+                == .pointerPress(
+                    PointerPress(
+                        button: .left,
+                        location: Point(column: 11, row: 2),
+                        phase: .up
+                    )
+                )
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<20;1;2M".utf8))
-                == .pointer(
-                    PointerEvent(
+                == .pointerPress(
+                    PointerPress(
                         button: .left,
-                        column: 1,
-                        row: 2,
+                        location: Point(column: 0, row: 1),
                         modifiers: [.shift, .control],
                         phase: .down
                     )
@@ -300,56 +309,79 @@ struct InputEventSemanticsTests {
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<32;12;3M".utf8))
-                == .pointer(PointerEvent(button: .left, column: 12, row: 3, phase: .motion))
+                == .pointerMotion(
+                    PointerMotion(
+                        button: .left,
+                        location: Point(column: 11, row: 2),
+                        modifiers: []
+                    )
+                )
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<52;1;2M".utf8))
-                == .pointer(
-                    PointerEvent(
+                == .pointerMotion(
+                    PointerMotion(
                         button: .left,
-                        column: 1,
-                        row: 2,
+                        location: Point(column: 0, row: 1),
                         modifiers: [.shift, .control],
-                        phase: .motion
                     )
                 )
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<35;8;9M".utf8))
-                == .pointer(PointerEvent(button: .other(3), column: 8, row: 9, phase: .motion))
+                == .pointerMotion(
+                    PointerMotion(
+                        button: nil,
+                        location: Point(column: 7, row: 8),
+                        modifiers: []
+                    )
+                )
         )
         #expect(
             TerminalControl.input(for: Array("\u{001B}[<2;4;5M".utf8))
-                == .pointer(PointerEvent(button: .right, column: 4, row: 5, phase: .down))
-        )
-        #expect(
-            TerminalControl.input(for: Array("\u{001B}[<64;6;7M".utf8))
-                == .pointer(PointerEvent(button: .wheelUp, column: 6, row: 7, phase: .down))
-        )
-        #expect(
-            TerminalControl.input(for: Array("\u{001B}[<65;6;7M".utf8))
-                == .pointer(PointerEvent(button: .wheelDown, column: 6, row: 7, phase: .down))
-        )
-        #expect(
-            TerminalControl.input(for: Array("\u{001B}[<66;6;7M".utf8))
-                == .pointer(PointerEvent(button: .wheelRight, column: 6, row: 7, phase: .down))
-        )
-        #expect(
-            TerminalControl.input(for: Array("\u{001B}[<67;6;7M".utf8))
-                == .pointer(PointerEvent(button: .wheelLeft, column: 6, row: 7, phase: .down))
-        )
-        #expect(
-            TerminalControl.input(for: Array("\u{001B}[<68;6;7M".utf8))
-                == .pointer(
-                    PointerEvent(
-                        button: .wheelUp,
-                        column: 6,
-                        row: 7,
-                        modifiers: .shift,
+                == .pointerPress(
+                    PointerPress(
+                        button: .right,
+                        location: Point(column: 3, row: 4),
                         phase: .down
                     )
                 )
         )
+        #expect(
+            TerminalControl.input(for: Array("\u{001B}[<64;6;7M".utf8))
+                == .pointerScroll(
+                    PointerScroll(direction: .up, location: Point(column: 5, row: 6), modifiers: [])
+                )
+        )
+        #expect(
+            TerminalControl.input(for: Array("\u{001B}[<65;6;7M".utf8))
+                == .pointerScroll(
+                    PointerScroll(direction: .down, location: Point(column: 5, row: 6), modifiers: [])
+                )
+        )
+        #expect(
+            TerminalControl.input(for: Array("\u{001B}[<66;6;7M".utf8))
+                == .pointerScroll(
+                    PointerScroll(direction: .right, location: Point(column: 5, row: 6), modifiers: [])
+                )
+        )
+        #expect(
+            TerminalControl.input(for: Array("\u{001B}[<67;6;7M".utf8))
+                == .pointerScroll(
+                    PointerScroll(direction: .left, location: Point(column: 5, row: 6), modifiers: [])
+                )
+        )
+        #expect(
+            TerminalControl.input(for: Array("\u{001B}[<68;6;7M".utf8))
+                == .pointerScroll(
+                    PointerScroll(
+                        direction: .up,
+                        location: Point(column: 5, row: 6),
+                        modifiers: .shift
+                    )
+                )
+        )
+        #expect(TerminalControl.input(for: Array("\u{001B}[<64;6;7m".utf8)) == .none)
         #expect(TerminalControl.input(for: Array("\u{001B}[<0;12M".utf8)) == .none)
     }
 

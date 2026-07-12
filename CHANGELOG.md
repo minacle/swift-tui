@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added public `InputEvent`, `KeyEvent`, and `PointerEvent` matcher protocols with
+  configurable `KeyPressEvent` and `PointerPressEvent` primitives.
 - Added public keyed view attachments and captured pointer drags for composing
   reusable container adornments and interactive custom views.
 - Added configurable horizontal and vertical scroll indicators with overlay,

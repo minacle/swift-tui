@@ -75,7 +75,7 @@ struct ScrollIndicatorBehaviorTests {
         let proposal = RenderProposal(columns: 2, rows: 2)
 
         #expect(runtime.block(from: view, in: proposal)?.lines == ["A ", "B "])
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
         #expect(runtime.block(from: view, in: proposal)?.lines == ["B╻", "C╵"])
         let deadline = try #require(runtime.nextScrollIndicatorFlashDeadline)
         runtime.dispatchExpiredScrollIndicatorFlashes(at: deadline)
@@ -101,7 +101,7 @@ struct ScrollIndicatorBehaviorTests {
         let proposal = RenderProposal(columns: 2, rows: 2)
 
         _ = runtime.block(from: view, in: proposal)
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
         #expect(runtime.block(from: view, in: proposal)?.lines == ["B ", "C "])
         #expect(probe.count == 0)
     }
@@ -177,7 +177,7 @@ struct ScrollIndicatorBehaviorTests {
         let proposal = RenderProposal(columns: 2, rows: 2)
 
         _ = runtime.block(from: view, in: proposal)
-        dispatchWheel(to: runtime, button: .wheelDown, column: 1, row: 1)
+        dispatchWheel(to: runtime, direction: .down, column: 1, row: 1)
         #expect(runtime.block(from: view, in: proposal)?.lines == ["B!", "C "])
         let configuration = try #require(probe.values.last)
         configuration.beginInteraction()

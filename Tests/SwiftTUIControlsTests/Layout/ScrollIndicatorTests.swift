@@ -45,9 +45,9 @@ struct ScrollIndicatorTests {
         let configuration = makeConfiguration(offset: 0, probe: probe)
         _ = runtime.block(from: HorizontalScrollIndicator(configuration: configuration))
 
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 1, row: 1, phase: .down)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 20, row: 1, phase: .motion)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 20, row: 1, phase: .up)) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)) == .handled)
+        #expect(runtime.dispatch(PointerMotion(button: .left, location: Point(column: 19, row: 0), modifiers: [])) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 19, row: 0), phase: .up)) == .handled)
 
         #expect(probe.offsets.last == 5)
         #expect(probe.interactions == [true, false])
@@ -60,9 +60,9 @@ struct ScrollIndicatorTests {
         let configuration = makeConfiguration(offset: 0, probe: probe)
         _ = runtime.block(from: HorizontalScrollIndicator(configuration: configuration))
 
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 3, row: 1, phase: .down)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .motion)) == .handled)
-        #expect(runtime.dispatch(PointerEvent(button: .left, column: 4, row: 1, phase: .up)) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down)) == .handled)
+        #expect(runtime.dispatch(PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])) == .handled)
+        #expect(runtime.dispatch(PointerPress(button: .left, location: Point(column: 3, row: 0), phase: .up)) == .handled)
 
         #expect(probe.offsets == [4])
     }

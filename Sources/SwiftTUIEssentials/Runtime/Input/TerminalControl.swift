@@ -22,7 +22,11 @@ enum TerminalInput: Equatable, Sendable {
 
     case keyPress(KeyPress)
 
-    case pointer(PointerEvent)
+    case pointerPress(PointerPress)
+
+    case pointerMotion(PointerMotion)
+
+    case pointerScroll(PointerScroll)
 
     case none
 }
@@ -188,8 +192,8 @@ enum TerminalControl {
             return .quit
         }
 
-        if let pointerEvent = pointerEventInput(for: bytes) {
-            return .pointer(pointerEvent)
+        if let pointerInput = pointerInput(for: bytes) {
+            return pointerInput
         }
 
         if let keyPress = escapeSequenceInput(for: bytes) {
@@ -370,7 +374,7 @@ enum TerminalControl {
         }
     }
 
-    private static func pointerEventInput(for bytes: [UInt8]) -> PointerEvent? {
+    private static func pointerInput(for bytes: [UInt8]) -> TerminalInput? {
         guard let string = String(bytes: bytes, encoding: .ascii),
               string.hasPrefix("\u{001B}[<"),
               let final = string.last,
@@ -388,37 +392,81 @@ enum TerminalControl {
             return nil
         }
 
-        let isMotion = encodedButton & 32 != 0
-        let encodedButtonWithoutMotion = encodedButton & ~32
+        let modifiers = pointerModifiers(for: encodedButton)
+        let buttonCode = encodedButton & ~0b11_1100
+        let location = Point(
+            column: max(column - 1, 0),
+            row: max(row - 1, 0)
+        )
 
-        return PointerEvent(
-            button: pointerButton(for: encodedButtonWithoutMotion),
-            column: column,
-            row: row,
-            modifiers: pointerModifiers(for: encodedButtonWithoutMotion),
-            phase: isMotion ? .motion : final == "M" ? .down : .up
+        if encodedButton & 32 != 0 {
+            return .pointerMotion(
+                PointerMotion(
+                    button: pointerButton(for: buttonCode, allowsNoButton: true),
+                    location: location,
+                    modifiers: modifiers
+                )
+            )
+        }
+
+        if let direction = pointerScrollDirection(for: buttonCode) {
+            guard final == "M" else {
+                return TerminalInput.none
+            }
+            return .pointerScroll(
+                PointerScroll(
+                    direction: direction,
+                    location: location,
+                    modifiers: modifiers
+                )
+            )
+        }
+
+        guard let button = pointerButton(for: buttonCode, allowsNoButton: false) else {
+            return TerminalInput.none
+        }
+        return .pointerPress(
+            PointerPress(
+                button: button,
+                location: location,
+                modifiers: modifiers,
+                phase: final == "M" ? .down : .up
+            )
         )
     }
 
-    private static func pointerButton(for encodedButton: Int) -> PointerEvent.Button {
-        let button = encodedButton & ~0b1_1100
-        switch button {
+    private static func pointerButton(
+        for buttonCode: Int,
+        allowsNoButton: Bool
+    ) -> PointerButton? {
+        switch buttonCode {
         case 0:
             return .left
         case 1:
             return .middle
         case 2:
             return .right
-        case 64:
-            return .wheelUp
-        case 65:
-            return .wheelDown
-        case 66:
-            return .wheelRight
-        case 67:
-            return .wheelLeft
+        case 3 where allowsNoButton:
+            return nil
         default:
-            return .other(encodedButton)
+            return .other(buttonCode)
+        }
+    }
+
+    private static func pointerScrollDirection(
+        for buttonCode: Int
+    ) -> PointerScroll.Direction? {
+        switch buttonCode {
+        case 64:
+            return .up
+        case 65:
+            return .down
+        case 66:
+            return .right
+        case 67:
+            return .left
+        default:
+            return nil
         }
     }
 

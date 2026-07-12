@@ -44,7 +44,7 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
@@ -55,7 +55,7 @@ struct LongPressRecognitionTests {
         #expect(tapProbe.events == ["pressing", "long"])
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.6)
             ) == .handled
         )
@@ -82,13 +82,13 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.1)
             ) == .handled
         )
@@ -117,13 +117,13 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 4, row: 1, phase: .motion),
+                PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: []),
                 at: date.addingTimeInterval(0.1)
             ) == .handled
         )
@@ -151,21 +151,21 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
         #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.2)
             ) == .handled
         )
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down),
                 at: date.addingTimeInterval(1)
             ) == .ignored
         )
@@ -192,14 +192,14 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date.addingTimeInterval(1)
             ) == .handled
         )
         #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(1.1)) == .handled)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(1.2)
             ) == .handled
         )
@@ -216,7 +216,7 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )
@@ -229,7 +229,7 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .up),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.2)
             ) == .handled
         )
@@ -247,7 +247,7 @@ struct LongPressRecognitionTests {
 
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down),
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
             ) == .handled
         )

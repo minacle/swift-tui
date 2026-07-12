@@ -111,7 +111,7 @@ struct TextEditorLayoutAndScrollingTests {
         _ = runtime.block(from: view, in: RenderProposal(columns: 3))
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 1, row: 1, phase: .down)
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
         #expect(runtime.consumeInvalidation())
@@ -134,7 +134,7 @@ struct TextEditorLayoutAndScrollingTests {
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 5, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 4), phase: .down)
             ) == .handled
         )
 
@@ -155,7 +155,7 @@ struct TextEditorLayoutAndScrollingTests {
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .ignored)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 23, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 22), phase: .down)
             ) == .handled
         )
 
@@ -179,7 +179,7 @@ struct TextEditorLayoutAndScrollingTests {
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 2, row: 3, phase: .down)
+                PointerPress(button: .left, location: Point(column: 1, row: 2), phase: .down)
             ) == .handled
         )
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
@@ -330,7 +330,7 @@ struct TextEditorLayoutAndScrollingTests {
         #expect(runtime.block(from: view)?.lines == ["     ", "     ", "     "])
         #expect(
             runtime.dispatch(
-                PointerEvent(button: .left, column: 3, row: 2, phase: .down)
+                PointerPress(button: .left, location: Point(column: 2, row: 1), phase: .down)
             ) == .handled
         )
         #expect(focusProbe.binding?.wrappedValue == true)

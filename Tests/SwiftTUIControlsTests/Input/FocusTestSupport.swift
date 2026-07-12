@@ -631,13 +631,13 @@ func focusParentCallbackKeyPressChild(in runtime: StateRuntime) {
     let date = Date(timeIntervalSinceReferenceDate: 1_000)
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: 1, row: 0, phase: .down),
+            PointerPress(button: .left, location: .zero, phase: .down),
             at: date
         ) == .handled
     )
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: 1, row: 0, phase: .up),
+            PointerPress(button: .left, location: .zero, phase: .up),
             at: date
         ) == .ignored
     )

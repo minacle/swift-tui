@@ -1,60 +1,54 @@
 import Foundation
 import Terminal
 
-struct PointerEvent: Equatable, Sendable {
+/// A zero-based global pointer movement decoded from terminal input.
+///
+/// `button` identifies a button held during movement. It is `nil` for passive
+/// movement used only for hover tracking.
+struct PointerMotion: Equatable, Sendable {
 
-    enum Button: Equatable, Hashable, Sendable {
+    let button: PointerButton?
 
-        case left
+    let location: Point
 
-        case middle
+    let modifiers: EventModifiers
+}
 
-        case right
+/// A zero-based global scroll-wheel movement decoded from terminal input.
+struct PointerScroll: Equatable, Sendable {
 
-        case wheelUp
+    enum Direction: Equatable, Sendable {
 
-        case wheelDown
-
-        case wheelLeft
-
-        case wheelRight
-
-        case other(Int)
-    }
-
-    enum Phase: Equatable, Sendable {
+        case up
 
         case down
 
-        case motion
+        case left
 
-        case up
+        case right
     }
 
-    let button: Button
+    let direction: Direction
 
-    let column: Int
-
-    let row: Int
+    let location: Point
 
     let modifiers: EventModifiers
-
-    let phase: Phase
-
-    init(
-        button: Button,
-        column: Int,
-        row: Int,
-        modifiers: EventModifiers = [],
-        phase: Phase
-    ) {
-        self.button = button
-        self.column = max(column, 1)
-        self.row = max(row, 1)
-        self.modifiers = modifiers
-        self.phase = phase
-    }
 }
+
+/// A decoded pointer input whose location uses zero-based global terminal-cell
+/// coordinates.
+nonisolated protocol LocatedPointerInput {
+
+    var location: Point { get }
+
+    var modifiers: EventModifiers { get }
+}
+
+extension PointerPress: LocatedPointerInput {}
+
+extension PointerMotion: LocatedPointerInput {}
+
+extension PointerScroll: LocatedPointerInput {}
 
 nonisolated struct KeyPressView<Content: View>: View, InputModifierRenderable, LayoutTraitRenderable {
 
@@ -813,43 +807,32 @@ final class InputRuntime {
     }
 
     func dispatch(
-        _ pointerEvent: PointerEvent,
+        _ pointerPress: PointerPress,
         at date: Date,
         perform: ([Int], () -> Void) -> Void,
         performLink: ([Int], () -> Bool) -> Bool,
-        focus: ([Int]) -> Bool,
-        scroll: ([Int], PointerEvent) -> KeyPress.Result
+        focus: ([Int]) -> Bool
     ) -> KeyPress.Result {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
 
         if let activePointerDragTarget {
-            let matchesButton = pointerEvent.button.pointerPressButton
-                == activePointerDragTarget.handler.button
-            switch pointerEvent.phase {
-            case .motion where matchesButton:
+            if pointerPress.phase == .up,
+               pointerPress.button == activePointerDragTarget.handler.button {
                 dispatchActivePointerDrag(
-                    pointerEvent,
-                    phase: .changed,
-                    perform: perform
-                )
-                return .handled
-            case .up where matchesButton:
-                dispatchActivePointerDrag(
-                    pointerEvent,
+                    pointerPress,
                     phase: .ended,
                     perform: perform
                 )
                 self.activePointerDragTarget = nil
                 return .handled
-            default:
-                cancelActivePointerDrag(perform: perform)
             }
+
+            cancelActivePointerDrag(perform: perform)
         }
 
-        if pointerEvent.phase == .down,
-           !pointerEvent.button.isScrollWheel,
-           beginPointerDrag(pointerEvent, perform: perform) {
+        if pointerPress.phase == .down,
+           beginPointerDrag(pointerPress, perform: perform) {
             _ = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
             pressedTapTarget = nil
@@ -858,65 +841,30 @@ final class InputRuntime {
             return .handled
         }
 
-        if pointerEvent.phase == .motion {
-            let hoverResult = dispatchHoverMotion(pointerEvent, perform: perform)
-            guard pointerEvent.button == .left else {
-                let cancelled = cancelLongPress(perform: perform)
-                activePointerDownPositionTarget = nil
-                pressedTapTarget = nil
-                pressedLinkTarget = nil
-                return hoverResult == .handled || cancelled ? .handled : .ignored
-            }
-
-            let positioned = dispatchActivePointerDownPositionDrag(
-                at: pointerEvent,
-                perform: perform
-            )
-            if positioned {
-                pressedLinkTarget = nil
-                pressedTapTarget = nil
-            }
-            let longPressResult = dispatchLongPressMotion(pointerEvent, perform: perform)
-            return hoverResult == .handled
-                || positioned
-                || longPressResult == .handled
-                ? .handled : .ignored
-        }
-
-        if pointerEvent.button.isScrollWheel {
+        guard pointerPress.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
             pressedTapTarget = nil
             pressedLinkTarget = nil
-            let result = dispatchScroll(pointerEvent, scroll: scroll)
-            return result == .handled || cancelled ? .handled : .ignored
-        }
-
-        guard pointerEvent.button == .left else {
-            let cancelled = cancelLongPress(perform: perform)
-            activePointerDownPositionTarget = nil
-            pressedTapTarget = nil
-            pressedLinkTarget = nil
-            let pointerPressResult = dispatchPointerPress(pointerEvent, perform: perform)
+            let pointerPressResult = dispatchPointerPress(pointerPress, perform: perform)
             return pointerPressResult == .handled || cancelled ? .handled : .ignored
         }
 
-        switch pointerEvent.phase {
-        case .down:
+        if pointerPress.phase == .down {
             _ = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
-            let focusedPath = focusTargets(at: pointerEvent).first {
+            let focusedPath = focusTargets(at: pointerPress).first {
                 focus($0)
             }
             let positioned = beginPointerDownPositionDrag(
-                at: pointerEvent,
+                at: pointerPress,
                 eligiblePaths: focusedPath.map { [$0] } ?? [],
                 perform: perform
             )
-            pressedLinkTarget = linkTarget(at: pointerEvent)
-            pressedTapTarget = tapTarget(at: pointerEvent)
+            pressedLinkTarget = linkTarget(at: pointerPress)
+            pressedTapTarget = tapTarget(at: pointerPress)
             let longPressStarted = beginLongPress(
-                at: pointerEvent,
+                at: pointerPress,
                 date: date,
                 perform: perform
             )
@@ -924,7 +872,7 @@ final class InputRuntime {
                 at: date,
                 perform: perform
             ) == .handled
-            let pointerPressResult = dispatchPointerPress(pointerEvent, perform: perform)
+            let pointerPressResult = dispatchPointerPress(pointerPress, perform: perform)
             return focusedPath != nil
                 || positioned
                 || pressedLinkTarget != nil
@@ -933,10 +881,10 @@ final class InputRuntime {
                 || longPressRecognized
                 || pointerPressResult == .handled
                 ? .handled : .ignored
-        case .motion:
-            return .ignored
-        case .up:
-            let pointerPressResult = dispatchPointerPress(pointerEvent, perform: perform)
+        }
+
+        if pointerPress.phase == .up {
+            let pointerPressResult = dispatchPointerPress(pointerPress, perform: perform)
             if pointerPressResult == .handled {
                 activePointerDownPositionTarget = nil
                 _ = cancelLongPress(perform: perform)
@@ -962,14 +910,14 @@ final class InputRuntime {
                     self.pressedTapTarget = nil
                 }
 
-                guard linkTarget(at: pointerEvent) == pressedLinkTarget else {
+                guard linkTarget(at: pointerPress) == pressedLinkTarget else {
                     activePointerDownPositionTarget = nil
                     return .ignored
                 }
 
                 let linkResult = dispatchLink(at: pressedLinkTarget, perform: performLink)
                 let positioned = finishActivePointerDownPosition(
-                    at: pointerEvent,
+                    at: pointerPress,
                     perform: perform
                 )
                 return linkResult == .handled || positioned ? .handled : .ignored
@@ -977,7 +925,7 @@ final class InputRuntime {
 
             guard let pressedTapTarget else {
                 let positioned = finishActivePointerDownPosition(
-                    at: pointerEvent,
+                    at: pointerPress,
                     perform: perform
                 )
                 return longPressWasActive || pointerDownPositionWasActive || positioned
@@ -988,7 +936,7 @@ final class InputRuntime {
                 self.pressedTapTarget = nil
             }
 
-            guard tapTarget(at: pointerEvent) == pressedTapTarget else {
+            guard tapTarget(at: pointerPress) == pressedTapTarget else {
                 activePointerDownPositionTarget = nil
                 resetTapSequence()
                 return .ignored
@@ -996,30 +944,92 @@ final class InputRuntime {
 
             let tapResult = dispatchTap(
                 at: pressedTapTarget,
-                location: rootPoint(for: pointerEvent),
+                location: rootPoint(for: pointerPress),
                 date: date,
                 perform: perform
             )
             let positioned = finishActivePointerDownPosition(
-                at: pointerEvent,
+                at: pointerPress,
                 perform: perform
             )
             return tapResult == .handled || positioned ? .handled : .ignored
         }
+
+        return .ignored
+    }
+
+    func dispatch(
+        _ pointerMotion: PointerMotion,
+        at date: Date,
+        perform: ([Int], () -> Void) -> Void
+    ) -> KeyPress.Result {
+        _ = dispatchExpiredTapActions(at: date, perform: perform)
+        _ = dispatchExpiredLongPressActions(at: date, perform: perform)
+
+        if let activePointerDragTarget {
+            if pointerMotion.button == activePointerDragTarget.handler.button {
+                dispatchActivePointerDrag(
+                    pointerMotion,
+                    phase: .changed,
+                    perform: perform
+                )
+                return .handled
+            }
+
+            cancelActivePointerDrag(perform: perform)
+        }
+
+        let hoverResult = dispatchHoverMotion(pointerMotion, perform: perform)
+        guard pointerMotion.button == .left else {
+            let cancelled = cancelLongPress(perform: perform)
+            activePointerDownPositionTarget = nil
+            pressedTapTarget = nil
+            pressedLinkTarget = nil
+            return hoverResult == .handled || cancelled ? .handled : .ignored
+        }
+
+        let positioned = dispatchActivePointerDownPositionDrag(
+            at: pointerMotion,
+            perform: perform
+        )
+        if positioned {
+            pressedLinkTarget = nil
+            pressedTapTarget = nil
+        }
+        let longPressResult = dispatchLongPressMotion(pointerMotion, perform: perform)
+        return hoverResult == .handled
+            || positioned
+            || longPressResult == .handled
+            ? .handled : .ignored
+    }
+
+    func dispatch(
+        _ pointerScroll: PointerScroll,
+        at date: Date,
+        perform: ([Int], () -> Void) -> Void,
+        scroll: ([Int], PointerScroll) -> KeyPress.Result
+    ) -> KeyPress.Result {
+        _ = dispatchExpiredTapActions(at: date, perform: perform)
+        _ = dispatchExpiredLongPressActions(at: date, perform: perform)
+        cancelActivePointerDrag(perform: perform)
+
+        let cancelled = cancelLongPress(perform: perform)
+        activePointerDownPositionTarget = nil
+        pressedTapTarget = nil
+        pressedLinkTarget = nil
+        let result = dispatchScroll(pointerScroll, scroll: scroll)
+        return result == .handled || cancelled ? .handled : .ignored
     }
 
     private func beginPointerDrag(
-        _ pointerEvent: PointerEvent,
+        _ pointerPress: PointerPress,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
-        guard let button = pointerEvent.button.pointerPressButton else {
-            return false
-        }
-        let rootPoint = rootPoint(for: pointerEvent)
+        let rootPoint = rootPoint(for: pointerPress)
         guard let region = hitRegions
             .filter({ region in
                 region.frame.contains(column: rootPoint.column, row: rootPoint.row)
-                    && pointerDragHandlersByPath[region.path]?.button == button
+                    && pointerDragHandlersByPath[region.path]?.button == pointerPress.button
             })
             .sorted(by: hitRegionPrecedes)
             .first,
@@ -1039,21 +1049,21 @@ final class InputRuntime {
             handler: handler,
             startLocation: location,
             lastLocation: location,
-            modifiers: pointerEvent.modifiers
+            modifiers: pointerPress.modifiers
         )
         perform(handler.actionPath ?? region.path) {
             handler.action(PointerDrag(
                 phase: .began,
                 startLocation: location,
                 location: location,
-                modifiers: pointerEvent.modifiers
+                modifiers: pointerPress.modifiers
             ))
         }
         return true
     }
 
-    private func dispatchActivePointerDrag(
-        _ pointerEvent: PointerEvent,
+    private func dispatchActivePointerDrag<Input: LocatedPointerInput>(
+        _ pointerInput: Input,
         phase: PointerDrag.Phase,
         perform: ([Int], () -> Void) -> Void
     ) {
@@ -1061,20 +1071,20 @@ final class InputRuntime {
             return
         }
         let location = pointerDragLocation(
-            rootPoint: rootPoint(for: pointerEvent),
+            rootPoint: rootPoint(for: pointerInput),
             path: target.path,
             frame: target.frame,
             coordinateSpace: target.handler.coordinateSpace
         )
         target.lastLocation = location
-        target.modifiers = pointerEvent.modifiers
+        target.modifiers = pointerInput.modifiers
         activePointerDragTarget = target
         perform(target.handler.actionPath ?? target.path) {
             target.handler.action(PointerDrag(
                 phase: phase,
                 startLocation: target.startLocation,
                 location: location,
-                modifiers: pointerEvent.modifiers
+                modifiers: pointerInput.modifiers
             ))
         }
     }
@@ -1169,16 +1179,16 @@ final class InputRuntime {
     }
 
     private func beginLongPress(
-        at pointerEvent: PointerEvent,
+        at pointerPress: PointerPress,
         date: Date,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
-        guard let path = longPressTarget(at: pointerEvent),
+        guard let path = longPressTarget(at: pointerPress),
               let handlers = longPressHandlersByPath[path] else {
             return false
         }
 
-        let location = rootPoint(for: pointerEvent)
+        let location = rootPoint(for: pointerPress)
         let candidates = handlers.map {
             LongPressCandidate(
                 handler: $0,
@@ -1200,14 +1210,14 @@ final class InputRuntime {
     }
 
     private func dispatchLongPressMotion(
-        _ pointerEvent: PointerEvent,
+        _ pointerMotion: PointerMotion,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
         guard var sequence = longPressSequence else {
             return .ignored
         }
 
-        let location = rootPoint(for: pointerEvent)
+        let location = rootPoint(for: pointerMotion)
         var remaining: [LongPressCandidate] = []
         var handled = false
         for candidate in sequence.candidates {
@@ -1233,11 +1243,11 @@ final class InputRuntime {
     }
 
     private func dispatchHoverMotion(
-        _ pointerEvent: PointerEvent,
+        _ pointerMotion: PointerMotion,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
-        let rootPoint = rootPoint(for: pointerEvent)
-        let targets = hoverTargets(at: pointerEvent)
+        let rootPoint = rootPoint(for: pointerMotion)
+        let targets = hoverTargets(at: pointerMotion)
         let targetPaths = Set(targets.map(\.path))
         let exitedPaths = activeHoverPaths.subtracting(targetPaths)
         var handled = false
@@ -1268,36 +1278,31 @@ final class InputRuntime {
     }
 
     private func dispatchPointerPress(
-        _ pointerEvent: PointerEvent,
+        _ pointerPress: PointerPress,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
-        guard let button = pointerEvent.button.pointerPressButton,
-              let phase = pointerEvent.phase.pointerPressPhase else {
-            return .ignored
-        }
-
-        let rootPoint = rootPoint(for: pointerEvent)
-        for target in pointerPressTargets(at: pointerEvent) {
+        let rootPoint = rootPoint(for: pointerPress)
+        for target in pointerPressTargets(at: pointerPress) {
             for handler in pointerPressHandlersByPath[target.path] ?? [] {
                 let location = location(
                     in: handler.coordinateSpace,
                     path: target.path,
                     rootPoint: rootPoint
                 )
-                let pointerPress = PointerPress(
-                    button: button,
+                let deliveredPress = PointerPress(
+                    button: pointerPress.button,
                     location: location,
-                    modifiers: pointerEvent.modifiers,
-                    phase: phase
+                    modifiers: pointerPress.modifiers,
+                    phase: pointerPress.phase
                 )
-                guard handler.matches(pointerPress) else {
+                guard handler.matches(deliveredPress) else {
                     continue
                 }
 
                 let actionPath = handler.actionPath ?? target.path
                 var result = PointerPress.Result.ignored
                 perform(actionPath) {
-                    result = handler.action(pointerPress)
+                    result = handler.action(deliveredPress)
                 }
                 if result == .handled {
                     return .handled
@@ -1339,13 +1344,12 @@ final class InputRuntime {
         }
     }
 
-    private func tapTarget(at pointerEvent: PointerEvent) -> [Int]? {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func tapTarget(at pointerPress: PointerPress) -> [Int]? {
+        let point = rootPoint(for: pointerPress)
         return hitRegions
             .filter {
                 tapHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: column, row: row)
+                    && $0.frame.contains(column: point.column, row: point.row)
             }
             .max {
                 if $0.path.count != $1.path.count {
@@ -1357,13 +1361,12 @@ final class InputRuntime {
             .path
     }
 
-    private func longPressTarget(at pointerEvent: PointerEvent) -> [Int]? {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func longPressTarget(at pointerPress: PointerPress) -> [Int]? {
+        let point = rootPoint(for: pointerPress)
         return hitRegions
             .filter {
                 longPressHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: column, row: row)
+                    && $0.frame.contains(column: point.column, row: point.row)
             }
             .max {
                 if $0.path.count != $1.path.count {
@@ -1375,13 +1378,12 @@ final class InputRuntime {
             .path
     }
 
-    private func linkTarget(at pointerEvent: PointerEvent) -> [Int]? {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func linkTarget(at pointerPress: PointerPress) -> [Int]? {
+        let point = rootPoint(for: pointerPress)
         return hitRegions
             .filter {
                 linkHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: column, row: row)
+                    && $0.frame.contains(column: point.column, row: point.row)
             }
             .max {
                 if $0.path.count != $1.path.count {
@@ -1393,14 +1395,13 @@ final class InputRuntime {
             .path
     }
 
-    private func pointerPressTargets(at pointerEvent: PointerEvent) -> [RenderedHitRegion] {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func pointerPressTargets(at pointerPress: PointerPress) -> [RenderedHitRegion] {
+        let point = rootPoint(for: pointerPress)
         var paths: Set<[Int]> = []
         return hitRegions
             .filter {
                 pointerPressHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: column, row: row)
+                    && $0.frame.contains(column: point.column, row: point.row)
             }
             .sorted(by: pointerPressHitRegionPrecedes)
             .filter {
@@ -1408,14 +1409,13 @@ final class InputRuntime {
             }
     }
 
-    private func hoverTargets(at pointerEvent: PointerEvent) -> [RenderedHitRegion] {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func hoverTargets(at pointerMotion: PointerMotion) -> [RenderedHitRegion] {
+        let point = rootPoint(for: pointerMotion)
         var paths: Set<[Int]> = []
         return hitRegions
             .filter {
                 hoverHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: column, row: row)
+                    && $0.frame.contains(column: point.column, row: point.row)
             }
             .sorted(by: hitRegionPrecedes)
             .filter {
@@ -1453,12 +1453,11 @@ final class InputRuntime {
         return lhs.lexicographicallyPrecedes(rhs)
     }
 
-    private func focusTargets(at pointerEvent: PointerEvent) -> [[Int]] {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func focusTargets(at pointerPress: PointerPress) -> [[Int]] {
+        let point = rootPoint(for: pointerPress)
         return focusRegions
             .filter {
-                $0.frame.contains(column: column, row: row)
+                $0.frame.contains(column: point.column, row: point.row)
             }
             .sorted {
                 if $0.path.count != $1.path.count {
@@ -1471,12 +1470,12 @@ final class InputRuntime {
     }
 
     private func beginPointerDownPositionDrag(
-        at pointerEvent: PointerEvent,
+        at pointerPress: PointerPress,
         eligiblePaths: [[Int]],
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
         guard let target = pointerDownPositionTarget(
-            at: pointerEvent,
+            at: pointerPress,
             eligiblePaths: eligiblePaths
         ),
               let handler = pointerDownPositionHandlersByPath[target.path] else {
@@ -1499,7 +1498,7 @@ final class InputRuntime {
     }
 
     private func dispatchActivePointerDownPositionDrag(
-        at pointerEvent: PointerEvent,
+        at pointerMotion: PointerMotion,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
         guard var target = activePointerDownPositionTarget,
@@ -1515,7 +1514,7 @@ final class InputRuntime {
                 handler.began(target.startLocation)
             }
         }
-        let location = location(of: pointerEvent, in: target.frame)
+        let location = location(of: pointerMotion, in: target.frame)
         perform(handler.actionPath ?? target.path) {
             handler.changed(location)
         }
@@ -1523,7 +1522,7 @@ final class InputRuntime {
     }
 
     private func finishActivePointerDownPosition(
-        at pointerEvent: PointerEvent,
+        at pointerPress: PointerPress,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
         guard let target = activePointerDownPositionTarget else {
@@ -1535,29 +1534,30 @@ final class InputRuntime {
             return false
         }
 
-        let location = location(of: pointerEvent, in: target.frame)
+        let location = location(of: pointerPress, in: target.frame)
         perform(handler.actionPath ?? target.path) {
             handler.began(location)
         }
         return true
     }
 
-    private func location(
-        of pointerEvent: PointerEvent,
+    private func location<Input: LocatedPointerInput>(
+        of pointerInput: Input,
         in frame: RenderedRect
     ) -> Point {
         PointerCapture.localLocation(
-            rootPoint: rootPoint(for: pointerEvent),
+            rootPoint: rootPoint(for: pointerInput),
             frame: frame
         )
     }
 
     private func pointerDownPositionTarget(
-        at pointerEvent: PointerEvent,
+        at pointerPress: PointerPress,
         eligiblePaths: [[Int]]
     ) -> (path: [Int], frame: RenderedRect, location: Point)? {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+        let point = rootPoint(for: pointerPress)
+        let column = point.column
+        let row = point.row
         if let region = focusRegions
             .filter({
                 eligiblePaths.contains($0.path)
@@ -1606,15 +1606,11 @@ final class InputRuntime {
     }
 
     private func dispatchScroll(
-        _ pointerEvent: PointerEvent,
-        scroll: ([Int], PointerEvent) -> KeyPress.Result
+        _ pointerScroll: PointerScroll,
+        scroll: ([Int], PointerScroll) -> KeyPress.Result
     ) -> KeyPress.Result {
-        guard pointerEvent.phase == .down else {
-            return .ignored
-        }
-
-        for path in scrollTargets(at: pointerEvent) {
-            if scroll(path, pointerEvent) == .handled {
+        for path in scrollTargets(at: pointerScroll) {
+            if scroll(path, pointerScroll) == .handled {
                 return .handled
             }
         }
@@ -1622,12 +1618,11 @@ final class InputRuntime {
         return .ignored
     }
 
-    private func scrollTargets(at pointerEvent: PointerEvent) -> [[Int]] {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
+    private func scrollTargets(at pointerScroll: PointerScroll) -> [[Int]] {
+        let point = rootPoint(for: pointerScroll)
         return scrollRegions
             .filter {
-                $0.frame.contains(column: column, row: row)
+                $0.frame.contains(column: point.column, row: point.row)
             }
             .sorted {
                 if $0.path.count != $1.path.count {
@@ -1756,10 +1751,10 @@ final class InputRuntime {
         }
     }
 
-    private func rootPoint(for pointerEvent: PointerEvent) -> Point {
+    private func rootPoint<Input: LocatedPointerInput>(for pointerInput: Input) -> Point {
         Point(
-            column: pointerEvent.column - rootFrame.column,
-            row: pointerEvent.row - rootFrame.row
+            column: pointerInput.location.column - (rootFrame.column - 1),
+            row: pointerInput.location.row - (rootFrame.row - 1)
         )
     }
 
@@ -1863,47 +1858,6 @@ final class InputRuntime {
         let rows = end.row - start.row
         return abs(columns) <= maximumDistance.columns
             && abs(rows) <= maximumDistance.rows
-    }
-}
-
-extension PointerEvent.Button {
-
-    fileprivate var pointerPressButton: PointerButton? {
-        switch self {
-        case .left:
-            return .left
-        case .middle:
-            return .middle
-        case .right:
-            return .right
-        case .other(let button):
-            return .other(button)
-        case .wheelUp, .wheelDown, .wheelLeft, .wheelRight:
-            return nil
-        }
-    }
-
-    fileprivate var isScrollWheel: Bool {
-        switch self {
-        case .wheelUp, .wheelDown, .wheelLeft, .wheelRight:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-extension PointerEvent.Phase {
-
-    fileprivate var pointerPressPhase: PointerPress.Phases? {
-        switch self {
-        case .down:
-            return .down
-        case .up:
-            return .up
-        case .motion:
-            return nil
-        }
     }
 }
 

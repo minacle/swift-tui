@@ -97,7 +97,7 @@ final class TapGestureProbe {
     }
 }
 
-struct PointerPressEvent: Equatable {
+struct RecordedPointerPress: Equatable {
 
     var name: String
 
@@ -114,7 +114,7 @@ final class PointerPressProbe {
 
     var names: [String] = []
 
-    var events: [PointerPressEvent] = []
+    var events: [RecordedPointerPress] = []
 
     func record(_ name: String) {
         names.append(name)
@@ -123,7 +123,7 @@ final class PointerPressProbe {
     func record(_ name: String, _ pointerPress: PointerPress) {
         names.append(name)
         events.append(
-            PointerPressEvent(
+            RecordedPointerPress(
                 name: name,
                 button: pointerPress.button,
                 location: pointerPress.location,

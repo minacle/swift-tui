@@ -180,12 +180,12 @@ private func dispatchClick(
 ) {
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: column, row: row, phase: .down)
+            PointerPress(button: .left, location: Point(column: column - 1, row: row - 1), phase: .down)
         ) == result
     )
     #expect(
         runtime.dispatch(
-            PointerEvent(button: .left, column: column, row: row, phase: .up)
+            PointerPress(button: .left, location: Point(column: column - 1, row: row - 1), phase: .up)
         ) == result
     )
 }
