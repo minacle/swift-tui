@@ -7,7 +7,9 @@ public import Terminal
 /// associated ``Value`` is the value produced by recognition,
 /// while ``Body`` supports composing an event from another event. Primitive
 /// events use `Never` as their body.
-public nonisolated protocol InputEvent<Value> {
+@MainActor
+@preconcurrency
+public protocol InputEvent<Value> {
 
     /// The value produced when the event is recognized.
     associatedtype Value
@@ -24,7 +26,9 @@ public nonisolated protocol InputEvent<Value> {
 
 /// A declarative matcher whose recognized values originate from keyboard
 /// input.
-public nonisolated protocol KeyEvent<Value>: InputEvent {
+@MainActor
+@preconcurrency
+public protocol KeyEvent<Value>: InputEvent {
 
     /// The keyboard value produced when the event is recognized.
     associatedtype Value
@@ -32,7 +36,9 @@ public nonisolated protocol KeyEvent<Value>: InputEvent {
 
 /// A declarative matcher whose recognized values originate from pointer
 /// input.
-public nonisolated protocol PointerEvent<Value>: InputEvent {
+@MainActor
+@preconcurrency
+public protocol PointerEvent<Value>: InputEvent {
 
     /// The pointer value produced when the event is recognized.
     associatedtype Value
@@ -43,7 +49,7 @@ extension InputEvent where Body == Never {
     /// Marks a primitive event as having no composed body.
     ///
     /// - Precondition: This property must not be evaluated.
-    public nonisolated var body: Never {
+    public var body: Never {
         fatalError("Primitive events do not have a body.")
     }
 }
