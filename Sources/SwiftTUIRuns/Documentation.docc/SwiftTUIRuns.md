@@ -14,6 +14,8 @@ trailing ranges that fit a column budget, and identify exact grapheme
 boundaries without taking ownership of clipping or truncation policy.
 
 ```swift
+import SwiftTUIRuns
+
 let content = RunGroup {
     Run("Status: ").bold()
     Run("ready").foregroundColor(Color16.green)
