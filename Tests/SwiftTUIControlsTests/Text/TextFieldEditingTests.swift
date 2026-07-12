@@ -158,21 +158,6 @@ struct TextFieldEditingTests {
     }
 
     @Test
-    func `exact-fit wide text remains unscrolled with its caret inside the final column`() {
-        let runtime = StateRuntime()
-        let text = String(repeating: "ㅁ", count: 16)
-        let view = TextFieldInitialTextView(text: text)
-            .frame(width: 32)
-
-        _ = runtime.block(from: view)
-        _ = runtime.consumeInvalidation()
-        let block = runtime.block(from: view)
-
-        #expect(block?.lines == [text])
-        #expect(block?.caret == RenderedCaret(column: 31))
-    }
-
-    @Test
     func `an exact-fit field keeps its boundary caret out of the trailing sibling`() {
         let runtime = StateRuntime()
         let view = ExactFitDelimitedFixedSizeTextFieldView()

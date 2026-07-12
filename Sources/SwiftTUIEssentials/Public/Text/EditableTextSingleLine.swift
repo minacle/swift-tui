@@ -502,7 +502,8 @@ final class EditableTextSingleLineState {
         }
 
         let textWidth = layout.columns
-        if textWidth <= maxWidth {
+        // Exact-fit text may still need to scroll to expose its trailing caret cell.
+        if textWidth < maxWidth {
             horizontalScrollOffset = 0
             return
         }

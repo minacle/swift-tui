@@ -26,6 +26,20 @@ struct EditableTextTests {
     }
 
     @Test
+    func `an exact-fit single-line editor scrolls to place its end caret after the last visible character`() {
+        let runtime = StateRuntime()
+        let view = FocusedEditableText(text: .constant("abc"))
+            .frame(width: 3)
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        let block = runtime.block(from: view)
+
+        #expect(block?.lines == ["bc "])
+        #expect(block?.caret == RenderedCaret(column: 2))
+    }
+
+    @Test
     func `multiline editing inserts a newline and accepts text on the new line`() {
         var text = "a"
         let binding = Binding(
