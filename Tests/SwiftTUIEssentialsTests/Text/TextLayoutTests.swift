@@ -110,7 +110,7 @@ struct TextLayoutTests {
         attributed[attributed.range(of: "gamma")!].inlinePresentationIntent = .stronglyEmphasized
 
         let block = ViewResolver.block(
-            from: Text(attributed).lineLimit(1).truncationMode(.head),
+            from: Text(attributedContent: attributed).lineLimit(1).truncationMode(.head),
             in: RenderProposal(columns: 8)
         )
 

@@ -105,6 +105,9 @@ extension AnyColor {
 ///
 /// When ``Text`` contains an explicit attributed alignment and receives a
 /// finite column proposal, it aligns within and reports that proposed width.
+///
+/// Deprecated: Attributed string support will be removed in a future release.
+@available(*, deprecated, message: "AttributedString support will be removed in a future release.")
 public nonisolated enum AttributedTextAlignment: Hashable, Sendable {
 
     /// Align each line to the left edge of its proposed width.
@@ -114,6 +117,17 @@ public nonisolated enum AttributedTextAlignment: Hashable, Sendable {
     case center
 
     /// Align each line to the right edge of its proposed width.
+    case right
+}
+
+/// The internal horizontal alignment used after legacy attributed-string
+/// values cross the public conversion boundary.
+nonisolated enum TextAttributedAlignment: Hashable, Sendable {
+
+    case left
+
+    case center
+
     case right
 }
 
@@ -141,6 +155,9 @@ public nonisolated enum TextAlignment: CaseIterable, Hashable, Sendable {
 /// Access this attribute through the SwiftTUI attribute scope when building an
 /// `AttributedString`. ``Text`` applies the value to the corresponding runs
 /// when it renders them.
+///
+/// Deprecated: Attributed string support will be removed in a future release.
+@available(*, deprecated, message: "AttributedString support will be removed in a future release.")
 public enum SwiftTUIForegroundColorAttribute: AttributedStringKey {
 
     /// The type of foreground color stored by this attribute.
@@ -155,6 +172,9 @@ public enum SwiftTUIForegroundColorAttribute: AttributedStringKey {
 /// Access this attribute through the SwiftTUI attribute scope when building an
 /// `AttributedString`. ``Text`` applies the value to the corresponding runs
 /// when it renders them.
+///
+/// Deprecated: Attributed string support will be removed in a future release.
+@available(*, deprecated, message: "AttributedString support will be removed in a future release.")
 public enum SwiftTUIBackgroundColorAttribute: AttributedStringKey {
 
     /// The type of background color stored by this attribute.
@@ -168,6 +188,9 @@ public enum SwiftTUIBackgroundColorAttribute: AttributedStringKey {
 ///
 /// The attribute stores an ``AttributedTextAlignment`` value. ``Text`` uses
 /// that value when laying out the attributed paragraph in a proposed width.
+///
+/// Deprecated: Attributed string support will be removed in a future release.
+@available(*, deprecated, message: "AttributedString support will be removed in a future release.")
 public enum SwiftTUIAlignmentAttribute: AttributedStringKey {
 
     /// The type of text alignment stored by this attribute.
@@ -177,11 +200,38 @@ public enum SwiftTUIAlignmentAttribute: AttributedStringKey {
     public static let name = "SwiftTUIAlignment"
 }
 
+/// Stores foreground colors for the nondeprecated internal conversion path.
+enum TextForegroundColorAttribute: AttributedStringKey {
+
+    typealias Value = AnyColor
+
+    static let name = "SwiftTUIInternalForegroundColor"
+}
+
+/// Stores background colors for the nondeprecated internal conversion path.
+enum TextBackgroundColorAttribute: AttributedStringKey {
+
+    typealias Value = AnyColor
+
+    static let name = "SwiftTUIInternalBackgroundColor"
+}
+
+/// Stores horizontal alignment for the nondeprecated internal conversion path.
+enum TextAlignmentAttribute: AttributedStringKey {
+
+    typealias Value = TextAttributedAlignment
+
+    static let name = "SwiftTUIInternalAlignment"
+}
+
 /// Adds SwiftTUI terminal styling keys to Foundation attributed-string scopes.
 extension AttributeScopes {
 
     /// The Foundation attribute scope containing SwiftTUI's supported terminal
     /// foreground, background, and paragraph-alignment keys.
+    ///
+    /// Deprecated: Attributed string support will be removed in a future release.
+    @available(*, deprecated, message: "AttributedString support will be removed in a future release.")
     public struct SwiftTUIAttributes: AttributeScope {
 
         /// The key-path member for a run's terminal foreground color.
@@ -195,6 +245,9 @@ extension AttributeScopes {
     }
 
     /// The SwiftTUI attributed-string scope type used by dynamic lookup.
+    ///
+    /// Deprecated: Attributed string support will be removed in a future release.
+    @available(*, deprecated, message: "AttributedString support will be removed in a future release.")
     public var swiftTUI: SwiftTUIAttributes.Type {
         SwiftTUIAttributes.self
     }
@@ -210,6 +263,7 @@ extension AttributeDynamicLookup {
     ///   ``AttributeScopes/SwiftTUIAttributes``.
     /// - Returns: The key value used by Foundation's attributed-string dynamic
     ///   member lookup.
+    @available(*, deprecated, message: "AttributedString support will be removed in a future release.")
     public nonisolated subscript<T: AttributedStringKey>(
         dynamicMember keyPath: KeyPath<AttributeScopes.SwiftTUIAttributes, T>
     ) -> T {
@@ -326,8 +380,25 @@ public nonisolated struct Text: View, Equatable, Sendable {
     /// remain unchanged; sanitize untrusted text before constructing the view.
     ///
     /// - Parameter attributedContent: The attributed string to render.
+    @available(*, deprecated, message: "AttributedString support will be removed in a future release.")
     public init(_ attributedContent: AttributedString) {
-        let converted = TextAnnotation.convert(attributedContent)
+        self.init(convertedAttributedContent: TextAnnotation.convertLegacy(attributedContent))
+    }
+
+    /// Converts Foundation attributed-string content into internal text runs
+    /// without exposing the deprecated public initializer to module tests.
+    ///
+    /// - Parameter attributedContent: The attributed string to convert.
+    internal init(attributedContent: AttributedString) {
+        self.init(convertedAttributedContent: TextAnnotation.convert(attributedContent))
+    }
+
+    private init(
+        convertedAttributedContent converted: (
+            runs: [Run],
+            annotations: [TextAnnotation]
+        )
+    ) {
         self.runGroup = RunGroup {
             for run in converted.runs {
                 run
@@ -360,13 +431,22 @@ extension Text {
 
 nonisolated struct TextAnnotation: Equatable, Sendable {
 
+    private struct Attributes {
+
+        var foregroundStyle: AnyColor?
+
+        var backgroundStyle: AnyColor?
+
+        var alignment: TextAttributedAlignment?
+    }
+
     var link: URL?
 
-    var alignment: AttributedTextAlignment?
+    var alignment: TextAttributedAlignment?
 
     var range: Range<RunIndex>
 
-    init(link: URL?, alignment: AttributedTextAlignment?, range: Range<RunIndex>) {
+    init(link: URL?, alignment: TextAttributedAlignment?, range: Range<RunIndex>) {
         self.link = link
         self.alignment = alignment
         self.range = range
@@ -374,6 +454,42 @@ nonisolated struct TextAnnotation: Equatable, Sendable {
 
     static func convert(
         _ attributedString: AttributedString
+    ) -> (runs: [Run], annotations: [TextAnnotation]) {
+        convert(attributedString) {
+            Attributes(
+                foregroundStyle: $0[TextForegroundColorAttribute.self],
+                backgroundStyle: $0[TextBackgroundColorAttribute.self],
+                alignment: $0[TextAlignmentAttribute.self]
+            )
+        }
+    }
+
+    @available(*, deprecated, message: "AttributedString support will be removed in a future release.")
+    static func convertLegacy(
+        _ attributedString: AttributedString
+    ) -> (runs: [Run], annotations: [TextAnnotation]) {
+        convert(attributedString) {
+            let alignment = $0.alignment.map {
+                switch $0 {
+                case .left:
+                    TextAttributedAlignment.left
+                case .center:
+                    TextAttributedAlignment.center
+                case .right:
+                    TextAttributedAlignment.right
+                }
+            }
+            return Attributes(
+                foregroundStyle: $0.foregroundColor,
+                backgroundStyle: $0.backgroundColor,
+                alignment: alignment
+            )
+        }
+    }
+
+    private static func convert(
+        _ attributedString: AttributedString,
+        attributes: (AttributedString.Runs.Run) -> Attributes
     ) -> (runs: [Run], annotations: [TextAnnotation]) {
         var offset = 0
         var runs: [Run] = []
@@ -388,14 +504,15 @@ nonisolated struct TextAnnotation: Equatable, Sendable {
 #if canImport(Darwin)
             style = TextStyle(inlinePresentationIntent: attributedRun.inlinePresentationIntent)
 #endif
-            style.foregroundStyle = attributedRun.foregroundColor
-            style.backgroundStyle = attributedRun.backgroundColor
+            let attributes = attributes(attributedRun)
+            style.foregroundStyle = attributes.foregroundStyle
+            style.backgroundStyle = attributes.backgroundStyle
             let upperOffset = offset + text.count
             runs.append(Run(text, attributes: style.inheritingRunAttributes))
             annotations.append(
                 TextAnnotation(
                     link: attributedRun.link,
-                    alignment: attributedRun.alignment,
+                    alignment: attributes.alignment,
                     range: RunIndex(characterOffset: offset)
                         ..< RunIndex(characterOffset: upperOffset)
                 )
@@ -403,6 +520,43 @@ nonisolated struct TextAnnotation: Equatable, Sendable {
             offset = upperOffset
         }
         return (runs, annotations)
+    }
+}
+
+extension AttributedString {
+
+    /// Sets a legacy SwiftTUI foreground attribute without requiring tests to
+    /// call the deprecated public dynamic-member API.
+    internal mutating func setSwiftTUIForegroundColor(
+        _ color: AnyColor,
+        in range: Range<Index>? = nil
+    ) {
+        if let range {
+            self[range][TextForegroundColorAttribute.self] = color
+        }
+        else {
+            self[TextForegroundColorAttribute.self] = color
+        }
+    }
+
+    /// Sets a legacy SwiftTUI background attribute without requiring tests to
+    /// call the deprecated public dynamic-member API.
+    internal mutating func setSwiftTUIBackgroundColor(
+        _ color: AnyColor,
+        in range: Range<Index>? = nil
+    ) {
+        if let range {
+            self[range][TextBackgroundColorAttribute.self] = color
+        }
+        else {
+            self[TextBackgroundColorAttribute.self] = color
+        }
+    }
+
+    /// Sets a legacy SwiftTUI alignment attribute without requiring tests to
+    /// call the deprecated public dynamic-member API.
+    internal mutating func setSwiftTUIAlignment(_ alignment: TextAttributedAlignment) {
+        self[TextAlignmentAttribute.self] = alignment
     }
 }
 

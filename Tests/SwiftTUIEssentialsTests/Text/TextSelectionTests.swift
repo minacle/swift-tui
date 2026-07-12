@@ -323,7 +323,7 @@ struct TextSelectionTests {
         attributed.link = url
         var opened: [URL] = []
         let runtime = StateRuntime()
-        let view = Text(attributed)
+        let view = Text(attributedContent: attributed)
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { opened.append($0); return .handled })
 

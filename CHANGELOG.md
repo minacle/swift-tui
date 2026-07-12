@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added configurable horizontal and vertical scroll indicators with overlay,
   reserved-space, flash, proportional thumb-drag, and page-scroll behavior.
 
+### Deprecated
+
+- Deprecated Foundation `AttributedString` text initialization, SwiftTUI
+  attributed-string keys and scopes, and attributed text alignment. These APIs
+  will be removed in a future release.
+
 ## [0.9.0] - 2026-07-12
 
 ### Added

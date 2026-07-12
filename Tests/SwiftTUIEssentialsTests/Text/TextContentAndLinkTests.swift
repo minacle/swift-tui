@@ -71,7 +71,7 @@ struct TextContentAndLinkTests {
 
         #expect(Text(string).content == "Hello")
         #expect(Text(substring).content == "Hell")
-        #expect(Text(attributed).content == "Styled")
+        #expect(Text(attributedContent: attributed).content == "Styled")
     }
 
 #if canImport(Darwin)
@@ -82,7 +82,7 @@ struct TextContentAndLinkTests {
         attributed[attributed.range(of: "Italic")!].inlinePresentationIntent = .emphasized
         attributed[attributed.range(of: "Strike")!].inlinePresentationIntent = .strikethrough
 
-        let block = ViewResolver.block(from: Text(attributed))
+        let block = ViewResolver.block(from: Text(attributedContent: attributed))
 
         #expect(block?.runs == [
             RenderedRun(text: "Bold", style: TextStyle(isBold: true)),
@@ -98,7 +98,9 @@ struct TextContentAndLinkTests {
         var attributed = AttributedString("Bold plain")
         attributed[attributed.range(of: "Bold")!].inlinePresentationIntent = .stronglyEmphasized
 
-        let block = ViewResolver.block(from: Text(attributed).foregroundStyle(.red).italic())
+        let block = ViewResolver.block(
+            from: Text(attributedContent: attributed).foregroundStyle(.red).italic()
+        )
 
         #expect(block?.runs == [
             RenderedRun(
@@ -124,14 +126,16 @@ struct TextContentAndLinkTests {
     @Test
     func `attributed foreground and background colors produce separate styled runs`() {
         var attributed = AttributedString("Red Blue")
-        attributed[attributed.range(of: "Red")!].foregroundColor = .color16(.red)
-        attributed[attributed.range(of: "Blue")!].backgroundColor = .trueColor(
-            red: 1,
-            green: 2,
-            blue: 3
+        attributed.setSwiftTUIForegroundColor(
+            .color16(.red),
+            in: attributed.range(of: "Red")!
+        )
+        attributed.setSwiftTUIBackgroundColor(
+            .trueColor(red: 1, green: 2, blue: 3),
+            in: attributed.range(of: "Blue")!
         )
 
-        let block = ViewResolver.block(from: Text(attributed))
+        let block = ViewResolver.block(from: Text(attributedContent: attributed))
 
         #expect(block?.runs == [
             RenderedRun(
@@ -152,11 +156,11 @@ struct TextContentAndLinkTests {
     @Test
     func `attributed colors take precedence over inherited text colors`() {
         var attributed = AttributedString("Styled")
-        attributed.foregroundColor = .color16(.green)
-        attributed.backgroundColor = .color256(196)
+        attributed.setSwiftTUIForegroundColor(.color16(.green))
+        attributed.setSwiftTUIBackgroundColor(.color256(196))
 
         let block = ViewResolver.block(
-            from: Text(attributed)
+            from: Text(attributedContent: attributed)
                 .foregroundStyle(.red)
                 ._backgroundStyle(.blue)
         )
@@ -178,7 +182,10 @@ struct TextContentAndLinkTests {
         var attributed = AttributedString("Alpha Beta")
         attributed[attributed.range(of: "Beta")!].inlinePresentationIntent = .stronglyEmphasized
 
-        let block = ViewResolver.block(from: Text(attributed), in: RenderProposal(columns: 5))
+        let block = ViewResolver.block(
+            from: Text(attributedContent: attributed),
+            in: RenderProposal(columns: 5)
+        )
 
         #expect(block?.runs == [
             RenderedRun(text: "Alpha", row: 0),
@@ -191,15 +198,24 @@ struct TextContentAndLinkTests {
     @Test
     func `attributed alignment positions text within the proposed width`() {
         var left = AttributedString("A")
-        left.alignment = .left
+        left.setSwiftTUIAlignment(.left)
         var center = AttributedString("A")
-        center.alignment = .center
+        center.setSwiftTUIAlignment(.center)
         var right = AttributedString("A")
-        right.alignment = .right
+        right.setSwiftTUIAlignment(.right)
 
-        let leftBlock = ViewResolver.block(from: Text(left), in: RenderProposal(columns: 5))
-        let centerBlock = ViewResolver.block(from: Text(center), in: RenderProposal(columns: 5))
-        let rightBlock = ViewResolver.block(from: Text(right), in: RenderProposal(columns: 5))
+        let leftBlock = ViewResolver.block(
+            from: Text(attributedContent: left),
+            in: RenderProposal(columns: 5)
+        )
+        let centerBlock = ViewResolver.block(
+            from: Text(attributedContent: center),
+            in: RenderProposal(columns: 5)
+        )
+        let rightBlock = ViewResolver.block(
+            from: Text(attributedContent: right),
+            in: RenderProposal(columns: 5)
+        )
 
         #expect(leftBlock?.runs == [RenderedRun(text: "A")])
         #expect(leftBlock?.lines == ["A    "])
@@ -212,10 +228,10 @@ struct TextContentAndLinkTests {
     @Test
     func `an attributed string's alignment takes precedence over multilineTextAlignment`() {
         var attributed = AttributedString("A")
-        attributed.alignment = .left
+        attributed.setSwiftTUIAlignment(.left)
 
         let block = ViewResolver.block(
-            from: Text(attributed).multilineTextAlignment(.trailing),
+            from: Text(attributedContent: attributed).multilineTextAlignment(.trailing),
             in: RenderProposal(columns: 5)
         )
 
@@ -226,9 +242,12 @@ struct TextContentAndLinkTests {
     @Test
     func `wrapped attributed lines retain their alignment`() {
         var attributed = AttributedString("AB CD")
-        attributed.alignment = .center
+        attributed.setSwiftTUIAlignment(.center)
 
-        let block = ViewResolver.block(from: Text(attributed), in: RenderProposal(columns: 4))
+        let block = ViewResolver.block(
+            from: Text(attributedContent: attributed),
+            in: RenderProposal(columns: 4)
+        )
 
         #expect(block?.runs == [
             RenderedRun(text: "AB", column: 1),
@@ -244,7 +263,7 @@ struct TextContentAndLinkTests {
         attributed.link = url
         var opened: [URL] = []
         let runtime = StateRuntime()
-        let view = Text(attributed)
+        let view = Text(attributedContent: attributed)
             .environment(\.openURL, OpenURLAction { opened.append($0); return .handled })
 
         let block = runtime.block(from: view)
@@ -266,7 +285,9 @@ struct TextContentAndLinkTests {
         let url = URL(string: "https://example.com")!
         attributed.link = url
 
-        let block = ViewResolver.block(from: Text(attributed).tint(.green))
+        let block = ViewResolver.block(
+            from: Text(attributedContent: attributed).tint(.green)
+        )
 
         #expect(block?.runs == [
             RenderedRun(
@@ -282,9 +303,11 @@ struct TextContentAndLinkTests {
         var attributed = AttributedString("Visit")
         let url = URL(string: "https://example.com")!
         attributed.link = url
-        attributed.foregroundColor = .color16(.red)
+        attributed.setSwiftTUIForegroundColor(.color16(.red))
 
-        let block = ViewResolver.block(from: Text(attributed).tint(.green))
+        let block = ViewResolver.block(
+            from: Text(attributedContent: attributed).tint(.green)
+        )
 
         #expect(block?.runs == [
             RenderedRun(
@@ -301,7 +324,7 @@ struct TextContentAndLinkTests {
         attributed.link = URL(string: "https://example.com")!
         let runtime = StateRuntime()
 
-        #expect(runtime.block(from: Text(attributed))?.text == "Visit")
+        #expect(runtime.block(from: Text(attributedContent: attributed))?.text == "Visit")
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
         #expect(
             runtime.dispatch(

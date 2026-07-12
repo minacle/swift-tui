@@ -358,7 +358,7 @@ private enum TextRunLayoutMapper {
 
         var link: URL?
 
-        var alignment: AttributedTextAlignment?
+        var alignment: TextAttributedAlignment?
     }
 
     static func renderedRuns(
@@ -382,7 +382,7 @@ private enum TextRunLayoutMapper {
             var pendingStyle: TextStyle?
             var pendingLink: URL?
             var rowRuns: [RenderedRun] = []
-            var rowAlignment: AttributedTextAlignment?
+            var rowAlignment: TextAttributedAlignment?
             let lineLayout = RunGroup(line.text).layout()
 
             func flush() {
@@ -495,7 +495,7 @@ private enum TextRunLayoutMapper {
 
     private static func horizontalOffset(
         for line: String,
-        alignment: AttributedTextAlignment?,
+        alignment: TextAttributedAlignment?,
         defaultAlignment: TextAlignment,
         width: Int?
     ) -> Int {
