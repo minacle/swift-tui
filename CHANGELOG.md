@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added public keyed view attachments and captured pointer drags for composing
+  reusable container adornments and interactive custom views.
+- Added configurable horizontal and vertical scroll indicators with overlay,
+  reserved-space, flash, proportional thumb-drag, and page-scroll behavior.
+
 ## [0.9.0] - 2026-07-12
 
 ### Added

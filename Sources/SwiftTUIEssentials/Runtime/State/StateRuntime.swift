@@ -4,6 +4,8 @@ import Terminal
 
 final class StateRuntime {
 
+    private let now: () -> Date
+
     private var cells: [StateKey: Any] = [:]
 
     private var renderKeysByStorageID: [ObjectIdentifier: StateKey] = [:]
@@ -62,6 +64,10 @@ final class StateRuntime {
 
     private var pendingRemovedStateSubtrees: [[Int]] = []
 
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
+    }
+
     var isSuppressingRenderRegistrations: Bool {
         suppressRenderRegistrations
     }
@@ -84,6 +90,9 @@ final class StateRuntime {
         terminationHandler = nil
         openURLHandlers = []
         defer {
+            input.finishRender { path, operation in
+                withView(at: path, perform: operation)
+            }
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
             }
@@ -139,6 +148,9 @@ final class StateRuntime {
         terminationHandler = nil
         openURLHandlers = []
         defer {
+            input.finishRender { path, operation in
+                withView(at: path, perform: operation)
+            }
             if focus.finishRender(requests: currentFocusRequests()) {
                 invalidated = true
             }
@@ -456,6 +468,21 @@ final class StateRuntime {
         )
     }
 
+    func registerPointerDragHandler(
+        _ handler: PointerDragHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.register(
+            environmentRestoringPointerDragHandler(handler),
+            at: path
+        )
+    }
+
     func registerLinkHandler(_ handler: LinkHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled else {
@@ -608,7 +635,9 @@ final class StateRuntime {
         maximumPoint: ScrollPoint,
         viewportSize: Size,
         identifiedRegions: [RenderedIdentifiedRegion],
-        binding: Binding<ScrollPosition>?
+        binding: Binding<ScrollPosition>?,
+        flashGeneration: Int?,
+        at date: Date? = nil
     ) {
         guard !isSuppressingInteractiveRenderRegistrations else {
             return
@@ -618,14 +647,77 @@ final class StateRuntime {
             $0 == path
         }
         scrollViewRenderOrder.append(path)
+        let date = date ?? now()
+        let previous = scrollViewStates[path]
+        let requestsFlash = previous != nil && (
+            previous?.point != point
+                || flashGeneration.map { $0 != previous?.flashGeneration } == true
+        )
         scrollViewStates[path] = ScrollViewState(
             axes: axes,
             point: point,
             maximumPoint: maximumPoint,
             viewportSize: viewportSize,
             identifiedRegions: identifiedRegions,
-            binding: binding
+            binding: binding,
+            flashGeneration: flashGeneration,
+            flashDeadline: requestsFlash
+                ? date.addingTimeInterval(0.5)
+                : previous?.flashDeadline,
+            isIndicatorInteracting: previous?.isIndicatorInteracting ?? false
         )
+        if requestsFlash {
+            invalidated = true
+        }
+    }
+
+    func scrollIndicatorIsTemporarilyVisible(
+        at path: [Int],
+        date: Date? = nil
+    ) -> Bool {
+        guard let state = scrollViewStates[path] else {
+            return false
+        }
+        return state.isIndicatorInteracting
+            || state.flashDeadline.map { $0 > (date ?? now()) } == true
+    }
+
+    func scrollIndicatorScroll(to offset: Int, axis: Axis, at path: [Int]) {
+        guard scrollViewRenderOrder.contains(path),
+              var state = scrollViewStates[path] else {
+            return
+        }
+        let current = state.binding?.wrappedValue.point ?? state.point
+        let next = ScrollPoint(
+            x: axis == .horizontal
+                ? clamped(offset, upperBound: state.maximumPoint.x)
+                : current.x,
+            y: axis == .vertical
+                ? clamped(offset, upperBound: state.maximumPoint.y)
+                : current.y
+        )
+        guard next != current else {
+            return
+        }
+        state.point = next
+        state.flashDeadline = now().addingTimeInterval(0.5)
+        scrollViewStates[path] = state
+        state.binding?.wrappedValue = ScrollPosition(point: next)
+        invalidated = true
+    }
+
+    func setScrollIndicatorInteraction(_ active: Bool, at path: [Int]) {
+        guard scrollViewRenderOrder.contains(path),
+              var state = scrollViewStates[path],
+              state.isIndicatorInteracting != active else {
+            return
+        }
+        state.isIndicatorInteracting = active
+        if !active {
+            state.flashDeadline = now().addingTimeInterval(0.5)
+        }
+        scrollViewStates[path] = state
+        invalidated = true
     }
 
     func isFocused(at path: [Int]) -> Bool {
@@ -793,6 +885,15 @@ final class StateRuntime {
         input.nextLongPressDeadline
     }
 
+    var nextScrollIndicatorFlashDeadline: Date? {
+        scrollViewRenderOrder.compactMap {
+            guard let state = scrollViewStates[$0], !state.isIndicatorInteracting else {
+                return nil
+            }
+            return state.flashDeadline
+        }.min()
+    }
+
     func dispatchExpiredTapActions(at date: Date = Date()) -> KeyPress.Result {
         input.dispatchExpiredTapActions(at: date) { path, operation in
             withView(at: path, perform: operation)
@@ -802,6 +903,23 @@ final class StateRuntime {
     func dispatchExpiredLongPressActions(at date: Date = Date()) -> KeyPress.Result {
         input.dispatchExpiredLongPressActions(at: date) { path, operation in
             withView(at: path, perform: operation)
+        }
+    }
+
+    func dispatchExpiredScrollIndicatorFlashes(at date: Date = Date()) {
+        var expired = false
+        for path in scrollViewStates.keys {
+            guard var state = scrollViewStates[path],
+                  !state.isIndicatorInteracting,
+                  state.flashDeadline.map({ $0 <= date }) == true else {
+                continue
+            }
+            state.flashDeadline = nil
+            scrollViewStates[path] = state
+            expired = true
+        }
+        if expired {
+            invalidated = true
         }
     }
 
@@ -1009,6 +1127,22 @@ final class StateRuntime {
         )
     }
 
+    private func environmentRestoringPointerDragHandler(
+        _ handler: PointerDragHandler
+    ) -> PointerDragHandler {
+        let environment = EnvironmentRenderContext.current
+        return PointerDragHandler(
+            actionPath: handler.actionPath,
+            button: handler.button,
+            coordinateSpace: handler.coordinateSpace,
+            action: { drag in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action(drag)
+                }
+            }
+        )
+    }
+
     private func environmentRestoringLinkHandler(
         _ handler: LinkHandler
     ) -> LinkHandler {
@@ -1149,6 +1283,7 @@ final class StateRuntime {
             }
 
             state.point = nextPoint
+            state.flashDeadline = now().addingTimeInterval(0.5)
             scrollViewStates[path] = state
             state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
             invalidated = true
@@ -1244,6 +1379,7 @@ final class StateRuntime {
         }
 
         state.point = nextPoint
+        state.flashDeadline = now().addingTimeInterval(0.5)
         scrollViewStates[path] = state
         state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
         invalidated = true
@@ -1567,6 +1703,12 @@ private struct ScrollViewState {
     var identifiedRegions: [RenderedIdentifiedRegion]
 
     var binding: Binding<ScrollPosition>?
+
+    var flashGeneration: Int?
+
+    var flashDeadline: Date?
+
+    var isIndicatorInteracting: Bool
 }
 
 struct TerminationHandler {

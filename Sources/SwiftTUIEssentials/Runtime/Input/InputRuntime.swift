@@ -227,6 +227,48 @@ nonisolated struct PointerPressView<Content: View>: View, InputModifierRenderabl
     }
 }
 
+nonisolated struct PointerDragView<Content: View>: View, InputModifierRenderable,
+    LayoutTraitRenderable
+{
+
+    typealias Body = Never
+
+    let content: Content
+
+    let handler: PointerDragHandler
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        runtime?.registerPointerDragHandler(handler, at: path)
+        guard var block = ViewResolver.block(
+            from: content,
+            in: proposal,
+            path: path,
+            runtime: runtime
+        ) else {
+            return nil
+        }
+
+        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+        return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
+    }
+}
+
 struct LongPressGestureView<Content: View>: View, InputModifierRenderable,
     LayoutTraitRenderable
 {
@@ -389,6 +431,17 @@ nonisolated struct PointerPressHandler {
     let action: (PointerPress) -> PointerPress.Result
 }
 
+nonisolated struct PointerDragHandler {
+
+    let actionPath: [Int]?
+
+    let button: PointerButton
+
+    let coordinateSpace: CoordinateSpace
+
+    let action: (PointerDrag) -> Void
+}
+
 struct LongPressGestureHandler {
 
     let actionPath: [Int]?
@@ -487,6 +540,24 @@ protocol InputModifierRenderable {
 
 final class InputRuntime {
 
+    /// Geometry and identity retained for any captured pointer sequence,
+    /// including editable-text selection and public pointer drags.
+    private struct PointerCapture {
+
+        var path: [Int]
+
+        var frame: RenderedRect
+
+        var startLocation: Point
+
+        static func localLocation(rootPoint: Point, frame: RenderedRect) -> Point {
+            Point(
+                column: rootPoint.column - frame.x,
+                row: rootPoint.row - frame.y
+            )
+        }
+    }
+
     private struct GlobalKeyPressHandler {
 
         var path: [Int]
@@ -498,13 +569,51 @@ final class InputRuntime {
 
     private struct ActivePointerDownPositionTarget {
 
-        var path: [Int]
-
-        var frame: RenderedRect
-
-        var startLocation: Point
+        var capture: PointerCapture
 
         var hasBegun: Bool
+
+        var path: [Int] { capture.path }
+
+        var frame: RenderedRect { capture.frame }
+
+        var startLocation: Point { capture.startLocation }
+
+        init(path: [Int], frame: RenderedRect, startLocation: Point, hasBegun: Bool) {
+            capture = PointerCapture(path: path, frame: frame, startLocation: startLocation)
+            self.hasBegun = hasBegun
+        }
+    }
+
+    private struct ActivePointerDragTarget {
+
+        var capture: PointerCapture
+
+        var handler: PointerDragHandler
+
+        var lastLocation: Point
+
+        var modifiers: EventModifiers
+
+        var path: [Int] { capture.path }
+
+        var frame: RenderedRect { capture.frame }
+
+        var startLocation: Point { capture.startLocation }
+
+        init(
+            path: [Int],
+            frame: RenderedRect,
+            handler: PointerDragHandler,
+            startLocation: Point,
+            lastLocation: Point,
+            modifiers: EventModifiers
+        ) {
+            capture = PointerCapture(path: path, frame: frame, startLocation: startLocation)
+            self.handler = handler
+            self.lastLocation = lastLocation
+            self.modifiers = modifiers
+        }
     }
 
     private var handlersByPath: [[Int]: [KeyPressHandler]] = [:]
@@ -514,6 +623,8 @@ final class InputRuntime {
     private var tapHandlersByPath: [[Int]: [TapGestureHandler]] = [:]
 
     private var pointerPressHandlersByPath: [[Int]: [PointerPressHandler]] = [:]
+
+    private var pointerDragHandlersByPath: [[Int]: PointerDragHandler] = [:]
 
     private var longPressHandlersByPath: [[Int]: [LongPressGestureHandler]] = [:]
 
@@ -539,6 +650,8 @@ final class InputRuntime {
 
     private var activePointerDownPositionTarget: ActivePointerDownPositionTarget?
 
+    private var activePointerDragTarget: ActivePointerDragTarget?
+
     private var tapSequence: TapSequence?
 
     private var longPressSequence: LongPressSequence?
@@ -560,10 +673,19 @@ final class InputRuntime {
         globalHandlers = []
         tapHandlersByPath = [:]
         pointerPressHandlersByPath = [:]
+        pointerDragHandlersByPath = [:]
         longPressHandlersByPath = [:]
         hoverHandlersByPath = [:]
         linkHandlersByPath = [:]
         pointerDownPositionHandlersByPath = [:]
+    }
+
+    func finishRender(perform: ([Int], () -> Void) -> Void) {
+        guard let target = activePointerDragTarget,
+              pointerDragHandlersByPath[target.path] == nil else {
+            return
+        }
+        cancelActivePointerDrag(perform: perform)
     }
 
     func register(_ handler: KeyPressHandler, at path: [Int]) {
@@ -586,6 +708,10 @@ final class InputRuntime {
 
     func register(_ handler: PointerPressHandler, at path: [Int]) {
         pointerPressHandlersByPath[path, default: []].append(handler)
+    }
+
+    func register(_ handler: PointerDragHandler, at path: [Int]) {
+        pointerDragHandlersByPath[path] = handler
     }
 
     func register(_ handler: LongPressGestureHandler, at path: [Int]) {
@@ -696,6 +822,41 @@ final class InputRuntime {
     ) -> KeyPress.Result {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
+
+        if let activePointerDragTarget {
+            let matchesButton = pointerEvent.button.pointerPressButton
+                == activePointerDragTarget.handler.button
+            switch pointerEvent.phase {
+            case .motion where matchesButton:
+                dispatchActivePointerDrag(
+                    pointerEvent,
+                    phase: .changed,
+                    perform: perform
+                )
+                return .handled
+            case .up where matchesButton:
+                dispatchActivePointerDrag(
+                    pointerEvent,
+                    phase: .ended,
+                    perform: perform
+                )
+                self.activePointerDragTarget = nil
+                return .handled
+            default:
+                cancelActivePointerDrag(perform: perform)
+            }
+        }
+
+        if pointerEvent.phase == .down,
+           !pointerEvent.button.isScrollWheel,
+           beginPointerDrag(pointerEvent, perform: perform) {
+            _ = cancelLongPress(perform: perform)
+            activePointerDownPositionTarget = nil
+            pressedTapTarget = nil
+            pressedLinkTarget = nil
+            resetTapSequence()
+            return .handled
+        }
 
         if pointerEvent.phase == .motion {
             let hoverResult = dispatchHoverMotion(pointerEvent, perform: perform)
@@ -844,6 +1005,116 @@ final class InputRuntime {
                 perform: perform
             )
             return tapResult == .handled || positioned ? .handled : .ignored
+        }
+    }
+
+    private func beginPointerDrag(
+        _ pointerEvent: PointerEvent,
+        perform: ([Int], () -> Void) -> Void
+    ) -> Bool {
+        guard let button = pointerEvent.button.pointerPressButton else {
+            return false
+        }
+        let rootPoint = rootPoint(for: pointerEvent)
+        guard let region = hitRegions
+            .filter({ region in
+                region.frame.contains(column: rootPoint.column, row: rootPoint.row)
+                    && pointerDragHandlersByPath[region.path]?.button == button
+            })
+            .sorted(by: hitRegionPrecedes)
+            .first,
+              let handler = pointerDragHandlersByPath[region.path] else {
+            return false
+        }
+
+        let location = pointerDragLocation(
+            rootPoint: rootPoint,
+            path: region.path,
+            frame: region.frame,
+            coordinateSpace: handler.coordinateSpace
+        )
+        activePointerDragTarget = ActivePointerDragTarget(
+            path: region.path,
+            frame: region.frame,
+            handler: handler,
+            startLocation: location,
+            lastLocation: location,
+            modifiers: pointerEvent.modifiers
+        )
+        perform(handler.actionPath ?? region.path) {
+            handler.action(PointerDrag(
+                phase: .began,
+                startLocation: location,
+                location: location,
+                modifiers: pointerEvent.modifiers
+            ))
+        }
+        return true
+    }
+
+    private func dispatchActivePointerDrag(
+        _ pointerEvent: PointerEvent,
+        phase: PointerDrag.Phase,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        guard var target = activePointerDragTarget else {
+            return
+        }
+        let location = pointerDragLocation(
+            rootPoint: rootPoint(for: pointerEvent),
+            path: target.path,
+            frame: target.frame,
+            coordinateSpace: target.handler.coordinateSpace
+        )
+        target.lastLocation = location
+        target.modifiers = pointerEvent.modifiers
+        activePointerDragTarget = target
+        perform(target.handler.actionPath ?? target.path) {
+            target.handler.action(PointerDrag(
+                phase: phase,
+                startLocation: target.startLocation,
+                location: location,
+                modifiers: pointerEvent.modifiers
+            ))
+        }
+    }
+
+    private func cancelActivePointerDrag(
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        guard let target = activePointerDragTarget else {
+            return
+        }
+        activePointerDragTarget = nil
+        perform(target.handler.actionPath ?? target.path) {
+            target.handler.action(PointerDrag(
+                phase: .cancelled,
+                startLocation: target.startLocation,
+                location: target.lastLocation,
+                modifiers: target.modifiers
+            ))
+        }
+    }
+
+    private func pointerDragLocation(
+        rootPoint: Point,
+        path: [Int],
+        frame: RenderedRect,
+        coordinateSpace: CoordinateSpace
+    ) -> Point {
+        switch coordinateSpace.storage {
+        case .local:
+            return PointerCapture.localLocation(rootPoint: rootPoint, frame: frame)
+        case .global:
+            return rootPoint
+        case .named(let name):
+            guard let region = coordinateSpaceRegion(named: name, containing: path) else {
+                preconditionFailure("No coordinate space named \(name) is registered.")
+            }
+            return Point(
+                column: rootPoint.column - region.frame.x,
+                row: rootPoint.row - region.frame.y
+            )
         }
     }
 
@@ -1275,11 +1546,9 @@ final class InputRuntime {
         of pointerEvent: PointerEvent,
         in frame: RenderedRect
     ) -> Point {
-        let column = pointerEvent.column - rootFrame.column
-        let row = pointerEvent.row - rootFrame.row
-        return Point(
-            column: column - frame.x,
-            row: row - frame.y
+        PointerCapture.localLocation(
+            rootPoint: rootPoint(for: pointerEvent),
+            frame: frame
         )
     }
 

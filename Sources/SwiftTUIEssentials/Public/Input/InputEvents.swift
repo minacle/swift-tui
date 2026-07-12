@@ -385,6 +385,63 @@ public nonisolated struct PointerPress: Equatable, Sendable {
     }
 }
 
+/// A captured pointer-drag event delivered from one rendered view.
+///
+/// A drag begins when the requested button is pressed inside the modified
+/// view. Later motion and release events remain captured even outside that
+/// view's bounds. Locations use the coordinate space requested by
+/// ``View/onPointerDrag(_:coordinateSpace:perform:)`` and can therefore be
+/// negative or extend beyond the view during a captured drag.
+public nonisolated struct PointerDrag: Equatable, Sendable {
+
+    /// The current stage of a captured pointer drag.
+    public nonisolated enum Phase: Equatable, Hashable, Sendable {
+
+        /// The pointer button was pressed inside the view.
+        case began
+
+        /// The pressed pointer moved while the view retained capture.
+        case changed
+
+        /// The matching pointer button was released.
+        case ended
+
+        /// SwiftTUI ended capture without receiving a matching release.
+        case cancelled
+    }
+
+    /// The current stage of the drag.
+    public let phase: Phase
+
+    /// The location at which the captured pointer-down occurred.
+    public let startLocation: Point
+
+    /// The location associated with this phase.
+    public let location: Point
+
+    /// The modifier keys reported with this phase's pointer event.
+    public let modifiers: EventModifiers
+
+    /// Creates a pointer-drag value.
+    ///
+    /// - Parameters:
+    ///   - phase: The current drag stage.
+    ///   - startLocation: The location of the captured pointer-down.
+    ///   - location: The location associated with `phase`.
+    ///   - modifiers: The reported modifier flags.
+    public init(
+        phase: Phase,
+        startLocation: Point,
+        location: Point,
+        modifiers: EventModifiers = []
+    ) {
+        self.phase = phase
+        self.startLocation = startLocation
+        self.location = location
+        self.modifiers = modifiers
+    }
+}
+
 /// The current terminal-cell hover state and pointer location.
 public enum HoverPhase: Equatable, Sendable {
 
@@ -467,6 +524,38 @@ public extension View {
 
             action()
         }
+    }
+
+    /// Captures a pointer-button drag that begins inside this view.
+    ///
+    /// The matching pointer-down registers ``PointerDrag/Phase/began`` and
+    /// consumes that pointer sequence. Motion produces
+    /// ``PointerDrag/Phase/changed`` even after leaving the rendered bounds,
+    /// and release produces ``PointerDrag/Phase/ended``. Replacing the captured
+    /// sequence with another pointer-down or an incompatible pointer event
+    /// produces ``PointerDrag/Phase/cancelled``. Captured sequences don't also
+    /// activate tap, long-press, link, focus, or pointer-press handlers.
+    ///
+    /// - Parameters:
+    ///   - button: The pointer button that can begin capture. The default is the
+    ///     primary button.
+    ///   - coordinateSpace: The frame of reference for reported locations.
+    ///   - action: The action to invoke synchronously for every drag phase.
+    /// - Returns: A view with a pointer-drag handler attached.
+    nonisolated func onPointerDrag(
+        _ button: PointerButton = .left,
+        coordinateSpace: CoordinateSpace = .local,
+        perform action: @escaping (PointerDrag) -> Void
+    ) -> some View {
+        PointerDragView(
+            content: self,
+            handler: PointerDragHandler(
+                actionPath: StateContext.currentPath,
+                button: button,
+                coordinateSpace: coordinateSpace,
+                action: action
+            )
+        )
     }
 
     /// Performs an action when matching pointer button presses occur inside

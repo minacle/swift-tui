@@ -48,6 +48,7 @@ struct AppRunner<Application: App> {
 
             _ = runtime.dispatchExpiredTapActions()
             _ = runtime.dispatchExpiredLongPressActions()
+            runtime.dispatchExpiredScrollIndicatorFlashes()
 
             let currentViewport = TerminalControl.currentTerminalSize()
             if runtime.consumeInvalidation()
@@ -136,7 +137,11 @@ struct AppRunner<Application: App> {
     }
 
     private func inputTimeout(using runtime: StateRuntime) -> TimeInterval? {
-        [runtime.nextTapDeadline, runtime.nextLongPressDeadline].compactMap(\.self).min().map {
+        [
+            runtime.nextTapDeadline,
+            runtime.nextLongPressDeadline,
+            runtime.nextScrollIndicatorFlashDeadline,
+        ].compactMap(\.self).min().map {
             max($0.timeIntervalSinceNow, 0)
         }
     }

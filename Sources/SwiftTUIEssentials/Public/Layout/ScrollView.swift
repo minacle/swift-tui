@@ -270,6 +270,222 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
     }
 }
 
+/// A preference that controls when a scroll indicator can be visible.
+public nonisolated struct ScrollIndicatorVisibility: Equatable, Hashable, Sendable {
+
+    private enum Storage: Equatable, Hashable, Sendable {
+
+        case hidden
+
+        case never
+
+        case visible
+    }
+
+    private let storage: Storage
+
+    private init(_ storage: Storage) {
+        self.storage = storage
+    }
+
+    /// Shows the indicator temporarily over the scroll viewport.
+    ///
+    /// This is the default. The indicator appears after scrolling or an
+    /// explicit flash request and doesn't reserve terminal cells.
+    public static var hidden: ScrollIndicatorVisibility {
+        ScrollIndicatorVisibility(.hidden)
+    }
+
+    /// Prevents the indicator from being created or shown.
+    public static var never: ScrollIndicatorVisibility {
+        ScrollIndicatorVisibility(.never)
+    }
+
+    /// Shows the indicator while its axis can scroll and reserves its cells.
+    public static var visible: ScrollIndicatorVisibility {
+        ScrollIndicatorVisibility(.visible)
+    }
+
+    var reservesSpace: Bool {
+        storage == .visible
+    }
+
+    var permitsDisplay: Bool {
+        storage != .never
+    }
+}
+
+/// The current geometry and actions supplied to a scroll-indicator attachment.
+///
+/// A ``ScrollView`` creates this value for one enabled axis. Read the geometry
+/// while building the attachment, and call the actions only from input or
+/// other deferred callbacks. Retaining the value after its scroll view is
+/// removed is safe, but its actions then do nothing.
+///
+/// ```swift
+/// ScrollView {
+///     Text("Scrollable content")
+/// }
+/// .viewAttachment(VerticalScrollIndicatorAttachmentKey.self) { configuration in
+///     Text(configuration.isScrollable ? "|" : "")
+/// }
+/// .environment(\.verticalScrollIndicatorVisibility, .visible)
+/// ```
+public struct ScrollIndicatorConfiguration {
+
+    /// The current content offset along the indicator's axis.
+    public let offset: Int
+
+    /// The greatest supported content offset along the indicator's axis.
+    public let maximumOffset: Int
+
+    /// The number of visible terminal cells along the indicator's axis.
+    public let viewportLength: Int
+
+    /// The full content length in terminal cells along the indicator's axis.
+    public let contentLength: Int
+
+    private let scrollAction: (Int) -> Void
+
+    private let interactionAction: (Bool) -> Void
+
+    /// Whether the content extends beyond the viewport on this axis.
+    public var isScrollable: Bool {
+        maximumOffset > 0
+    }
+
+    init(
+        offset: Int,
+        maximumOffset: Int,
+        viewportLength: Int,
+        contentLength: Int,
+        scrollAction: @escaping (Int) -> Void,
+        interactionAction: @escaping (Bool) -> Void
+    ) {
+        self.offset = offset
+        self.maximumOffset = maximumOffset
+        self.viewportLength = viewportLength
+        self.contentLength = contentLength
+        self.scrollAction = scrollAction
+        self.interactionAction = interactionAction
+    }
+
+    /// Requests a clamped content offset along this indicator's axis.
+    ///
+    /// - Parameter offset: The requested offset. Values outside
+    ///   `0...maximumOffset` are clamped before the scroll view is updated.
+    public func scroll(to offset: Int) {
+        scrollAction(min(max(offset, 0), maximumOffset))
+    }
+
+    /// Keeps a temporarily shown indicator visible during pointer interaction.
+    public func beginInteraction() {
+        interactionAction(true)
+    }
+
+    /// Ends pointer interaction and starts the indicator's hide delay.
+    public func endInteraction() {
+        interactionAction(false)
+    }
+}
+
+/// The attachment point for a horizontal scroll indicator.
+public enum HorizontalScrollIndicatorAttachmentKey: ViewAttachmentKey {
+
+    /// Geometry and actions supplied by the consuming scroll view.
+    public typealias Context = ScrollIndicatorConfiguration
+}
+
+/// The attachment point for a vertical scroll indicator.
+public enum VerticalScrollIndicatorAttachmentKey: ViewAttachmentKey {
+
+    /// Geometry and actions supplied by the consuming scroll view.
+    public typealias Context = ScrollIndicatorConfiguration
+}
+
+public extension EnvironmentValues {
+
+    /// The visibility applied to horizontal scroll-indicator attachments.
+    nonisolated var horizontalScrollIndicatorVisibility: ScrollIndicatorVisibility {
+        get {
+            self[HorizontalScrollIndicatorVisibilityKey.self]
+        }
+        set {
+            self[HorizontalScrollIndicatorVisibilityKey.self] = newValue
+        }
+    }
+
+    /// The visibility applied to vertical scroll-indicator attachments.
+    nonisolated var verticalScrollIndicatorVisibility: ScrollIndicatorVisibility {
+        get {
+            self[VerticalScrollIndicatorVisibilityKey.self]
+        }
+        set {
+            self[VerticalScrollIndicatorVisibilityKey.self] = newValue
+        }
+    }
+
+    internal var scrollIndicatorFlashGeneration: Int? {
+        get {
+            self[ScrollIndicatorFlashGenerationKey.self]
+        }
+        set {
+            self[ScrollIndicatorFlashGenerationKey.self] = newValue
+        }
+    }
+}
+
+private struct HorizontalScrollIndicatorVisibilityKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: ScrollIndicatorVisibility { .hidden }
+}
+
+private struct VerticalScrollIndicatorVisibilityKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: ScrollIndicatorVisibility { .hidden }
+}
+
+private struct ScrollIndicatorFlashGenerationKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: Int? { nil }
+}
+
+private struct ScrollIndicatorsFlashOnAppearView<Content: View>: View {
+
+    let content: Content
+
+    let flashes: Bool
+
+    @State private var generation = 0
+
+    var body: some View {
+        content
+            .environment(\.scrollIndicatorFlashGeneration, generation)
+            .onAppear {
+                if flashes {
+                    generation &+= 1
+                }
+            }
+    }
+}
+
+private struct ScrollIndicatorsFlashTriggerView<Content: View, Value: Equatable>: View {
+
+    let content: Content
+
+    let value: Value
+
+    @State private var generation = 0
+
+    var body: some View {
+        content
+            .environment(\.scrollIndicatorFlashGeneration, generation)
+            .onChange(of: value) {
+                generation &+= 1
+            }
+    }
+}
+
 /// A scrollable view.
 ///
 /// `ScrollView` measures content without constraining the enabled scrolling
@@ -515,6 +731,31 @@ protocol ScrollPositionModifierRenderable {
 
 public extension View {
 
+    /// Flashes scroll indicators when scrollable descendants first appear.
+    ///
+    /// Only temporarily hidden indicators react to the request. Permanently
+    /// visible indicators remain visible, and ``ScrollIndicatorVisibility/never``
+    /// suppresses the request. Reappearing with a new rendered identity creates
+    /// a new flash when `onAppear` is `true`.
+    ///
+    /// - Parameter onAppear: Whether descendant indicators flash after this
+    ///   hierarchy first appears.
+    /// - Returns: A view that supplies the appearance flash request.
+    func scrollIndicatorsFlash(onAppear: Bool) -> some View {
+        ScrollIndicatorsFlashOnAppearView(content: self, flashes: onAppear)
+    }
+
+    /// Flashes scroll indicators when an equatable value changes.
+    ///
+    /// The initial value doesn't flash. Each later unequal value restarts the
+    /// temporary display interval for scrollable descendants.
+    ///
+    /// - Parameter value: The value whose changes request a flash.
+    /// - Returns: A view that supplies the value-driven flash request.
+    func scrollIndicatorsFlash<Value: Equatable>(trigger value: Value) -> some View {
+        ScrollIndicatorsFlashTriggerView(content: self, value: value)
+    }
+
     /// Binds this view's identity to a hashable value.
     ///
     /// SwiftTUI uses this identity for subtree state and as a scroll target for
@@ -581,22 +822,78 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let contentBlock = ViewResolver.block(
-            from: content,
-            in: contentProposal(from: proposal),
-            path: path + [0],
-            runtime: runtime
-        ) ?? RenderedBlock(lines: [])
-
         let binding = ScrollPositionContext.currentBinding
         let position = binding?.wrappedValue
             ?? runtime?.scrollPoint(at: path).map { ScrollPosition(point: $0) }
             ?? ScrollPosition()
+        let environment = EnvironmentRenderContext.current
+        let attachments = environment.viewAttachments
+        let hasHorizontalIndicator = axes.contains(.horizontal)
+            && attachments.contains(HorizontalScrollIndicatorAttachmentKey.self)
+            && environment.horizontalScrollIndicatorVisibility.permitsDisplay
+        let hasVerticalIndicator = axes.contains(.vertical)
+            && attachments.contains(VerticalScrollIndicatorAttachmentKey.self)
+            && environment.verticalScrollIndicatorVisibility.permitsDisplay
+        let initialContentBlock = measuredContentBlock(
+            in: contentProposal(from: proposal),
+            path: path,
+            runtime: runtime
+        )
+        let baseWidth = max(proposal?.columns ?? initialContentBlock.width, 0)
+        let baseHeight = max(proposal?.rows ?? initialContentBlock.height, 0)
+        var reservesHorizontal = false
+        var reservesVertical = false
+        for _ in 0..<4 {
+            let viewportWidth = max(baseWidth - (reservesVertical ? 1 : 0), 0)
+            let viewportHeight = max(baseHeight - (reservesHorizontal ? 1 : 0), 0)
+            let measuredContent = measuredContentBlock(
+                in: contentProposal(
+                    from: proposal,
+                    viewportWidth: viewportWidth,
+                    viewportHeight: viewportHeight
+                ),
+                path: path,
+                runtime: runtime
+            )
+            let horizontalOverflows = hasHorizontalIndicator
+                && ScrollViewRenderer.maxHorizontalOffset(
+                    for: measuredContent,
+                    width: viewportWidth
+                ) > 0
+            let verticalOverflows = hasVerticalIndicator
+                && measuredContent.height > viewportHeight
+            let nextHorizontal = horizontalOverflows
+                && environment.horizontalScrollIndicatorVisibility.reservesSpace
+            let nextVertical = verticalOverflows
+                && environment.verticalScrollIndicatorVisibility.reservesSpace
+            guard nextHorizontal != reservesHorizontal
+                || nextVertical != reservesVertical else {
+                break
+            }
+            reservesHorizontal = nextHorizontal
+            reservesVertical = nextVertical
+        }
+        let viewportWidth = max(baseWidth - (reservesVertical ? 1 : 0), 0)
+        let viewportHeight = max(baseHeight - (reservesHorizontal ? 1 : 0), 0)
+        let contentBlock = ViewResolver.block(
+            from: content,
+            in: contentProposal(
+                from: proposal,
+                viewportWidth: viewportWidth,
+                viewportHeight: viewportHeight
+            ),
+            path: path + [0],
+            runtime: runtime
+        ) ?? RenderedBlock(lines: [])
+        let viewportProposal = RenderProposal(
+            columns: viewportWidth,
+            rows: viewportHeight
+        )
         let result = ScrollViewRenderer.render(
             contentBlock,
             axes: axes,
             position: position,
-            proposal: proposal
+            proposal: viewportProposal
         )
         runtime?.registerScrollView(
             at: path,
@@ -605,7 +902,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             maximumPoint: result.maximumPoint,
             viewportSize: Size(columns: result.block.width, rows: result.block.height),
             identifiedRegions: contentBlock.identifiedRegions,
-            binding: binding
+            binding: binding,
+            flashGeneration: environment.scrollIndicatorFlashGeneration
         )
         if binding != nil
             && !LayoutMeasurementContext.isMeasuring
@@ -614,7 +912,98 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             ScrollPositionContext.updateCurrentPosition(to: ScrollPosition(point: result.point))
         }
 
-        var block = result.block
+        let temporarilyVisible = runtime?.scrollIndicatorIsTemporarilyVisible(at: path) == true
+        let showsHorizontal = hasHorizontalIndicator
+            && result.maximumPoint.x > 0
+            && (reservesHorizontal || temporarilyVisible)
+        let showsVertical = hasVerticalIndicator
+            && result.maximumPoint.y > 0
+            && (reservesVertical || temporarilyVisible)
+        let bounds = RenderedRect(width: baseWidth, height: baseHeight)
+        var layers = [result.block.offsetBy(x: 0, y: 0, clippedTo: bounds)]
+        if showsHorizontal, viewportWidth > 0, viewportHeight > 0 {
+            let configuration = indicatorConfiguration(
+                axis: .horizontal,
+                result: result,
+                content: contentBlock,
+                path: path,
+                runtime: runtime
+            )
+            let trackWidth = showsVertical && !reservesVertical
+                ? max(viewportWidth - 1, 0)
+                : viewportWidth
+            if trackWidth > 0,
+               let indicator = attachments.view(
+                for: HorizontalScrollIndicatorAttachmentKey.self,
+                context: configuration
+               ),
+               let indicatorBlock = ViewResolver.block(
+                from: indicator.frame(width: viewportWidth, height: 1, alignment: .leading),
+                in: RenderProposal(columns: viewportWidth, rows: 1),
+                path: path + [1],
+                runtime: runtime
+               ) {
+                let clipped = indicatorBlock.offsetBy(
+                    x: 0,
+                    y: reservesHorizontal ? viewportHeight : viewportHeight - 1,
+                    clippedTo: bounds
+                )
+                layers.append(
+                    trackWidth == viewportWidth
+                        ? clipped
+                        : clipped.offsetBy(
+                            x: 0,
+                            y: 0,
+                            clippedTo: RenderedRect(width: trackWidth, height: baseHeight)
+                        )
+                )
+            }
+        }
+        if showsVertical, viewportWidth > 0, viewportHeight > 0 {
+            let configuration = indicatorConfiguration(
+                axis: .vertical,
+                result: result,
+                content: contentBlock,
+                path: path,
+                runtime: runtime
+            )
+            let trackHeight = showsHorizontal && !reservesHorizontal
+                ? max(viewportHeight - 1, 0)
+                : viewportHeight
+            if trackHeight > 0,
+               let indicator = attachments.view(
+                for: VerticalScrollIndicatorAttachmentKey.self,
+                context: configuration
+               ),
+               let indicatorBlock = ViewResolver.block(
+                from: indicator.frame(width: 1, height: viewportHeight, alignment: .top),
+                in: RenderProposal(columns: 1, rows: viewportHeight),
+                path: path + [2],
+                runtime: runtime
+               ) {
+                let clipped = indicatorBlock.offsetBy(
+                    x: reservesVertical ? viewportWidth : viewportWidth - 1,
+                    y: 0,
+                    clippedTo: bounds
+                )
+                layers.append(
+                    trackHeight == viewportHeight
+                        ? clipped
+                        : clipped.offsetBy(
+                            x: 0,
+                            y: 0,
+                            clippedTo: RenderedRect(width: baseWidth, height: trackHeight)
+                        )
+                )
+            }
+        }
+
+        var block = RenderedBlock.composited(
+            layers,
+            width: baseWidth,
+            height: baseHeight,
+            paddedRows: Set(0..<baseHeight)
+        )
         if EnvironmentRenderContext.current.isEnabled
             && EnvironmentRenderContext.current.isScrollEnabled {
             block.scrollRegions.append(RenderedScrollRegion(path: path, frame: block.bounds))
@@ -622,10 +1011,71 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         return block
     }
 
-    private func contentProposal(from proposal: RenderProposal?) -> RenderProposal {
+    private func indicatorConfiguration(
+        axis: Axis,
+        result: ScrollViewRenderer.Result,
+        content: RenderedBlock,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> ScrollIndicatorConfiguration {
+        let offset = axis == .horizontal ? result.point.x : result.point.y
+        let maximum = axis == .horizontal
+            ? result.maximumPoint.x
+            : result.maximumPoint.y
+        let viewportLength = axis == .horizontal
+            ? result.block.width
+            : result.block.height
+        let contentLength = axis == .horizontal ? content.width : content.height
+        return ScrollIndicatorConfiguration(
+            offset: offset,
+            maximumOffset: maximum,
+            viewportLength: viewportLength,
+            contentLength: contentLength,
+            scrollAction: {
+                [weak runtime]
+                in
+
+                runtime?.scrollIndicatorScroll(to: $0, axis: axis, at: path)
+            },
+            interactionAction: {
+                [weak runtime]
+                in
+
+                runtime?.setScrollIndicatorInteraction($0, at: path)
+            }
+        )
+    }
+
+    private func measuredContentBlock(
+        in proposal: RenderProposal,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock {
+        let render = {
+            ViewResolver.block(
+                from: content,
+                in: proposal,
+                path: path + [0],
+                runtime: runtime
+            ) ?? RenderedBlock(lines: [])
+        }
+        return LayoutMeasurementContext.withMeasurement {
+            runtime?.withoutRenderRegistrations(render) ?? render()
+        }
+    }
+
+    private func contentProposal(
+        from proposal: RenderProposal?,
+        viewportWidth: Int? = nil,
+        viewportHeight: Int? = nil
+    ) -> RenderProposal {
         RenderProposal(
-            columns: axes.contains(.horizontal) ? nil : proposal?.columns,
-            rows: axes.contains(.vertical) ? nil : proposal?.rows
+            columns: axes.contains(.horizontal)
+                ? nil
+                : viewportWidth ?? proposal?.columns,
+            rows: axes.contains(.vertical)
+                ? nil
+                : viewportHeight ?? proposal?.rows
         )
     }
 }
@@ -828,7 +1278,7 @@ enum ScrollViewRenderer {
         )
     }
 
-    private static func maxHorizontalOffset(for content: RenderedBlock, width: Int) -> Int {
+    static func maxHorizontalOffset(for content: RenderedBlock, width: Int) -> Int {
         let caretAllowance = content.caret == nil || content.width < width ? 0 : 1
         var offset = max(content.width - width + caretAllowance, 0)
         let lines = content.lines.compactMap {
