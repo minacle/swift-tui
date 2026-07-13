@@ -1897,11 +1897,13 @@ final class InputRuntime {
         recognizing count: Int
     ) -> (path: [Int], handler: TapGestureHandler)? {
         target.handlers.reversed().compactMap {
-            guard case .tap(let handler) = $0.handler,
+            registered -> (path: [Int], handler: TapGestureHandler)? in
+
+            guard case .tap(let handler) = registered.handler,
                   handler.count == count else {
                 return nil
             }
-            return ($0.path, handler)
+            return (registered.path, handler)
         }.first
     }
 

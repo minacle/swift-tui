@@ -1530,6 +1530,13 @@ private final class LayoutCacheBox<L: Layout> {
         self.cache = cache
         self.generation = generation
     }
+
+    #if swift(<6.4)
+    // Work around an optimizer crash in the Swift 6.3 synthesized deinitializer.
+    @inline(never)
+    deinit {
+    }
+    #endif
 }
 
 final class StateStorage<Value> {
