@@ -112,7 +112,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.consumeInvalidation())
         _ = runtime.block(from: view, in: RenderProposal(columns: 3))
@@ -135,7 +135,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 4), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
 
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
@@ -156,7 +156,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 22), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
 
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
@@ -180,7 +180,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 2), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
 
@@ -331,7 +331,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(focusProbe.binding?.wrappedValue == true)
     }

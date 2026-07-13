@@ -15,6 +15,8 @@ struct TerminalIOAndControlTests {
         #expect(TerminalControl.exitAlternateScreenSequence == "\u{001B}[?1049l")
         #expect(TerminalControl.enablePointerTrackingSequence == "\u{001B}[?1003h\u{001B}[?1006h")
         #expect(TerminalControl.disablePointerTrackingSequence == "\u{001B}[?1006l\u{001B}[?1003l")
+        #expect(TerminalControl.enableFocusReportingSequence == "\u{001B}[?1004h")
+        #expect(TerminalControl.disableFocusReportingSequence == "\u{001B}[?1004l")
     }
 
     @Test

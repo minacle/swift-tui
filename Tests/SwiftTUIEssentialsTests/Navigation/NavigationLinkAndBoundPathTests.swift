@@ -16,7 +16,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -62,7 +62,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(path == [1])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Value 1")
@@ -137,7 +137,7 @@ struct NavigationLinkAndBoundPathTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
@@ -192,7 +192,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(path == [.detail])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
@@ -207,7 +207,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }
@@ -221,7 +221,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }

@@ -17,9 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key handlers ignore an event, and nested declarations fall back from the
   closest matching environment scope outward.
 - Added public `InputEvent`, `KeyEvent`, and `PointerEvent` matcher protocols with
-  configurable `KeyPressEvent` and `PointerPressEvent` primitives.
-- Added public keyed view attachments and captured pointer drags for composing
-  reusable container adornments and interactive custom views.
+  custom `body` lowering, `InputEventResult`, `onRecognized(_:)`, explicit
+  eager and lazy `DeferredInputEvent`, and configurable `KeyPressEvent`,
+  `PointerPressEvent`, `PointerMotionEvent`, and `PointerScrollEvent`
+  primitives.
+- Added `ExclusiveInputEvent`, `SimultaneousInputEvent`, and
+  `SequenceInputEvent` composition together with normal, high-priority, and
+  simultaneous view attachments controlled by `InputEventMask`.
+- Added the public `Gesture` recognition graph with `TapGesture`,
+  `SpatialTapGesture`, `LongPressGesture`, and `DragGesture`, changed and ended
+  callbacks, transient `GestureState`, and minimal gesture `Transaction`
+  metadata.
+- Added `ExclusiveGesture`, `SimultaneousGesture`, and `SequenceGesture`, plus
+  `gesture`, `highPriorityGesture`, and `simultaneousGesture` attachments
+  controlled by `GestureMask`.
+- Added public keyed view attachments for composing reusable container
+  adornments and interactive custom views.
 - Added configurable horizontal and vertical scroll indicators with overlay,
   reserved-space, flash, proportional thumb-drag, and page-scroll behavior.
 
@@ -28,12 +41,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** Changed focused `onKeyPress` propagation to visit handlers from
   the outermost ancestor inward toward the focused view. A handled ancestor now
   prevents delivery to focused descendants.
-- **Breaking:** Changed overlapping `onLongPressGesture`, `onTapGesture`, and
-  `Button` interactions to use one default-gesture chain. Taps use
-  innermost-first precedence with matching outer handlers as timeout fallbacks;
-  long presses use earliest-deadline precedence and prefer the innermost
-  modifier on ties. A recognized tap, long press, or button action suppresses
-  competing default gestures.
+- **Breaking:** Changed overlapping `onLongPressGesture` and `onTapGesture`
+  interactions to use one view-defined gesture chain. Taps use innermost-first
+  precedence with matching outer handlers as timeout fallbacks; long presses
+  use earliest-deadline precedence and prefer the innermost modifier on ties.
+  A recognized tap or long press suppresses competing view-defined gestures.
+- **Breaking:** Unified focused key and hit-tested pointer recognition into
+  high-priority, view-defined/simultaneous, and normal attachment tiers. Each
+  tier now runs immediate input events, eager deferred events, gestures, and
+  lazy deferred events in order; `InputEventResult.handled` cancels remaining
+  consumable recognition while hover reconciliation remains observational.
+- Changed `Button`, links, focus-on-pointer-down, editable-text selection, and
+  wheel scrolling to register internal eager input events in the same
+  recognition graph and return `InputEventResult.ignored` after their default
+  action so later user recognition can continue.
+- Changed terminal input to expose signed cell `PointerScroll.delta`, public
+  `PointerMotion`, and focus-in/focus-out decoding; terminal sessions now
+  enable xterm focus reporting and cancel active recognition on focus-out.
 - **Breaking:** Changed overlapping `onHover` and `onContinuousHover`
   modifiers to end innermost-first. Entry and continuous movement remain
   outermost-first, while exit now unwinds the modifier chain from the inside
@@ -44,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deprecated all five `onGlobalKeyPress` overloads. Use
   `environment(\.resolveKey[key], _:)` for key-down fallback handling; legacy
   global handlers continue to run before `resolveKey`.
+- Deprecated `KeyPress.Result` and `PointerPress.Result` as aliases of
+  `InputEventResult`.
 - Deprecated Foundation `AttributedString` text initialization, SwiftTUI
   attributed-string keys and scopes, and attributed text alignment. These APIs
   will be removed in a future release.

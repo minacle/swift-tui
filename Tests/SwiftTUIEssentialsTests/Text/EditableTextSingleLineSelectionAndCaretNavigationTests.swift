@@ -294,7 +294,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(runtime.consumeInvalidation())
@@ -344,7 +344,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
         #expect(runtime.block(from: view)?.caret == nil)
@@ -352,7 +352,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.1)
-            ) == .handled
+            ) == .ignored
         )
         #expect(selectionCharacterOffsets(tapSelection, in: text) == 1..<3)
         #expect(selectionCharacterOffsets(selection, in: text) == 2..<2)
@@ -371,7 +371,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down),
                 at: date.addingTimeInterval(1)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatchExpiredLongPressActions(
@@ -383,7 +383,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .up),
                 at: date.addingTimeInterval(1.6)
-            ) == .handled
+            ) == .ignored
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 1..<3)
         #expect(runtime.block(from: view)?.caret == nil)
@@ -409,7 +409,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 4, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(runtime.consumeInvalidation())
@@ -431,12 +431,12 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.block(from: view)?.caret == nil)
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -661,12 +661,12 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 3, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
         #expect(renderUntilStable(runtime, view: view) <= 3)
 
@@ -709,12 +709,12 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
@@ -744,7 +744,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(runtime.consumeInvalidation())

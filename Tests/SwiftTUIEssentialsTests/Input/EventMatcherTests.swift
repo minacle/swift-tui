@@ -17,6 +17,16 @@ struct EventMatcherTests {
             value: PointerPress.self,
             body: Never.self
         )
+        requireInputEvent(
+            PointerMotionEvent(),
+            value: PointerMotion.self,
+            body: Never.self
+        )
+        requireInputEvent(
+            PointerScrollEvent(),
+            value: PointerScroll.self,
+            body: Never.self
+        )
     }
 
     @Test
@@ -102,6 +112,60 @@ struct EventMatcherTests {
         #expect(event.matches(matchingPress))
         #expect(!event.matches(wrongPhase))
         #expect(!emptyEvent.matches(matchingPress))
+    }
+
+    @Test
+    func `PointerMotion preserves raw values and each filter selects its button state`() {
+        let buttonless = PointerMotion(
+            button: nil,
+            location: Point(column: 3, row: 4),
+            modifiers: [.shift]
+        )
+        let pressed = PointerMotion(
+            button: .right,
+            location: Point(column: 5, row: 6),
+            modifiers: [.control]
+        )
+
+        #expect(buttonless.location == Point(column: 3, row: 4))
+        #expect(buttonless.modifiers == [.shift])
+        #expect(PointerMotionEvent().matches(buttonless))
+        #expect(PointerMotionEvent(.buttonless).matches(buttonless))
+        #expect(!PointerMotionEvent(.pressed).matches(buttonless))
+        #expect(PointerMotionEvent(.pressed).matches(pressed))
+        #expect(PointerMotionEvent(.buttons([.right])).matches(pressed))
+        #expect(!PointerMotionEvent(.buttons([.left])).matches(pressed))
+        #expect(!PointerMotionEvent(.buttons([])).matches(pressed))
+        #expect(
+            PointerMotionEvent(.buttonless, coordinateSpace: .global).coordinateSpace
+                == .global
+        )
+    }
+
+    @Test
+    func `PointerScroll derives axes from signed diagonal and magnitude deltas`() {
+        let stationary = PointerScroll(delta: .zero, location: .zero)
+        let vertical = PointerScroll(
+            delta: Size(columns: 0, rows: -3),
+            location: Point(column: 2, row: 1),
+            modifiers: [.option]
+        )
+        let diagonal = PointerScroll(
+            delta: Size(columns: 2, rows: 4),
+            location: .zero
+        )
+
+        #expect(stationary.axes.isEmpty)
+        #expect(vertical.axes == [.vertical])
+        #expect(vertical.delta == Size(columns: 0, rows: -3))
+        #expect(vertical.location == Point(column: 2, row: 1))
+        #expect(vertical.modifiers == [.option])
+        #expect(diagonal.axes == [.horizontal, .vertical])
+        #expect(PointerScrollEvent(.horizontal).matches(diagonal))
+        #expect(PointerScrollEvent(.vertical).matches(diagonal))
+        #expect(!PointerScrollEvent([]).matches(diagonal))
+        #expect(!PointerScrollEvent().matches(stationary))
+        #expect(PointerScrollEvent(coordinateSpace: .global).coordinateSpace == .global)
     }
 }
 

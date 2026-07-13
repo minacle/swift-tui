@@ -53,7 +53,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             selectionCharacterOffsets(
@@ -168,7 +168,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(runtime.consumeInvalidation())
@@ -208,7 +208,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 0..<4)
         #expect(runtime.block(from: view, in: proposal)?.caret == nil)
@@ -216,7 +216,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up)
-            ) == .handled
+            ) == .ignored
         )
         #expect(selectionCharacterOffsets(selection, in: text) == 1..<1)
         #expect(
@@ -238,12 +238,12 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 2, row: 1), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.block(from: view, in: proposal)?.caret == nil)
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
@@ -339,12 +339,12 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 2), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 0, row: 0), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)
 
@@ -367,7 +367,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(renderUntilStable(runtime, view: view, in: proposal) <= 3)

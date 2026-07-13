@@ -28,6 +28,10 @@ enum TerminalInput: Equatable, Sendable {
 
     case pointerScroll(PointerScroll)
 
+    case focusIn
+
+    case focusOut
+
     case none
 }
 
@@ -50,6 +54,10 @@ enum TerminalControl {
     static let enablePointerTrackingSequence = "\u{001B}[?1003h\u{001B}[?1006h"
 
     static let disablePointerTrackingSequence = "\u{001B}[?1006l\u{001B}[?1003l"
+
+    static let enableFocusReportingSequence = "\u{001B}[?1004h"
+
+    static let disableFocusReportingSequence = "\u{001B}[?1004l"
 
     static let pasteFromClipboardSequence = "\u{001B}]52;c;?\u{001B}\\"
 
@@ -190,6 +198,14 @@ enum TerminalControl {
 
         if bytes == [quitByte] {
             return .quit
+        }
+
+        if bytes == Array("\u{001B}[I".utf8) {
+            return .focusIn
+        }
+
+        if bytes == Array("\u{001B}[O".utf8) {
+            return .focusOut
         }
 
         if let pointerInput = pointerInput(for: bytes) {
@@ -409,13 +425,13 @@ enum TerminalControl {
             )
         }
 
-        if let direction = pointerScrollDirection(for: buttonCode) {
+        if let delta = pointerScrollDelta(for: buttonCode) {
             guard final == "M" else {
                 return TerminalInput.none
             }
             return .pointerScroll(
                 PointerScroll(
-                    direction: direction,
+                    delta: delta,
                     location: location,
                     modifiers: modifiers
                 )
@@ -453,18 +469,18 @@ enum TerminalControl {
         }
     }
 
-    private static func pointerScrollDirection(
+    private static func pointerScrollDelta(
         for buttonCode: Int
-    ) -> PointerScroll.Direction? {
+    ) -> Size? {
         switch buttonCode {
         case 64:
-            return .up
+            return Size(columns: 0, rows: -1)
         case 65:
-            return .down
+            return Size(columns: 0, rows: 1)
         case 66:
-            return .right
+            return Size(columns: 1, rows: 0)
         case 67:
-            return .left
+            return Size(columns: -1, rows: 0)
         default:
             return nil
         }
@@ -676,6 +692,7 @@ final class TerminalSession {
         previousWindowChangeHandler = signal(SIGWINCH, handleTerminalWindowChangeSignal)
         TerminalControl.write(TerminalControl.enterAlternateScreenSequence)
         TerminalControl.write(TerminalControl.enablePointerTrackingSequence)
+        TerminalControl.write(TerminalControl.enableFocusReportingSequence)
         TerminalControl.write(TerminalControl.hideCaretSequence)
         isActive = true
     }
@@ -691,6 +708,7 @@ final class TerminalSession {
             self.previousWindowChangeHandler = nil
         }
         TerminalControl.write(TerminalControl.showCaretSequence)
+        TerminalControl.write(TerminalControl.disableFocusReportingSequence)
         TerminalControl.write(TerminalControl.disablePointerTrackingSequence)
         TerminalControl.write(TerminalControl.exitAlternateScreenSequence)
         isActive = false

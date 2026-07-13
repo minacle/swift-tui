@@ -295,9 +295,9 @@ private struct FocusedGlobalAndResolveView: View {
 
     let probe: ResolveKeyProbe
 
-    let focusedResult: KeyPress.Result
+    let focusedResult: InputEventResult
 
-    let globalResult: KeyPress.Result
+    let globalResult: InputEventResult
 
     var body: some View {
         Text("A")

@@ -16,7 +16,7 @@ struct NavigationActionTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Destination empty")
 
@@ -44,7 +44,7 @@ struct NavigationActionTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Value 1 count 0")
 
@@ -56,7 +56,7 @@ struct NavigationActionTests {
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Open")
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Value 1 count 0")
     }

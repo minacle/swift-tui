@@ -15,6 +15,7 @@ struct AppRunner<Application: App> {
         let session = try TerminalSession()
         try session.start()
         defer {
+            runtime.endInputSession()
             session.stop()
         }
 
@@ -46,8 +47,7 @@ struct AppRunner<Application: App> {
                 dispatchPendingInput(using: runtime, session: session)
             }
 
-            _ = runtime.dispatchExpiredTapActions()
-            _ = runtime.dispatchExpiredLongPressActions()
+            runtime.dispatchExpiredRecognitionActions()
             runtime.dispatchExpiredScrollIndicatorFlashes()
 
             let currentViewport = TerminalControl.currentTerminalSize()
@@ -87,6 +87,11 @@ struct AppRunner<Application: App> {
             return true
         case .pointerScroll(let pointerScroll):
             _ = runtime.dispatch(pointerScroll)
+            return true
+        case .focusIn:
+            return false
+        case .focusOut:
+            runtime.dispatchSceneInactive()
             return true
         case .none:
             return false
@@ -146,6 +151,7 @@ struct AppRunner<Application: App> {
         [
             runtime.nextTapDeadline,
             runtime.nextLongPressDeadline,
+            runtime.nextRecognitionDeadline,
             runtime.nextScrollIndicatorFlashDeadline,
         ].compactMap(\.self).min().map {
             max($0.timeIntervalSinceNow, 0)

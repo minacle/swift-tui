@@ -176,7 +176,7 @@ private func dispatchClick(
     to runtime: StateRuntime,
     column: Int,
     row: Int,
-    expecting result: KeyPress.Result = .handled
+    expecting result: InputEventResult = .ignored
 ) {
     #expect(
         runtime.dispatch(

@@ -22,6 +22,14 @@ public protocol InputEvent<Value> {
     /// Primitive events receive the default implementation whose body is
     /// `Never`; callers must not evaluate that implementation.
     var body: Body { get }
+
+    /// Lowers this event into SwiftTUI's recognition graph.
+    ///
+    /// SwiftTUI supplies this implementation for custom events whose `Value`
+    /// equals `Body.Value`. This underscored public witness enforces that
+    /// relationship during conformance checking without runtime casts. Pass
+    /// events to a view attachment instead of calling this hook directly.
+    func _makeInputEvent() -> _InputEventDefinition<Value>
 }
 
 /// A declarative matcher whose recognized values originate from keyboard
@@ -52,16 +60,11 @@ extension InputEvent where Body == Never {
     public var body: Never {
         fatalError("Primitive events do not have a body.")
     }
+
 }
 
-extension Never: InputEvent {
-
-    /// The uninhabited value produced by an uninhabited event.
-    public typealias Value = Never
-
-    /// The uninhabited event's body type.
-    public typealias Body = Never
-}
+/// Makes `Never` the terminal body of primitive input events.
+extension Never: InputEvent {}
 
 /// A frame of reference for zero-based terminal-cell coordinates reported by
 /// pointer input APIs.
@@ -272,7 +275,8 @@ public nonisolated struct KeyEquivalent: Equatable, Hashable, Sendable,
 /// A normalized terminal key event delivered through SwiftTUI input handling.
 ///
 /// Focused dispatch begins at the outermost handler on the branch containing
-/// the focused view and continues inward until one returns ``Result/handled``.
+/// the focused view and continues inward until one returns
+/// ``InputEventResult/handled``.
 /// Handlers at the same identity path run in registration order. If the focused
 /// chain ignores the event, SwiftTUI offers it to global handlers, ordered by
 /// deepest rendered path first and then registration order.
@@ -306,18 +310,11 @@ public nonisolated struct KeyPress: Equatable, Sendable {
         public static let all: Phases = [.down, .up, .repeat]
     }
 
-    /// Indicates whether a key handler stops or continues event propagation.
-    public nonisolated enum Result: Equatable, Hashable, Sendable {
-
-        /// The handler consumed the event and propagation should stop.
-        case handled
-
-        /// The handler didn't consume the event. Dispatch continues with later
-        /// matching handlers registered at the same view path, then with
-        /// matching handlers farther inward toward the focused view, and
-        /// finally with global handlers.
-        case ignored
-    }
+    /// The result returned by a key-input action.
+    ///
+    /// Use ``InputEventResult`` in new code.
+    @available(*, deprecated, renamed: "InputEventResult")
+    public typealias Result = InputEventResult
 
     /// The single normalized key used for key-equivalent matching.
     public let key: KeyEquivalent
@@ -402,17 +399,11 @@ public nonisolated struct PointerPress: Equatable, Sendable {
         public static let all: Phases = [.down, .up]
     }
 
-    /// Indicates whether a pointer-press handler stops propagation to later
-    /// matching regions and handlers.
-    public nonisolated enum Result: Equatable, Hashable, Sendable {
-
-        /// The handler consumed the event and propagation should stop.
-        case handled
-
-        /// The handler didn't consume the event, allowing another matching
-        /// handler or region to inspect it.
-        case ignored
-    }
+    /// The result returned by a pointer-input action.
+    ///
+    /// Use ``InputEventResult`` in new code.
+    @available(*, deprecated, renamed: "InputEventResult")
+    public typealias Result = InputEventResult
 
     /// The normalized button associated with this event.
     public let button: PointerButton
@@ -658,63 +649,6 @@ public nonisolated struct PointerPressEvent: PointerEvent, Equatable, Sendable {
     }
 }
 
-/// A captured pointer-drag event delivered from one rendered view.
-///
-/// A drag begins when the requested button is pressed inside the modified
-/// view. Later motion and release events remain captured even outside that
-/// view's bounds. Locations use the coordinate space requested by
-/// ``View/onPointerDrag(_:coordinateSpace:perform:)`` and can therefore be
-/// negative or extend beyond the view during a captured drag.
-public nonisolated struct PointerDrag: Equatable, Sendable {
-
-    /// The current stage of a captured pointer drag.
-    public nonisolated enum Phase: Equatable, Hashable, Sendable {
-
-        /// The pointer button was pressed inside the view.
-        case began
-
-        /// The pressed pointer moved while the view retained capture.
-        case changed
-
-        /// The matching pointer button was released.
-        case ended
-
-        /// SwiftTUI ended capture without receiving a matching release.
-        case cancelled
-    }
-
-    /// The current stage of the drag.
-    public let phase: Phase
-
-    /// The location at which the captured pointer-down occurred.
-    public let startLocation: Point
-
-    /// The location associated with this phase.
-    public let location: Point
-
-    /// The modifier keys reported with this phase's pointer event.
-    public let modifiers: EventModifiers
-
-    /// Creates a pointer-drag value.
-    ///
-    /// - Parameters:
-    ///   - phase: The current drag stage.
-    ///   - startLocation: The location of the captured pointer-down.
-    ///   - location: The location associated with `phase`.
-    ///   - modifiers: The reported modifier flags.
-    public init(
-        phase: Phase,
-        startLocation: Point,
-        location: Point,
-        modifiers: EventModifiers = []
-    ) {
-        self.phase = phase
-        self.startLocation = startLocation
-        self.location = location
-        self.modifiers = modifiers
-    }
-}
-
 /// The current terminal-cell hover state and pointer location.
 public enum HoverPhase: Equatable, Sendable {
 
@@ -796,7 +730,7 @@ extension View {
     /// - Parameter action: The action to perform for a matching pointer press.
     /// - Returns: A view with a pointer-press handler attached.
     public nonisolated func onPointerPress(
-        action: @escaping () -> PointerPress.Result
+        action: @escaping () -> InputEventResult
     ) -> some View {
         onPointerPress(.left, phases: .down, coordinateSpace: .local) {
             _ in
@@ -805,43 +739,11 @@ extension View {
         }
     }
 
-    /// Captures a pointer-button drag that begins inside this view.
-    ///
-    /// The matching pointer-down registers ``PointerDrag/Phase/began`` and
-    /// consumes that pointer sequence. Motion produces
-    /// ``PointerDrag/Phase/changed`` even after leaving the rendered bounds,
-    /// and release produces ``PointerDrag/Phase/ended``. Replacing the captured
-    /// sequence with another pointer-down or an incompatible pointer event
-    /// produces ``PointerDrag/Phase/cancelled``. Captured sequences don't also
-    /// activate tap, long-press, link, focus, or pointer-press handlers.
-    ///
-    /// - Parameters:
-    ///   - button: The pointer button that can begin capture. The default is the
-    ///     primary button.
-    ///   - coordinateSpace: The frame of reference for reported locations.
-    ///   - action: The action to invoke synchronously for every drag phase.
-    /// - Returns: A view with a pointer-drag handler attached.
-    public nonisolated func onPointerDrag(
-        _ button: PointerButton = .left,
-        coordinateSpace: CoordinateSpace = .local,
-        perform action: @escaping (PointerDrag) -> Void
-    ) -> some View {
-        PointerDragView(
-            content: self,
-            handler: PointerDragHandler(
-                actionPath: StateContext.currentPath,
-                button: button,
-                coordinateSpace: coordinateSpace,
-                action: action
-            )
-        )
-    }
-
     /// Performs an action when matching pointer button presses occur inside
     /// this view's frame.
     ///
     /// The view registers its rendered terminal frame as a hit region. A
-    /// ``PointerPress/Result/handled`` result stops later pointer-press handlers
+    /// ``InputEventResult/handled`` result stops later pointer-press handlers
     /// for the event. Pointer motion and scroll-wheel input don't produce
     /// pointer-press events.
     ///
@@ -859,7 +761,7 @@ extension View {
         phases: PointerPress.Phases = .down,
         buttons: Set<PointerButton> = [.left],
         coordinateSpace: CoordinateSpace = .local,
-        action: @escaping (PointerPress) -> PointerPress.Result
+        action: @escaping (PointerPress) -> InputEventResult
     ) -> some View {
         PointerPressView(
             content: self,
@@ -883,7 +785,7 @@ extension View {
     /// - Returns: A view with a pointer-press handler attached.
     public nonisolated func onPointerPress(
         _ button: PointerButton,
-        action: @escaping () -> PointerPress.Result
+        action: @escaping () -> InputEventResult
     ) -> some View {
         onPointerPress(button, phases: .down, coordinateSpace: .local) {
             _ in
@@ -907,7 +809,7 @@ extension View {
         _ button: PointerButton,
         phases: PointerPress.Phases,
         coordinateSpace: CoordinateSpace = .local,
-        action: @escaping (PointerPress) -> PointerPress.Result
+        action: @escaping (PointerPress) -> InputEventResult
     ) -> some View {
         onPointerPress(
             buttons: [button],
@@ -932,7 +834,7 @@ extension View {
         buttons: Set<PointerButton>,
         phases: PointerPress.Phases = .down,
         coordinateSpace: CoordinateSpace = .local,
-        action: @escaping (PointerPress) -> PointerPress.Result
+        action: @escaping (PointerPress) -> InputEventResult
     ) -> some View {
         onPointerPress(
             phases: phases,
@@ -1006,21 +908,19 @@ extension View {
     /// independently along the terminal column and row axes rather than as a
     /// Euclidean radius.
     ///
-    /// Long presses in the selected default-gesture chain compete by their
-    /// recognition deadline. The earliest deadline wins; equal deadlines use
-    /// the innermost modifier. A winner suppresses every other long-press
-    /// action and any competing tap or `Button` action. A tap or `Button` that
-    /// is deeper than a long press prevents that outer long press from
-    /// recognizing, while still receiving its pressing-state callbacks. If no
-    /// long press recognizes before release, the tap or `Button` can run as a
-    /// fallback.
+    /// Long presses in the selected view-defined gesture chain compete by
+    /// their recognition deadline. The earliest deadline wins; equal deadlines
+    /// use the innermost modifier. A winner suppresses every other long-press
+    /// action and any competing tap action. A tap that is deeper than a long
+    /// press prevents that outer long press from recognizing, while the long
+    /// press still receives its pressing-state callbacks. If no long press
+    /// recognizes before release, the tap can run as a fallback.
     ///
     /// Pressing-state callbacks begin from the outermost modifier and proceed
     /// inward. They end in the same modifier order, interleaved with a fallback
-    /// tap or `Button` according to that order. Moving outside one handler's
-    /// extent ends only that handler; other long presses can continue to
-    /// compete. Once a long press recognizes, later movement doesn't cancel
-    /// the winner.
+    /// tap according to that order. Moving outside one handler's extent ends
+    /// only that handler; other long presses can continue to compete. Once a
+    /// long press recognizes, later movement doesn't cancel the winner.
     ///
     /// - Parameters:
     ///   - minimumDuration: The minimum duration of the long press, in seconds.
@@ -1079,12 +979,12 @@ extension View {
     /// - Parameters:
     ///   - key: The key to match.
     ///   - action: The action to perform for matching key-down or repeat events.
-    ///     Return ``KeyPress/Result/handled`` to stop propagation toward the
+    ///     Return ``InputEventResult/handled`` to stop propagation toward the
     ///     focused view, global handlers, and key-resolution fallbacks.
     /// - Returns: A view with a focused key handler attached.
     public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
-        action: @escaping () -> KeyPress.Result
+        action: @escaping () -> InputEventResult
     ) -> some View {
         onKeyPress(key, phases: [.down, .repeat]) {
             _ in
@@ -1103,7 +1003,7 @@ extension View {
     /// - Returns: A view with a focused key handler attached.
     public nonisolated func onKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         KeyPressView(
             content: self,
@@ -1128,7 +1028,7 @@ extension View {
     public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         onKeyPress(keys: [key], phases: phases, action: action)
     }
@@ -1145,7 +1045,7 @@ extension View {
     public nonisolated func onKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         KeyPressView(
             content: self,
@@ -1172,7 +1072,7 @@ extension View {
     public nonisolated func onKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         KeyPressView(
             content: self,
@@ -1196,7 +1096,7 @@ extension View {
     /// - Parameters:
     ///   - key: The key to match.
     ///   - action: The action to perform for matching key-down or repeat events.
-    ///     Return ``KeyPress/Result/handled`` to stop later global handlers.
+    ///     Return ``InputEventResult/handled`` to stop later global handlers.
     /// - Returns: A view with a global key handler attached.
     @available(
         *,
@@ -1205,7 +1105,7 @@ extension View {
     )
     public func onGlobalKeyPress(
         _ key: KeyEquivalent,
-        action: @escaping () -> KeyPress.Result
+        action: @escaping () -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(key, action: action)
     }
@@ -1225,7 +1125,7 @@ extension View {
     )
     public func onGlobalKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(phases: phases, action: action)
     }
@@ -1246,7 +1146,7 @@ extension View {
     public func onGlobalKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(key, phases: phases, action: action)
     }
@@ -1268,7 +1168,7 @@ extension View {
     public func onGlobalKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(keys: keys, phases: phases, action: action)
     }
@@ -1291,7 +1191,7 @@ extension View {
     public func onGlobalKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(characters: characters, phases: phases, action: action)
     }
@@ -1304,7 +1204,7 @@ extension View {
     // and internal callers.
     func _onGlobalKeyPress(
         _ key: KeyEquivalent,
-        action: @escaping () -> KeyPress.Result
+        action: @escaping () -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(key, phases: [.down, .repeat]) {
             _ in
@@ -1315,7 +1215,7 @@ extension View {
 
     func _onGlobalKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         GlobalKeyPressView(
             content: self,
@@ -1332,7 +1232,7 @@ extension View {
     func _onGlobalKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         _onGlobalKeyPress(keys: [key], phases: phases, action: action)
     }
@@ -1340,7 +1240,7 @@ extension View {
     func _onGlobalKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         GlobalKeyPressView(
             content: self,
@@ -1357,7 +1257,7 @@ extension View {
     func _onGlobalKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
-        action: @escaping (KeyPress) -> KeyPress.Result
+        action: @escaping (KeyPress) -> InputEventResult
     ) -> some View {
         GlobalKeyPressView(
             content: self,

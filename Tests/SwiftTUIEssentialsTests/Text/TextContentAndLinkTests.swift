@@ -330,7 +330,7 @@ struct TextContentAndLinkTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(

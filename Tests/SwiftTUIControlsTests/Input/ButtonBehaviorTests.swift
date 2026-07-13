@@ -38,7 +38,7 @@ struct ButtonBehaviorTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(tapProbe.events.isEmpty)
 
@@ -46,13 +46,13 @@ struct ButtonBehaviorTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(tapProbe.events == ["run"])
     }
 
     @Test
-    func `a button tap suppresses an outer tap modifier at the same view path`() {
+    func `button activation and an outer tap both recognize the pointer sequence`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = Button("Run") {
@@ -66,11 +66,11 @@ struct ButtonBehaviorTests {
 
         dispatchClick(to: runtime, column: 1, row: 1)
 
-        #expect(tapProbe.events == ["button"])
+        #expect(tapProbe.events == ["button", "outer"])
     }
 
     @Test
-    func `a button runs after an outer long press ends without recognizing`() {
+    func `button activation and an outer long press both recognize the pointer sequence`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -93,18 +93,18 @@ struct ButtonBehaviorTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
-        #expect(tapProbe.events == ["pressing"])
+        #expect(tapProbe.events == ["pressing", "long"])
         #expect(runtime.nextLongPressDeadline == nil)
 
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.1)
-            ) == .handled
+            ) == .ignored
         )
-        #expect(tapProbe.events == ["pressing", "ended", "button"])
+        #expect(tapProbe.events == ["pressing", "long", "button", "ended"])
     }
 
     @Test
@@ -133,8 +133,40 @@ struct ButtonBehaviorTests {
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .ignored)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(tapProbe.events == ["go"])
+    }
+
+    @Test
+    func `button Return activation continues to key resolution after its action`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let view = ResolvedButtonView(tapProbe: tapProbe)
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled
+        )
+        #expect(tapProbe.events == ["button", "resolve"])
+    }
+
+    @Test
+    func `a handled immediate key event prevents deferred Button activation`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let view = HandledButtonView(tapProbe: tapProbe)
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled
+        )
+        #expect(tapProbe.events == ["event"])
     }
 
     @Test
@@ -179,7 +211,7 @@ struct ButtonBehaviorTests {
 
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
 
         #expect(tapProbe.events == ["button", "button"])
     }
@@ -265,6 +297,42 @@ private struct DisabledFocusedButtonView: View {
             tapProbe: tapProbe
         )
         .disabled(true)
+    }
+}
+
+private struct ResolvedButtonView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        Button("Resolve") {
+            tapProbe.record("button")
+        }
+        .focused($isFocused)
+        .environment(\.resolveKey[.return]) { _ in
+            tapProbe.record("resolve")
+            return .handled
+        }
+    }
+}
+
+private struct HandledButtonView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let tapProbe: TapGestureProbe
+
+    var body: some View {
+        Button("Handled") {
+            tapProbe.record("button")
+        }
+        .focused($isFocused)
+        .onKeyPress(.return) {
+            tapProbe.record("event")
+            return .handled
+        }
     }
 }
 

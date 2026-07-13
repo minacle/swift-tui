@@ -38,13 +38,7 @@ extension View where Body == Never {
 ///
 /// No value of `Never` can be constructed, and SwiftTUI must not attempt to
 /// resolve this conformance as a rendered view.
-extension Never: View {
-
-    /// Traps if a renderer incorrectly asks `Never` for a view body.
-    public var body: Never {
-        fatalError("Never has no body.")
-    }
-}
+extension Never: View {}
 
 /// Builds declarative child hierarchies from SwiftTUI view expressions.
 ///

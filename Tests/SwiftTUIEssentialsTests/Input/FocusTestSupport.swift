@@ -523,7 +523,7 @@ struct FocusedKeyPressView: View {
 
     let keyProbe: KeyPressProbe
 
-    let result: KeyPress.Result
+    let result: InputEventResult
 
     var body: some View {
         CapturedFocusedKeyPressText(
@@ -541,13 +541,13 @@ struct CapturedFocusedKeyPressText: View {
 
     let keyProbe: KeyPressProbe
 
-    let result: KeyPress.Result
+    let result: InputEventResult
 
     init(
         focusBinding: FocusState<Bool>.Binding,
         focusProbe: FocusBindingProbe<Bool>,
         keyProbe: KeyPressProbe,
-        result: KeyPress.Result
+        result: InputEventResult
     ) {
         self.focusBinding = focusBinding
         self.keyProbe = keyProbe
@@ -633,7 +633,7 @@ func focusParentCallbackKeyPressChild(in runtime: StateRuntime) {
         runtime.dispatch(
             PointerPress(button: .left, location: .zero, phase: .down),
             at: date
-        ) == .handled
+        ) == .ignored
     )
     #expect(
         runtime.dispatch(

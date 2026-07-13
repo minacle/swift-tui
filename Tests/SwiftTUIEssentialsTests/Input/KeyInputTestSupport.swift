@@ -12,9 +12,9 @@ struct ParentKeyPressView: View {
 
     let keyProbe: KeyPressProbe
 
-    let parentResult: KeyPress.Result
+    let parentResult: InputEventResult
 
-    let childResult: KeyPress.Result
+    let childResult: InputEventResult
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,13 +68,13 @@ struct CapturedParentChildKeyPressText: View {
 
     let keyProbe: KeyPressProbe
 
-    let result: KeyPress.Result
+    let result: InputEventResult
 
     init(
         focusBinding: FocusState<Bool>.Binding,
         focusProbe: FocusBindingProbe<Bool>,
         keyProbe: KeyPressProbe,
-        result: KeyPress.Result
+        result: InputEventResult
     ) {
         self.focusBinding = focusBinding
         self.keyProbe = keyProbe
@@ -118,7 +118,7 @@ struct FocusedAndGlobalKeyPressView: View {
 
     let keyProbe: KeyPressProbe
 
-    let focusedResult: KeyPress.Result
+    let focusedResult: InputEventResult
 
     var body: some View {
         CapturedFocusedAndGlobalKeyPressText(
@@ -155,7 +155,7 @@ struct NestedGlobalKeyPressView: View {
 
     let keyProbe: KeyPressProbe
 
-    let innerResult: KeyPress.Result
+    let innerResult: InputEventResult
 
     var body: some View {
         VStack(spacing: 0) {
@@ -312,13 +312,13 @@ struct CapturedFocusedAndGlobalKeyPressText: View {
 
     let keyProbe: KeyPressProbe
 
-    let focusedResult: KeyPress.Result
+    let focusedResult: InputEventResult
 
     init(
         focusBinding: FocusState<Bool>.Binding,
         focusProbe: FocusBindingProbe<Bool>,
         keyProbe: KeyPressProbe,
-        focusedResult: KeyPress.Result
+        focusedResult: InputEventResult
     ) {
         self.focusBinding = focusBinding
         self.keyProbe = keyProbe

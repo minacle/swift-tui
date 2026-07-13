@@ -120,7 +120,7 @@ struct SecureTextEntryTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 2, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.dispatch(KeyPress(key: "X", characters: "X")) == .handled)
         #expect(runtime.consumeInvalidation())
@@ -153,12 +153,12 @@ struct SecureTextEntryTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.block(from: view)?.runs == [
             RenderedRun(
@@ -205,7 +205,7 @@ struct SecureTextEntryTests {
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.lines == ["• ", "s "])
         #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))

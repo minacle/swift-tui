@@ -18,7 +18,7 @@ func dispatchClick(
     column: Int,
     row: Int,
     at date: Date = Date(timeIntervalSinceReferenceDate: 1_000),
-    expecting result: KeyPress.Result = .handled
+    expecting result: InputEventResult = .ignored
 ) {
     #expect(
         runtime.dispatch(
@@ -56,7 +56,7 @@ func dispatchSelectionDrag(
                 location: Point(column: fromColumn - 1, row: fromRow - 1),
                 phase: .down
             )
-        ) == .handled
+        ) == .ignored
     )
     #expect(
         runtime.dispatch(
@@ -65,7 +65,7 @@ func dispatchSelectionDrag(
                 location: Point(column: toColumn - 1, row: toRow - 1),
                 modifiers: []
             )
-        ) == .handled
+        ) == .ignored
     )
     #expect(
         runtime.dispatch(
@@ -74,22 +74,46 @@ func dispatchSelectionDrag(
                 location: Point(column: toColumn - 1, row: toRow - 1),
                 phase: .up
             )
-        ) == .handled
+        ) == .ignored
     )
+}
+
+enum TestWheelDirection {
+
+    case up
+
+    case down
+
+    case left
+
+    case right
+
+    var delta: Size {
+        switch self {
+        case .up:
+            Size(columns: 0, rows: -1)
+        case .down:
+            Size(columns: 0, rows: 1)
+        case .left:
+            Size(columns: -1, rows: 0)
+        case .right:
+            Size(columns: 1, rows: 0)
+        }
+    }
 }
 
 func dispatchWheel(
     to runtime: StateRuntime,
-    direction: PointerScroll.Direction,
+    direction: TestWheelDirection,
     column: Int,
     row: Int,
     modifiers: EventModifiers = [],
-    expecting result: KeyPress.Result = .handled
+    expecting result: InputEventResult = .ignored
 ) {
     #expect(
         runtime.dispatch(
             PointerScroll(
-                direction: direction,
+                delta: direction.delta,
                 location: Point(column: column - 1, row: row - 1),
                 modifiers: modifiers
             )
@@ -102,7 +126,7 @@ func dispatchHover(
     column: Int,
     row: Int,
     button: PointerButton? = nil,
-    expecting result: KeyPress.Result = .handled
+    expecting result: InputEventResult = .ignored
 ) {
     #expect(
         runtime.dispatch(

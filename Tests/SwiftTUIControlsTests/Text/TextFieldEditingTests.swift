@@ -16,7 +16,7 @@ struct TextFieldEditingTests {
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.lines == ["a ", "a "])
         #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))

@@ -177,7 +177,7 @@ extension EditableText {
         selection: Binding<TextSelection?>?,
         state: EditableTextMultilineState?,
         displayedText: String
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard let state else {
             return .ignored
         }

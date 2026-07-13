@@ -160,12 +160,12 @@ struct TextSelectionTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerMotion(button: .left, location: Point(column: 3, row: 0), modifiers: [])
-            ) == .handled
+            ) == .ignored
         )
 
         let block = runtime.block(from: view)
@@ -355,14 +355,14 @@ struct TextSelectionTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == AnyColor(Color16.blue))
 
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.block(from: view)?.runs.first?.style.backgroundStyle == nil)
     }

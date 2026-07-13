@@ -94,6 +94,23 @@ struct FocusManagementTests {
     }
 
     @Test
+    func `a handled immediate pointer event prevents deferred pointer focus`() {
+        let runtime = StateRuntime()
+        let probe = FocusBindingProbe<Bool>()
+        let view = ClickableFocusedTextView(probe: probe)
+            .onPointerPress { .handled }
+
+        _ = runtime.block(from: view)
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: .zero, phase: .down)
+            ) == .handled
+        )
+
+        #expect(probe.binding?.wrappedValue == false)
+    }
+
+    @Test
     func `a navigation link label observes isFocused after the link receives pointer focus`() {
         let runtime = StateRuntime()
         let view = FocusableEnvironmentNavigationLink()
@@ -102,7 +119,7 @@ struct FocusManagementTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "focused")
@@ -279,7 +296,7 @@ struct FocusManagementTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == true)
     }
@@ -296,7 +313,7 @@ struct FocusManagementTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == true)
     }
@@ -319,7 +336,7 @@ struct FocusManagementTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == true)
     }
@@ -335,7 +352,7 @@ struct FocusManagementTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(probe.binding?.wrappedValue == true)
     }
@@ -373,7 +390,7 @@ struct FocusManagementTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(focusProbe.binding?.wrappedValue == true)
         #expect(tapProbe.events.isEmpty)
@@ -382,7 +399,7 @@ struct FocusManagementTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date
-            ) == .handled
+            ) == .ignored
         )
         #expect(tapProbe.events == ["tap"])
     }

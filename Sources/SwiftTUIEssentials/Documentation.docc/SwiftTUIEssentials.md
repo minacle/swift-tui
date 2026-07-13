@@ -109,13 +109,25 @@ rendering them because text APIs preserve terminal control characters.
 
 ### Input and navigation
 
+- <doc:InputRecognition>
 - ``InputEvent``
 - ``KeyEvent``
 - ``PointerEvent``
+- ``InputEventResult``
 - ``KeyPressEvent``
 - ``PointerPressEvent``
+- ``PointerMotionEvent``
+- ``PointerScrollEvent``
 - ``KeyPress``
 - ``PointerPress``
+- ``Gesture``
+- ``TapGesture``
+- ``SpatialTapGesture``
+- ``LongPressGesture``
+- ``DragGesture``
+- ``GestureState``
+- ``GestureMask``
+- ``InputEventMask``
 - ``NavigationStack``
 - ``NavigationLink``
 - ``NavigationPath``

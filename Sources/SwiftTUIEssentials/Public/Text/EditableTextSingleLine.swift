@@ -252,7 +252,7 @@ enum EditableTextSingleLineRenderer {
         text: Binding<String>,
         selection: Binding<TextSelection?>?,
         state: EditableTextSingleLineState?
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard let state else {
             return .ignored
         }

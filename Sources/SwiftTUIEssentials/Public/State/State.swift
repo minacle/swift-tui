@@ -1,6 +1,13 @@
 import Foundation
 public import Observation
 
+/// A view property that SwiftTUI materializes before evaluating a view's body.
+///
+/// Conforming property wrappers can bind their storage to the current rendered
+/// identity. This protocol is a marker for public API composition; SwiftTUI's
+/// built-in wrappers provide the runtime behavior.
+public protocol DynamicProperty {}
+
 /// A two-way connection to a value owned by a source of truth.
 ///
 /// `Binding` lets controls and child views read and write state that is stored
@@ -96,7 +103,7 @@ public struct Binding<Value> {
 /// Outside a SwiftTUI render or captured action context, the wrapper uses
 /// wrapper-local fallback storage whose writes don't invalidate a renderer.
 @propertyWrapper
-public struct State<Value> {
+public struct State<Value>: DynamicProperty {
 
     private let storage: StateStorage<Value>
 
@@ -188,7 +195,7 @@ extension State: DynamicStateProperty {
 /// mutates the same object; it doesn't copy the object's property values.
 @dynamicMemberLookup
 @propertyWrapper
-public struct Bindable<Value: Observable> {
+public struct Bindable<Value: Observable>: DynamicProperty {
 
     /// The observable object reference exposed by this wrapper.
     public var wrappedValue: Value
@@ -245,7 +252,7 @@ public struct Bindable<Value: Observable> {
 /// context, the wrapper uses local fallback storage and can't request focus from
 /// a runtime.
 @propertyWrapper
-public struct FocusState<Value: Hashable> {
+public struct FocusState<Value: Hashable>: DynamicProperty {
 
     private let storage: FocusStateStorage<Value>
 

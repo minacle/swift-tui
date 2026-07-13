@@ -346,7 +346,7 @@ struct EditableTextSingleLineEditingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(focusProbe.binding?.wrappedValue == .second)
 
@@ -369,7 +369,7 @@ struct EditableTextSingleLineEditingTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 4, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(focusProbe.binding?.wrappedValue == true)
     }

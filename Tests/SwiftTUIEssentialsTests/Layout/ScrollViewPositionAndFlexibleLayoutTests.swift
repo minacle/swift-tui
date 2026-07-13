@@ -74,7 +74,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.consumeInvalidation())
         #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .handled)
@@ -124,7 +124,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 1, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         _ = runtime.consumeInvalidation()
         #expect(runtime.dispatch(KeyPress(key: .downArrow, characters: "\u{F701}")) == .handled)
@@ -440,7 +440,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.consumeInvalidation())
         #expect(runtime.dispatch(KeyPress(key: "v", characters: "v")) == .handled)
@@ -459,7 +459,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 10, row: 1), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(runtime.consumeInvalidation())
         #expect(runtime.dispatch(KeyPress(key: "h", characters: "h")) == .handled)

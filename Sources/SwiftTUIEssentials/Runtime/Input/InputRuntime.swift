@@ -1,40 +1,6 @@
 import Foundation
 import Terminal
 
-/// A zero-based global pointer movement decoded from terminal input.
-///
-/// `button` identifies a button held during movement. It is `nil` for passive
-/// movement used only for hover tracking.
-struct PointerMotion: Equatable, Sendable {
-
-    let button: PointerButton?
-
-    let location: Point
-
-    let modifiers: EventModifiers
-}
-
-/// A zero-based global scroll-wheel movement decoded from terminal input.
-struct PointerScroll: Equatable, Sendable {
-
-    enum Direction: Equatable, Sendable {
-
-        case up
-
-        case down
-
-        case left
-
-        case right
-    }
-
-    let direction: Direction
-
-    let location: Point
-
-    let modifiers: EventModifiers
-}
-
 /// A decoded pointer input whose location uses zero-based global terminal-cell
 /// coordinates.
 nonisolated protocol LocatedPointerInput {
@@ -221,48 +187,6 @@ nonisolated struct PointerPressView<Content: View>: View, InputModifierRenderabl
     }
 }
 
-nonisolated struct PointerDragView<Content: View>: View, InputModifierRenderable,
-    LayoutTraitRenderable
-{
-
-    typealias Body = Never
-
-    let content: Content
-
-    let handler: PointerDragHandler
-
-    var layoutTraits: LayoutTraits {
-        ViewResolver.layoutTraits(from: content)
-    }
-
-    func renderedBlock(
-        in proposal: RenderProposal?,
-        path: [Int],
-        runtime: StateRuntime?
-    ) -> RenderedBlock? {
-        runtime?.registerPointerDragHandler(handler, at: path)
-        guard var block = ViewResolver.block(
-            from: content,
-            in: proposal,
-            path: path,
-            runtime: runtime
-        ) else {
-            return nil
-        }
-
-        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
-        return block
-    }
-
-    func renderedElement(
-        in proposal: RenderProposal?,
-        path: [Int],
-        runtime: StateRuntime?
-    ) -> RenderedElement? {
-        renderedBlock(in: proposal, path: path, runtime: runtime).map { .block($0) }
-    }
-}
-
 struct LongPressGestureView<Content: View>: View, InputModifierRenderable,
     LayoutTraitRenderable
 {
@@ -402,7 +326,35 @@ nonisolated struct KeyPressHandler {
 
     let matches: (KeyPress) -> Bool
 
-    let action: (KeyPress) -> KeyPress.Result
+    let action: (KeyPress) -> InputEventResult
+}
+
+nonisolated struct ViewDefinedKeyPressEvent: KeyEvent {
+
+    typealias Value = KeyPress
+
+    typealias Body = Never
+
+    let handler: KeyPressHandler
+
+    func _makeInputEvent() -> _InputEventDefinition<KeyPress> {
+        _InputEventDefinition(
+            configuration: InputRecognitionConfiguration("viewDefinedKeyPress"),
+            families: .key,
+            makeNode: {
+                RecognizedInputRecognitionNode(
+                    base: MatcherInputRecognitionNode { sample, _ in
+                        guard case .keyPress(let press) = sample,
+                              handler.matches(press) else {
+                            return nil
+                        }
+                        return press
+                    },
+                    action: handler.action
+                )
+            }
+        )
+    }
 }
 
 /// A key-down fallback closure together with the state path that declared it.
@@ -422,6 +374,157 @@ struct TapGestureHandler {
     let action: TapGestureAction
 }
 
+struct ViewDefinedTapGesture: Gesture {
+
+    typealias Value = Void
+
+    typealias Body = Never
+
+    let handler: TapGestureHandler
+
+    func _makeGesture() -> _GestureDefinition<Void> {
+        let coordinateSpace: CoordinateSpace?
+        switch handler.action {
+        case .plain:
+            coordinateSpace = nil
+        case .location(let space, _):
+            coordinateSpace = space
+        }
+        return _GestureDefinition(
+            configuration: GestureRecognitionConfiguration(
+                "viewDefinedTap",
+                values: [handler.count, coordinateSpace ?? CoordinateSpace.global]
+            ),
+            makeNode: {
+                ViewDefinedTapGestureRecognitionNode(
+                    count: handler.count,
+                    coordinateSpace: coordinateSpace,
+                    action: handler.action
+                )
+            }
+        )
+    }
+}
+
+final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
+
+    enum Storage {
+
+        case plain(TapGestureRecognitionNode<Void>)
+
+        case location(TapGestureRecognitionNode<Point>)
+    }
+
+    let storage: Storage
+
+    let action: TapGestureAction
+
+    init(
+        count: Int,
+        coordinateSpace: CoordinateSpace?,
+        action: TapGestureAction
+    ) {
+        if let coordinateSpace {
+            storage = .location(
+                TapGestureRecognitionNode(
+                    count: count,
+                    coordinateSpace: coordinateSpace,
+                    makeValue: { $0 }
+                )
+            )
+        } else {
+            storage = .plain(
+                TapGestureRecognitionNode(
+                    count: count,
+                    coordinateSpace: nil,
+                    makeValue: { _ in () }
+                )
+            )
+        }
+        self.action = action
+        super.init()
+    }
+
+    override var isActive: Bool {
+        switch storage {
+        case .plain(let node):
+            node.isActive
+        case .location(let node):
+            node.isActive
+        }
+    }
+
+    override var nextDeadline: Date? {
+        switch storage {
+        case .plain(let node):
+            node.nextDeadline
+        case .location(let node):
+            node.nextDeadline
+        }
+    }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Void> {
+        switch storage {
+        case .plain(let node):
+            return observe(node.process(sample, context: context), context: context)
+        case .location(let node):
+            return observe(node.process(sample, context: context), context: context)
+        }
+    }
+
+    override func advance(
+        to date: Date,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Void> {
+        switch storage {
+        case .plain(let node):
+            return observe(node.advance(to: date, context: context), context: context)
+        case .location(let node):
+            return observe(node.advance(to: date, context: context), context: context)
+        }
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        switch storage {
+        case .plain(let node):
+            node.cancel(reason)
+        case .location(let node):
+            node.cancel(reason)
+        }
+    }
+
+    private func observe<Child>(
+        _ output: GestureRecognitionOutput<Child>,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Void> {
+        let phase: GestureRecognitionPhase<Void>
+        switch output.phase {
+        case .none:
+            phase = .none
+        case .changed:
+            phase = .changed(())
+        case .ended(let value):
+            let location = value as? Point ?? .zero
+            context.appendEnded { [action] in
+                action.perform(at: location)
+            }
+            phase = .ended(())
+        case .failed:
+            phase = .failed
+        }
+        return GestureRecognitionOutput(
+            participated: output.participated,
+            phase: phase,
+            claimsCompetition: output.claimsCompetition,
+            beginsCapture: output.beginsCapture,
+            endsCapture: output.endsCapture
+        )
+    }
+}
+
 nonisolated struct PointerPressHandler {
 
     let actionPath: [Int]?
@@ -430,18 +533,49 @@ nonisolated struct PointerPressHandler {
 
     let matches: (PointerPress) -> Bool
 
-    let action: (PointerPress) -> PointerPress.Result
+    let action: (PointerPress) -> InputEventResult
 }
 
-nonisolated struct PointerDragHandler {
+nonisolated struct ViewDefinedPointerPressEvent: PointerEvent {
 
-    let actionPath: [Int]?
+    typealias Value = PointerPress
 
-    let button: PointerButton
+    typealias Body = Never
 
-    let coordinateSpace: CoordinateSpace
+    let handler: PointerPressHandler
 
-    let action: (PointerDrag) -> Void
+    func _makeInputEvent() -> _InputEventDefinition<PointerPress> {
+        _InputEventDefinition(
+            configuration: InputRecognitionConfiguration(
+                "viewDefinedPointerPress",
+                values: [handler.coordinateSpace]
+            ),
+            families: .pointerPress,
+            makeNode: {
+                RecognizedInputRecognitionNode(
+                    base: MatcherInputRecognitionNode { sample, context in
+                        guard case .pointerPress(let press) = sample,
+                              handler.matches(press) else {
+                            return nil
+                        }
+                        guard let location = context.location(
+                            press.location,
+                            in: handler.coordinateSpace
+                        ) else {
+                            return nil
+                        }
+                        return PointerPress(
+                            button: press.button,
+                            location: location,
+                            modifiers: press.modifiers,
+                            phase: press.phase
+                        )
+                    },
+                    action: handler.action
+                )
+            }
+        )
+    }
 }
 
 struct LongPressGestureHandler {
@@ -455,6 +589,106 @@ struct LongPressGestureHandler {
     let action: () -> Void
 
     let onPressingChanged: ((Bool) -> Void)?
+}
+
+struct ViewDefinedLongPressGesture: Gesture {
+
+    typealias Value = Bool
+
+    typealias Body = Never
+
+    let handler: LongPressGestureHandler
+
+    func _makeGesture() -> _GestureDefinition<Bool> {
+        _GestureDefinition(
+            configuration: GestureRecognitionConfiguration(
+                "viewDefinedLongPress",
+                values: [
+                    handler.minimumDuration.bitPattern,
+                    handler.maximumDistance.columns,
+                    handler.maximumDistance.rows,
+                ]
+            ),
+            makeNode: {
+                ViewDefinedLongPressGestureRecognitionNode(handler: handler)
+            }
+        )
+    }
+}
+
+final class ViewDefinedLongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
+
+    let handler: LongPressGestureHandler
+
+    let base: LongPressGestureRecognitionNode
+
+    var isPressing = false
+
+    init(handler: LongPressGestureHandler) {
+        self.handler = handler
+        self.base = LongPressGestureRecognitionNode(
+            minimumDuration: handler.minimumDuration,
+            maximumDistance: handler.maximumDistance
+        )
+        super.init()
+    }
+
+    override var isActive: Bool { base.isActive }
+
+    override var nextDeadline: Date? { base.nextDeadline }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Bool> {
+        let wasActive = base.isActive
+        let output = base.process(sample, context: context)
+        if !wasActive, base.isActive {
+            isPressing = true
+            if let action = handler.onPressingChanged {
+                context.appendChanged { action(true) }
+            }
+        } else if wasActive, !base.isActive {
+            finishPressing(context: context)
+        }
+        return observe(output, context: context)
+    }
+
+    override func advance(
+        to date: Date,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Bool> {
+        observe(base.advance(to: date, context: context), context: context)
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        base.cancel(reason)
+        guard isPressing else {
+            return
+        }
+        isPressing = false
+        handler.onPressingChanged?(false)
+    }
+
+    private func observe(
+        _ output: GestureRecognitionOutput<Bool>,
+        context: GestureRecognitionContext
+    ) -> GestureRecognitionOutput<Bool> {
+        if case .ended = output.phase {
+            context.appendEnded { [handler] in handler.action() }
+        }
+        return output
+    }
+
+    private func finishPressing(context: GestureRecognitionContext) {
+        guard isPressing else {
+            return
+        }
+        isPressing = false
+        if let action = handler.onPressingChanged {
+            context.appendChanged { action(false) }
+        }
+    }
 }
 
 struct HoverGestureHandler {
@@ -523,6 +757,282 @@ struct PointerDownPositionHandler {
     let began: (Point) -> Void
 
     let changed: (Point) -> Void
+}
+
+struct PointerPositionInputEvent: PointerEvent {
+
+    typealias Value = Void
+
+    typealias Body = Never
+
+    let handler: PointerDownPositionHandler
+
+    let isEligible: () -> Bool
+
+    let sequence: PointerPositionSequenceState
+
+    let stage: InputEventStage
+
+    func _makeInputEvent() -> _InputEventDefinition<Void> {
+        _InputEventDefinition(
+            configuration: InputRecognitionConfiguration(
+                "pointerPosition:\(stage.rawValue)",
+                values: [handler.requiresFocus]
+            ),
+            families: [.pointerPress, .pointerMotion],
+            stage: stage,
+            makeNode: {
+                if stage == .eager {
+                    return PointerPositionTrackingInputRecognitionNode(
+                        handler: handler,
+                        isEligible: isEligible,
+                        sequence: sequence
+                    )
+                }
+                return PointerPositionCompletionInputRecognitionNode(
+                    handler: handler,
+                    sequence: sequence,
+                    shouldComplete: isEligible
+                )
+            }
+        )
+    }
+}
+
+final class PointerPositionSequenceState {
+
+    var startLocation: Point?
+
+    var hasBegun = false
+
+    func reset() {
+        startLocation = nil
+        hasBegun = false
+    }
+}
+
+final class PointerPositionTrackingInputRecognitionNode: InputRecognitionNode<Void> {
+
+    let handler: PointerDownPositionHandler
+
+    let isEligible: () -> Bool
+
+    let sequence: PointerPositionSequenceState
+
+    init(
+        handler: PointerDownPositionHandler,
+        isEligible: @escaping () -> Bool,
+        sequence: PointerPositionSequenceState
+    ) {
+        self.handler = handler
+        self.isEligible = isEligible
+        self.sequence = sequence
+        super.init()
+    }
+
+    override var isActive: Bool {
+        sequence.startLocation != nil
+    }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: InputRecognitionContext
+    ) -> InputRecognitionOutput<Void> {
+        switch sample {
+        case .pointerPress(let press)
+        where press.button == .left && press.phase == .down:
+            guard isEligible() else {
+                return .noMatch
+            }
+            guard let location = context.location(press.location, in: .local) else {
+                return .noMatch
+            }
+            sequence.startLocation = location
+            sequence.hasBegun = !handler.shouldDeferBegin(location)
+            if sequence.hasBegun {
+                handler.began(location)
+            }
+            return .progress(beginsCapture: true)
+
+        case .pointerMotion(let motion) where motion.button == .left:
+            guard let startLocation = sequence.startLocation else {
+                return .noMatch
+            }
+            if !sequence.hasBegun {
+                sequence.hasBegun = true
+                handler.began(startLocation)
+            }
+            guard let location = context.location(motion.location, in: .local) else {
+                return .noMatch
+            }
+            handler.changed(location)
+            return .progress()
+
+        case .pointerPress(let press)
+        where press.button == .left && press.phase == .up:
+            guard sequence.startLocation != nil else {
+                return .noMatch
+            }
+            return .progress(endsCapture: true)
+
+        default:
+            return .noMatch
+        }
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        sequence.reset()
+    }
+
+    override func restoreState(from old: InputRecognitionNode<Void>) {
+        guard let old = old as? PointerPositionTrackingInputRecognitionNode else {
+            return
+        }
+        sequence.startLocation = old.sequence.startLocation
+        sequence.hasBegun = old.sequence.hasBegun
+    }
+}
+
+final class PointerPositionCompletionInputRecognitionNode: InputRecognitionNode<Void> {
+
+    let handler: PointerDownPositionHandler
+
+    let sequence: PointerPositionSequenceState
+
+    let shouldComplete: () -> Bool
+
+    init(
+        handler: PointerDownPositionHandler,
+        sequence: PointerPositionSequenceState,
+        shouldComplete: @escaping () -> Bool
+    ) {
+        self.handler = handler
+        self.sequence = sequence
+        self.shouldComplete = shouldComplete
+        super.init()
+    }
+
+    override var isActive: Bool {
+        sequence.startLocation != nil
+    }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: InputRecognitionContext
+    ) -> InputRecognitionOutput<Void> {
+        guard case .pointerPress(let press) = sample,
+              press.button == .left,
+              press.phase == .up,
+              sequence.startLocation != nil else {
+            return .noMatch
+        }
+        guard shouldComplete() else {
+            sequence.reset()
+            return .recognized(())
+        }
+        if !sequence.hasBegun {
+            guard let location = context.location(press.location, in: .local) else {
+                return .noMatch
+            }
+            handler.began(location)
+        }
+        sequence.reset()
+        return .recognized(())
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        sequence.reset()
+    }
+
+    override func restoreState(from old: InputRecognitionNode<Void>) {
+        guard let old = old as? PointerPositionCompletionInputRecognitionNode else {
+            return
+        }
+        sequence.startLocation = old.sequence.startLocation
+        sequence.hasBegun = old.sequence.hasBegun
+    }
+}
+
+/// Tracks link activation without treating button-bearing selection motion as
+/// a click. Buttonless hover motion remains outside this consumable state.
+struct LinkActivationInputEvent: PointerEvent {
+
+    typealias Value = Void
+
+    typealias Body = Never
+
+    let handler: LinkHandler
+
+    func _makeInputEvent() -> _InputEventDefinition<Void> {
+        _InputEventDefinition(
+            configuration: InputRecognitionConfiguration("linkActivation"),
+            families: [.pointerPress, .pointerMotion],
+            stage: .eager,
+            makeNode: {
+                LinkActivationInputRecognitionNode(handler: handler)
+            }
+        )
+    }
+}
+
+final class LinkActivationInputRecognitionNode: InputRecognitionNode<Void> {
+
+    let handler: LinkHandler
+
+    var startLocation: Point?
+
+    init(handler: LinkHandler) {
+        self.handler = handler
+        super.init()
+    }
+
+    override var isActive: Bool {
+        startLocation != nil
+    }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: InputRecognitionContext
+    ) -> InputRecognitionOutput<Void> {
+        switch sample {
+        case .pointerPress(let press)
+        where press.button == .left && press.phase == .down:
+            startLocation = press.location
+            return .progress()
+
+        case .pointerMotion(let motion) where motion.button == .left:
+            guard let startLocation else {
+                return .noMatch
+            }
+            if motion.location != startLocation {
+                self.startLocation = nil
+            }
+            return .progress()
+
+        case .pointerPress(let press)
+        where press.button == .left && press.phase == .up:
+            guard startLocation != nil else {
+                return .noMatch
+            }
+            startLocation = nil
+            _ = handler.action()
+            return .recognized(())
+
+        default:
+            return .noMatch
+        }
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        startLocation = nil
+    }
+
+    override func restoreState(from old: InputRecognitionNode<Void>) {
+        guard let old = old as? LinkActivationInputRecognitionNode else {
+            return
+        }
+        startLocation = old.startLocation
+    }
 }
 
 protocol InputModifierRenderable {
@@ -598,37 +1108,6 @@ final class InputRuntime {
         }
     }
 
-    private struct ActivePointerDragTarget {
-
-        var capture: PointerCapture
-
-        var handler: PointerDragHandler
-
-        var lastLocation: Point
-
-        var modifiers: EventModifiers
-
-        var path: [Int] { capture.path }
-
-        var frame: RenderedRect { capture.frame }
-
-        var startLocation: Point { capture.startLocation }
-
-        init(
-            path: [Int],
-            frame: RenderedRect,
-            handler: PointerDragHandler,
-            startLocation: Point,
-            lastLocation: Point,
-            modifiers: EventModifiers
-        ) {
-            capture = PointerCapture(path: path, frame: frame, startLocation: startLocation)
-            self.handler = handler
-            self.lastLocation = lastLocation
-            self.modifiers = modifiers
-        }
-    }
-
     private var handlersByPath: [[Int]: [KeyPressHandler]] = [:]
 
     private var globalHandlers: [GlobalKeyPressHandler] = []
@@ -638,8 +1117,6 @@ final class InputRuntime {
     private var defaultGestureHandlersByPath: [[Int]: [DefaultGestureHandler]] = [:]
 
     private var pointerPressHandlersByPath: [[Int]: [PointerPressHandler]] = [:]
-
-    private var pointerDragHandlersByPath: [[Int]: PointerDragHandler] = [:]
 
     private var hoverHandlersByPath: [[Int]: [HoverGestureHandler]] = [:]
 
@@ -662,8 +1139,6 @@ final class InputRuntime {
     private var pressedLinkTarget: [Int]?
 
     private var activePointerDownPositionTarget: ActivePointerDownPositionTarget?
-
-    private var activePointerDragTarget: ActivePointerDragTarget?
 
     private var tapSequence: TapSequence?
 
@@ -694,24 +1169,86 @@ final class InputRuntime {
             .min()
     }
 
+    var hasRecognizedLongPress: Bool {
+        longPressSequence?.didPerform == true
+    }
+
+    private(set) var hasRecognizedTap = false
+
     func beginRender() {
         handlersByPath = [:]
         globalHandlers = []
         resolveKeyHandlers = [:]
         defaultGestureHandlersByPath = [:]
         pointerPressHandlersByPath = [:]
-        pointerDragHandlersByPath = [:]
         hoverHandlersByPath = [:]
         linkHandlersByPath = [:]
         pointerDownPositionHandlersByPath = [:]
     }
 
     func finishRender(perform: ([Int], () -> Void) -> Void) {
-        guard let target = activePointerDragTarget,
-              pointerDragHandlersByPath[target.path] == nil else {
+        let location: Point
+        let configuration: [RegisteredDefaultGestureConfiguration]
+        if let pressedDefaultGestureTarget {
+            location = pressedDefaultGestureTarget.location
+            configuration = pressedDefaultGestureTarget.configuration
+        } else if let tapSequence {
+            location = tapSequence.location
+            configuration = tapSequence.configuration
+        } else {
             return
         }
-        cancelActivePointerDrag(perform: perform)
+        guard let updatedTarget = defaultGestureTarget(
+            atRootPoint: location
+        ),
+              updatedTarget.configuration == configuration else {
+            cancelDefaultGestureRecognition(perform: perform)
+            return
+        }
+
+        if pressedDefaultGestureTarget != nil {
+            self.pressedDefaultGestureTarget = updatedTarget
+        }
+        tapSequence?.configuration = updatedTarget.configuration
+        if var sequence = longPressSequence {
+            sequence.candidates = sequence.candidates.compactMap { candidate in
+                guard updatedTarget.handlers.indices.contains(candidate.order),
+                      case .longPress(let handler) = updatedTarget
+                        .handlers[candidate.order].handler else {
+                    return nil
+                }
+                return LongPressCandidate(
+                    order: candidate.order,
+                    path: candidate.path,
+                    handler: handler,
+                    deadline: candidate.deadline
+                )
+            }
+            longPressSequence = sequence
+        }
+    }
+
+    func cancelInteractions(
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        _ = cancelLongPress(perform: perform)
+        activePointerDownPositionTarget = nil
+        pressedDefaultGestureTarget = nil
+        pressedLinkTarget = nil
+        resetTapSequence()
+
+        for path in activeHoverPaths.sorted(by: pathPrecedes) {
+            performHoverExit(at: path, perform: perform)
+        }
+        activeHoverPaths = []
+    }
+
+    func cancelDefaultGestureRecognition(
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        _ = cancelLongPress(perform: perform)
+        pressedDefaultGestureTarget = nil
+        resetTapSequence()
     }
 
     func register(_ handler: KeyPressHandler, at path: [Int]) {
@@ -745,10 +1282,6 @@ final class InputRuntime {
 
     func register(_ handler: PointerPressHandler, at path: [Int]) {
         pointerPressHandlersByPath[path, default: []].append(handler)
-    }
-
-    func register(_ handler: PointerDragHandler, at path: [Int]) {
-        pointerDragHandlersByPath[path] = handler
     }
 
     func register(_ handler: LongPressGestureHandler, at path: [Int]) {
@@ -793,8 +1326,8 @@ final class InputRuntime {
     func dispatch(
         _ keyPress: KeyPress,
         toward focusedPath: [Int],
-        perform: ([Int], () -> KeyPress.Result) -> KeyPress.Result
-    ) -> KeyPress.Result {
+        perform: ([Int], () -> InputEventResult) -> InputEventResult
+    ) -> InputEventResult {
         var path: [Int] = []
         if dispatch(keyPress, at: path, perform: perform) == .handled {
             return .handled
@@ -812,8 +1345,8 @@ final class InputRuntime {
 
     func dispatchGlobal(
         _ keyPress: KeyPress,
-        perform: ([Int], () -> KeyPress.Result) -> KeyPress.Result
-    ) -> KeyPress.Result {
+        perform: ([Int], () -> InputEventResult) -> InputEventResult
+    ) -> InputEventResult {
         for entry in globalHandlers.sorted(by: globalHandlerPrecedes)
             where entry.handler.matches(keyPress) {
             let handler = entry.handler
@@ -901,8 +1434,8 @@ final class InputRuntime {
     private func dispatch(
         _ keyPress: KeyPress,
         at path: [Int],
-        perform: ([Int], () -> KeyPress.Result) -> KeyPress.Result
-    ) -> KeyPress.Result {
+        perform: ([Int], () -> InputEventResult) -> InputEventResult
+    ) -> InputEventResult {
         for handler in handlersByPath[path] ?? [] where handler.matches(keyPress) {
             let actionPath = handler.actionPath ?? path
             if perform(actionPath, { handler.action(keyPress) }) == .handled {
@@ -919,34 +1452,10 @@ final class InputRuntime {
         perform: ([Int], () -> Void) -> Void,
         performLink: ([Int], () -> Bool) -> Bool,
         focus: ([Int]) -> Bool
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
+        hasRecognizedTap = false
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
-
-        if let activePointerDragTarget {
-            if pointerPress.phase == .up,
-               pointerPress.button == activePointerDragTarget.handler.button {
-                dispatchActivePointerDrag(
-                    pointerPress,
-                    phase: .ended,
-                    perform: perform
-                )
-                self.activePointerDragTarget = nil
-                return .handled
-            }
-
-            cancelActivePointerDrag(perform: perform)
-        }
-
-        if pointerPress.phase == .down,
-           beginPointerDrag(pointerPress, perform: perform) {
-            _ = cancelLongPress(perform: perform)
-            activePointerDownPositionTarget = nil
-            pressedDefaultGestureTarget = nil
-            pressedLinkTarget = nil
-            resetTapSequence()
-            return .handled
-        }
 
         guard pointerPress.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
@@ -1063,6 +1572,9 @@ final class InputRuntime {
                 location: releasePoint,
                 date: date
             )
+            if case .recognized = tapOutcome {
+                hasRecognizedTap = true
+            }
             finishDefaultGesturePress(
                 pressedDefaultGestureTarget,
                 tapOutcome: tapOutcome,
@@ -1085,25 +1597,15 @@ final class InputRuntime {
     func dispatch(
         _ pointerMotion: PointerMotion,
         at date: Date,
+        includesHover: Bool = true,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
 
-        if let activePointerDragTarget {
-            if pointerMotion.button == activePointerDragTarget.handler.button {
-                dispatchActivePointerDrag(
-                    pointerMotion,
-                    phase: .changed,
-                    perform: perform
-                )
-                return .handled
-            }
-
-            cancelActivePointerDrag(perform: perform)
-        }
-
-        let hoverResult = dispatchHoverMotion(pointerMotion, perform: perform)
+        let hoverResult = includesHover
+            ? dispatchHoverMotion(pointerMotion, perform: perform)
+            : .ignored
         guard pointerMotion.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
@@ -1127,16 +1629,21 @@ final class InputRuntime {
             ? .handled : .ignored
     }
 
+    func reconcileHover(
+        _ pointerMotion: PointerMotion,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        _ = dispatchHoverMotion(pointerMotion, perform: perform)
+    }
+
     func dispatch(
         _ pointerScroll: PointerScroll,
         at date: Date,
         perform: ([Int], () -> Void) -> Void,
-        scroll: ([Int], PointerScroll) -> KeyPress.Result
-    ) -> KeyPress.Result {
+        scroll: ([Int], PointerScroll) -> InputEventResult
+    ) -> InputEventResult {
         _ = dispatchExpiredTapActions(at: date, perform: perform)
         _ = dispatchExpiredLongPressActions(at: date, perform: perform)
-        cancelActivePointerDrag(perform: perform)
-
         let cancelled = cancelLongPress(perform: perform)
         activePointerDownPositionTarget = nil
         pressedDefaultGestureTarget = nil
@@ -1145,117 +1652,10 @@ final class InputRuntime {
         return result == .handled || cancelled ? .handled : .ignored
     }
 
-    private func beginPointerDrag(
-        _ pointerPress: PointerPress,
-        perform: ([Int], () -> Void) -> Void
-    ) -> Bool {
-        let rootPoint = rootPoint(for: pointerPress)
-        guard let region = hitRegions
-            .filter({ region in
-                region.frame.contains(column: rootPoint.column, row: rootPoint.row)
-                    && pointerDragHandlersByPath[region.path]?.button == pointerPress.button
-            })
-            .sorted(by: hitRegionPrecedes)
-            .first,
-              let handler = pointerDragHandlersByPath[region.path] else {
-            return false
-        }
-
-        let location = pointerDragLocation(
-            rootPoint: rootPoint,
-            path: region.path,
-            frame: region.frame,
-            coordinateSpace: handler.coordinateSpace
-        )
-        activePointerDragTarget = ActivePointerDragTarget(
-            path: region.path,
-            frame: region.frame,
-            handler: handler,
-            startLocation: location,
-            lastLocation: location,
-            modifiers: pointerPress.modifiers
-        )
-        perform(handler.actionPath ?? region.path) {
-            handler.action(PointerDrag(
-                phase: .began,
-                startLocation: location,
-                location: location,
-                modifiers: pointerPress.modifiers
-            ))
-        }
-        return true
-    }
-
-    private func dispatchActivePointerDrag<Input: LocatedPointerInput>(
-        _ pointerInput: Input,
-        phase: PointerDrag.Phase,
-        perform: ([Int], () -> Void) -> Void
-    ) {
-        guard var target = activePointerDragTarget else {
-            return
-        }
-        let location = pointerDragLocation(
-            rootPoint: rootPoint(for: pointerInput),
-            path: target.path,
-            frame: target.frame,
-            coordinateSpace: target.handler.coordinateSpace
-        )
-        target.lastLocation = location
-        target.modifiers = pointerInput.modifiers
-        activePointerDragTarget = target
-        perform(target.handler.actionPath ?? target.path) {
-            target.handler.action(PointerDrag(
-                phase: phase,
-                startLocation: target.startLocation,
-                location: location,
-                modifiers: pointerInput.modifiers
-            ))
-        }
-    }
-
-    private func cancelActivePointerDrag(
-        perform: ([Int], () -> Void) -> Void
-    ) {
-        guard let target = activePointerDragTarget else {
-            return
-        }
-        activePointerDragTarget = nil
-        perform(target.handler.actionPath ?? target.path) {
-            target.handler.action(PointerDrag(
-                phase: .cancelled,
-                startLocation: target.startLocation,
-                location: target.lastLocation,
-                modifiers: target.modifiers
-            ))
-        }
-    }
-
-    private func pointerDragLocation(
-        rootPoint: Point,
-        path: [Int],
-        frame: RenderedRect,
-        coordinateSpace: CoordinateSpace
-    ) -> Point {
-        switch coordinateSpace.storage {
-        case .local:
-            return PointerCapture.localLocation(rootPoint: rootPoint, frame: frame)
-        case .global:
-            return rootPoint
-        case .named(let name):
-            guard let region = coordinateSpaceRegion(named: name, containing: path) else {
-                preconditionFailure("No coordinate space named \(name) is registered.")
-            }
-            return Point(
-                column: rootPoint.column - region.frame.x,
-                row: rootPoint.row - region.frame.y
-            )
-        }
-    }
-
     func dispatchExpiredLongPressActions(
         at date: Date,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard var sequence = longPressSequence,
               !sequence.didPerform,
               let candidate = sequence.candidates
@@ -1281,7 +1681,7 @@ final class InputRuntime {
     func dispatchExpiredTapActions(
         at date: Date,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard let sequence = tapSequence,
               date >= sequence.deadline else {
             return .ignored
@@ -1352,7 +1752,7 @@ final class InputRuntime {
     private func dispatchLongPressMotion(
         _ pointerMotion: PointerMotion,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard var sequence = longPressSequence else {
             return .ignored
         }
@@ -1415,7 +1815,7 @@ final class InputRuntime {
     private func dispatchHoverMotion(
         _ pointerMotion: PointerMotion,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         let rootPoint = rootPoint(for: pointerMotion)
         let targets = hoverTargets(at: pointerMotion)
         let targetPaths = Set(targets.map(\.path))
@@ -1450,7 +1850,7 @@ final class InputRuntime {
     private func dispatchPointerPress(
         _ pointerPress: PointerPress,
         perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         let rootPoint = rootPoint(for: pointerPress)
         for target in pointerPressTargets(at: pointerPress) {
             for handler in pointerPressHandlersByPath[target.path] ?? [] {
@@ -1470,7 +1870,7 @@ final class InputRuntime {
                 }
 
                 let actionPath = handler.actionPath ?? target.path
-                var result = PointerPress.Result.ignored
+                var result = InputEventResult.ignored
                 perform(actionPath) {
                     result = handler.action(deliveredPress)
                 }
@@ -1579,6 +1979,7 @@ final class InputRuntime {
         return DefaultGesturePressTarget(
             path: region.path,
             frame: region.frame,
+            location: point,
             handlers: handlers
         )
     }
@@ -1812,8 +2213,8 @@ final class InputRuntime {
 
     private func dispatchScroll(
         _ pointerScroll: PointerScroll,
-        scroll: ([Int], PointerScroll) -> KeyPress.Result
-    ) -> KeyPress.Result {
+        scroll: ([Int], PointerScroll) -> InputEventResult
+    ) -> InputEventResult {
         for path in scrollTargets(at: pointerScroll) {
             if scroll(path, pointerScroll) == .handled {
                 return .handled
@@ -1858,7 +2259,10 @@ final class InputRuntime {
         let (order, path, handler) = recognized
 
         if tapSequence?.path != target.path || tapSequence?.isExpired(at: date) == true {
-            tapSequence = TapSequence(path: target.path)
+            tapSequence = TapSequence(
+                path: target.path,
+                configuration: target.configuration
+            )
         }
 
         tapSequence?.count += 1
@@ -1883,7 +2287,7 @@ final class InputRuntime {
     private func dispatchLink(
         at path: [Int],
         perform: ([Int], () -> Bool) -> Bool
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard let handler = linkHandlersByPath[path] else {
             return .ignored
         }
@@ -2125,6 +2529,32 @@ private enum DefaultGestureHandler {
     case tap(TapGestureHandler)
 
     case longPress(LongPressGestureHandler)
+
+    var configuration: DefaultGestureHandlerConfiguration {
+        switch self {
+        case .tap(let handler):
+            let coordinateSpace: CoordinateSpace?
+            switch handler.action {
+            case .plain:
+                coordinateSpace = nil
+            case .location(let space, _):
+                coordinateSpace = space
+            }
+            return .tap(count: handler.count, coordinateSpace: coordinateSpace)
+        case .longPress(let handler):
+            return .longPress(
+                minimumDuration: handler.minimumDuration.bitPattern,
+                maximumDistance: handler.maximumDistance
+            )
+        }
+    }
+}
+
+private enum DefaultGestureHandlerConfiguration: Equatable {
+
+    case tap(count: Int, coordinateSpace: CoordinateSpace?)
+
+    case longPress(minimumDuration: UInt64, maximumDistance: Size)
 }
 
 private struct RegisteredDefaultGestureHandler {
@@ -2132,6 +2562,20 @@ private struct RegisteredDefaultGestureHandler {
     let path: [Int]
 
     let handler: DefaultGestureHandler
+
+    var configuration: RegisteredDefaultGestureConfiguration {
+        RegisteredDefaultGestureConfiguration(
+            path: path,
+            handler: handler.configuration
+        )
+    }
+}
+
+private struct RegisteredDefaultGestureConfiguration: Equatable {
+
+    var path: [Int]
+
+    var handler: DefaultGestureHandlerConfiguration
 }
 
 private struct DefaultGesturePressTarget {
@@ -2140,7 +2584,13 @@ private struct DefaultGesturePressTarget {
 
     let frame: RenderedRect
 
+    let location: Point
+
     let handlers: [RegisteredDefaultGestureHandler]
+
+    var configuration: [RegisteredDefaultGestureConfiguration] {
+        handlers.map(\.configuration)
+    }
 }
 
 private enum TapDispatchOutcome {
@@ -2151,7 +2601,7 @@ private enum TapDispatchOutcome {
 
     case recognized(order: Int, path: [Int], handler: TapGestureHandler)
 
-    var result: KeyPress.Result {
+    var result: InputEventResult {
         switch self {
         case .ignored:
             return .ignored
@@ -2164,6 +2614,8 @@ private enum TapDispatchOutcome {
 private struct TapSequence {
 
     let path: [Int]
+
+    var configuration: [RegisteredDefaultGestureConfiguration]
 
     var count = 0
 

@@ -128,11 +128,25 @@ private struct ButtonBody<Label: View>: View {
         sizedLabel
             .textSelection(.disabled)
             .focusable()
-            .onKeyPress(.return) {
-                action()
-                return .handled
-            }
-            .onTapGesture(perform: action)
+            .simultaneousInputEvent(
+                KeyPressEvent(.return)
+                    .onRecognized { _ in
+                        action()
+                        return .ignored
+                    }
+                    .deferred(priority: .eager)
+            )
+            .simultaneousInputEvent(
+                PointerPressEvent(.left)
+                    .sequenced(
+                        before: PointerPressEvent(.left, phases: .up)
+                    )
+                    .onRecognized { _ in
+                        action()
+                        return .ignored
+                    }
+                    .deferred(priority: .eager)
+            )
     }
 
     @ViewBuilder

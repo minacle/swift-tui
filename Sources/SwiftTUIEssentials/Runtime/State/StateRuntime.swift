@@ -16,6 +16,8 @@ final class StateRuntime {
 
     private let input = InputRuntime()
 
+    private let recognition = RecognitionRuntime()
+
     private let lifecycle = LifecycleRuntime()
 
     private let tasks = ViewTaskRuntime()
@@ -40,6 +42,8 @@ final class StateRuntime {
 
     private var scrollViewRenderOrder: [[Int]] = []
 
+    private var renderedScrollRegions: [RenderedScrollRegion] = []
+
     private var layoutCaches: [[Int]: Any] = [:]
 
     private var layoutMeasurementStores: [[Int]: LayoutMeasurementStore] = [:]
@@ -62,6 +66,8 @@ final class StateRuntime {
 
     private var suppressInteractiveRenderRegistrations = false
 
+    private var suppressPointerPositionCompletion = false
+
     private var pendingRemovedStateSubtrees: [[Int]] = []
 
     init(now: @escaping () -> Date = Date.init) {
@@ -80,9 +86,11 @@ final class StateRuntime {
         from view: Content,
         in proposal: RenderProposal? = nil
     ) -> RenderedBlock? {
+        let previousFocusPath = focus.activePath
         beginLayoutRender()
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
+        recognition.beginRender()
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
@@ -90,10 +98,16 @@ final class StateRuntime {
         terminationHandler = nil
         openURLHandlers = []
         defer {
+            recognition.finishRender(perform: performRecognitionAttachment)
             input.finishRender { path, operation in
                 withView(at: path, perform: operation)
             }
             if focus.finishRender(requests: currentFocusRequests()) {
+                recognition.focusDidChange(
+                    from: previousFocusPath,
+                    to: focus.activePath,
+                    perform: performRecognitionAttachment
+                )
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
@@ -115,6 +129,13 @@ final class StateRuntime {
         input.updateScrollRegions(block?.scrollRegions ?? [])
         input.updateFocusRegions(block?.focusRegions ?? [])
         input.updateCoordinateSpaceRegions(block?.coordinateSpaceRegions ?? [])
+        recognition.update(
+            hitRegions: block?.hitRegions ?? [],
+            focusRegions: block?.focusRegions ?? [],
+            scrollRegions: block?.scrollRegions ?? [],
+            coordinateSpaceRegions: block?.coordinateSpaceRegions ?? []
+        )
+        renderedScrollRegions = block?.scrollRegions ?? []
         return block
     }
 
@@ -138,9 +159,11 @@ final class StateRuntime {
         from view: Content,
         in proposal: RenderProposal? = nil
     ) -> RenderedElement? {
+        let previousFocusPath = focus.activePath
         beginLayoutRender()
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
+        recognition.beginRender()
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
@@ -148,10 +171,16 @@ final class StateRuntime {
         terminationHandler = nil
         openURLHandlers = []
         defer {
+            recognition.finishRender(perform: performRecognitionAttachment)
             input.finishRender { path, operation in
                 withView(at: path, perform: operation)
             }
             if focus.finishRender(requests: currentFocusRequests()) {
+                recognition.focusDidChange(
+                    from: previousFocusPath,
+                    to: focus.activePath,
+                    perform: performRecognitionAttachment
+                )
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
@@ -161,9 +190,27 @@ final class StateRuntime {
             finishLayoutRender()
         }
 
-        return observeRender {
+        let element = observeRender {
             ViewResolver.element(from: view, in: proposal, path: [], runtime: self)
         }
+        if case .block(let block) = element {
+            recognition.update(
+                hitRegions: block.hitRegions,
+                focusRegions: block.focusRegions,
+                scrollRegions: block.scrollRegions,
+                coordinateSpaceRegions: block.coordinateSpaceRegions
+            )
+            renderedScrollRegions = block.scrollRegions
+        } else {
+            recognition.update(
+                hitRegions: [],
+                focusRegions: [],
+                scrollRegions: [],
+                coordinateSpaceRegions: []
+            )
+            renderedScrollRegions = []
+        }
+        return element
     }
 
     func consumeInvalidation() -> Bool {
@@ -361,9 +408,38 @@ final class StateRuntime {
             return
         }
 
-        focus.registerFocusable(
-            isFocusable && EnvironmentRenderContext.current.isEnabled,
-            at: path
+        let isEnabled = isFocusable && EnvironmentRenderContext.current.isEnabled
+        focus.registerFocusable(isEnabled, at: path)
+
+        guard isEnabled, RecognitionRenderContext.values.inputEventsEnabled else {
+            return
+        }
+
+        let event = PointerPressEvent(.left)
+            .onRecognized { [weak self] _ in
+                guard let self else {
+                    return .ignored
+                }
+
+                let previousPath = focus.activePath
+                let result = focus.requestFocus(at: path)
+                if result.changed {
+                    recognition.focusDidChange(
+                        from: previousPath,
+                        to: focus.activePath,
+                        perform: performRecognitionAttachment
+                    )
+                    invalidated = true
+                }
+                return .ignored
+            }
+            .deferred(priority: .eager)
+        _ = recognition.register(
+            event,
+            at: path,
+            actionPath: path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
         )
     }
 
@@ -377,19 +453,68 @@ final class StateRuntime {
 
     func registerKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
             return
         }
 
-        input.register(
-            environmentRestoringKeyPressHandler(handler),
-            at: path
+        _ = recognition.register(
+            ViewDefinedKeyPressEvent(handler: handler),
+            at: path,
+            actionPath: handler.actionPath ?? path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
+        )
+    }
+
+    func registerInputEvent<Event: InputEvent>(
+        _ event: Event,
+        at path: [Int],
+        actionPath: [Int]?,
+        tier: RecognitionAttachmentTier
+    ) -> Bool {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
+            return false
+        }
+
+        return recognition.register(
+            event,
+            at: path,
+            actionPath: actionPath ?? path,
+            tier: tier,
+            environment: EnvironmentRenderContext.current
+        )
+    }
+
+    func registerGesture<G: Gesture>(
+        _ gesture: G,
+        at path: [Int],
+        actionPath: [Int]?,
+        tier: RecognitionAttachmentTier,
+        isSimultaneous: Bool = false
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.gesturesEnabled else {
+            return
+        }
+
+        recognition.register(
+            gesture,
+            at: path,
+            actionPath: actionPath ?? path,
+            tier: tier,
+            environment: EnvironmentRenderContext.current,
+            isSimultaneous: isSimultaneous
         )
     }
 
     func registerGlobalKeyPressHandler(_ handler: KeyPressHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
             return
         }
 
@@ -421,7 +546,8 @@ final class StateRuntime {
 
     func registerTapGestureHandler(_ handler: TapGestureHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.gesturesEnabled else {
             return
         }
 
@@ -433,13 +559,17 @@ final class StateRuntime {
 
     func registerPointerPressHandler(_ handler: PointerPressHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
             return
         }
 
-        input.register(
-            environmentRestoringPointerPressHandler(handler),
-            at: path
+        _ = recognition.register(
+            ViewDefinedPointerPressEvent(handler: handler),
+            at: path,
+            actionPath: handler.actionPath ?? path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
         )
     }
 
@@ -448,7 +578,8 @@ final class StateRuntime {
         at path: [Int]
     ) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.gesturesEnabled else {
             return
         }
 
@@ -478,40 +609,57 @@ final class StateRuntime {
         at path: [Int]
     ) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
             return
         }
 
-        input.register(
-            environmentRestoringPointerDownPositionHandler(handler),
-            at: path
+        let handler = environmentRestoringPointerDownPositionHandler(handler)
+        let sequence = PointerPositionSequenceState()
+        _ = recognition.register(
+            PointerPositionInputEvent(
+                handler: handler,
+                isEligible: { [weak self] in
+                    !handler.requiresFocus || self?.focus.activePath == path
+                },
+                sequence: sequence,
+                stage: .eager
+            ),
+            at: path,
+            actionPath: handler.actionPath ?? path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
         )
-    }
-
-    func registerPointerDragHandler(
-        _ handler: PointerDragHandler,
-        at path: [Int]
-    ) {
-        guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
-            return
-        }
-
-        input.register(
-            environmentRestoringPointerDragHandler(handler),
-            at: path
+        _ = recognition.register(
+            PointerPositionInputEvent(
+                handler: handler,
+                isEligible: { [weak self] in
+                    self?.suppressPointerPositionCompletion != true
+                },
+                sequence: sequence,
+                stage: .lazy
+            ),
+            at: path,
+            actionPath: handler.actionPath ?? path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
         )
     }
 
     func registerLinkHandler(_ handler: LinkHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
-              EnvironmentRenderContext.current.isEnabled else {
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.inputEventsEnabled else {
             return
         }
 
-        input.register(
-            environmentRestoringLinkHandler(handler),
-            at: path
+        let handler = environmentRestoringLinkHandler(handler)
+        _ = recognition.register(
+            LinkActivationInputEvent(handler: handler),
+            at: path,
+            actionPath: handler.actionPath ?? path,
+            tier: .viewDefined,
+            environment: EnvironmentRenderContext.current
         )
     }
 
@@ -689,6 +837,33 @@ final class StateRuntime {
         if requestsFlash {
             invalidated = true
         }
+
+        if EnvironmentRenderContext.current.isEnabled,
+           EnvironmentRenderContext.current.isScrollEnabled,
+           RecognitionRenderContext.values.inputEventsEnabled {
+            // A horizontal ScrollView must also see Shift-modified vertical
+            // wheel input so the terminal-specific axis remapping remains a
+            // ScrollView policy rather than a parser or matcher policy.
+            let event = PointerScrollEvent(
+                [.horizontal, .vertical],
+                coordinateSpace: .global
+            )
+                .onRecognized { [weak self] scroll in
+                    guard let self, scrollOwner(for: scroll) == path else {
+                        return .ignored
+                    }
+                    _ = dispatchScroll(scroll, at: path)
+                    return .ignored
+                }
+                .deferred(priority: .eager)
+            _ = recognition.register(
+                event,
+                at: path,
+                actionPath: path,
+                tier: .viewDefined,
+                environment: EnvironmentRenderContext.current
+            )
+        }
     }
 
     func scrollIndicatorIsTemporarilyVisible(
@@ -865,7 +1040,17 @@ final class StateRuntime {
         pendingRemovedStateSubtrees.append(contentsOf: removedPaths)
     }
 
-    func dispatch(_ keyPress: KeyPress) -> KeyPress.Result {
+    func dispatch(_ keyPress: KeyPress) -> InputEventResult {
+        if recognition.dispatch(
+            .keyPress(keyPress),
+            toward: focus.activePath,
+            at: now(),
+            perform: performRecognitionAttachment,
+            invalidate: { [weak self] in self?.invalidated = true }
+        ) == .handled {
+            return .handled
+        }
+
         if let activePath = focus.activePath,
            input.dispatch(keyPress, toward: activePath, perform: performKeyPress) == .handled {
             return .handled
@@ -891,47 +1076,144 @@ final class StateRuntime {
         }
     }
 
-    func dispatch(_ pointerPress: PointerPress, at date: Date = Date()) -> KeyPress.Result {
-        input.dispatch(
-            pointerPress,
+    func dispatch(_ pointerPress: PointerPress, at date: Date = Date()) -> InputEventResult {
+        suppressPointerPositionCompletion = false
+        defer { suppressPointerPositionCompletion = false }
+        let result = recognition.dispatch(
+            .pointerPress(pointerPress),
             at: date,
-            perform: { path, operation in
-                withView(at: path, perform: operation)
-            },
-            performLink: { path, operation in
-                withView(at: path, perform: operation)
-            },
-            focus: { path in
-                let result = focus.requestFocus(at: path)
-                if result.changed {
-                    invalidated = true
+            perform: performRecognitionAttachment,
+            performViewDefinedGesture: { [self] isEligible in
+                guard isEligible else {
+                    input.cancelDefaultGestureRecognition { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                    return false
                 }
-                return result.handled
-            }
+                suppressPointerPositionCompletion = input.hasRecognizedLongPress
+                _ = input.dispatch(
+                    pointerPress,
+                    at: date,
+                    perform: { path, operation in
+                        withView(at: path, perform: operation)
+                    },
+                    performLink: { path, operation in
+                        withView(at: path, perform: operation)
+                    },
+                    focus: { _ in false }
+                )
+                return input.hasRecognizedTap || input.hasRecognizedLongPress
+            },
+            invalidate: { [weak self] in self?.invalidated = true }
         )
-    }
-
-    func dispatch(_ pointerMotion: PointerMotion, at date: Date = Date()) -> KeyPress.Result {
-        input.dispatch(
-            pointerMotion,
-            at: date,
-            perform: { path, operation in
+        if result == .handled {
+            input.cancelDefaultGestureRecognition { path, operation in
                 withView(at: path, perform: operation)
             }
-        )
+            return .handled
+        }
+        if recognition.hasGestureCapture {
+            input.cancelDefaultGestureRecognition { path, operation in
+                withView(at: path, perform: operation)
+            }
+            return .ignored
+        }
+
+        return .ignored
     }
 
-    func dispatch(_ pointerScroll: PointerScroll, at date: Date = Date()) -> KeyPress.Result {
-        input.dispatch(
+    func dispatch(_ pointerMotion: PointerMotion, at date: Date = Date()) -> InputEventResult {
+        let result = recognition.dispatch(
+            .pointerMotion(pointerMotion),
+            at: date,
+            perform: performRecognitionAttachment,
+            performViewDefinedGesture: { [self] isEligible in
+                guard isEligible else {
+                    input.cancelDefaultGestureRecognition { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                    return false
+                }
+                _ = input.dispatch(
+                    pointerMotion,
+                    at: date,
+                    includesHover: false,
+                    perform: { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                )
+                return input.hasRecognizedLongPress
+            },
+            invalidate: { [weak self] in self?.invalidated = true }
+        )
+        if result == .handled {
+            input.cancelDefaultGestureRecognition { path, operation in
+                withView(at: path, perform: operation)
+            }
+            input.reconcileHover(pointerMotion) { path, operation in
+                withView(at: path, perform: operation)
+            }
+            return .handled
+        }
+
+        if recognition.hasGestureCapture {
+            input.cancelDefaultGestureRecognition { path, operation in
+                withView(at: path, perform: operation)
+            }
+            input.reconcileHover(pointerMotion) { path, operation in
+                withView(at: path, perform: operation)
+            }
+            return .ignored
+        }
+
+        input.reconcileHover(pointerMotion) { path, operation in
+            withView(at: path, perform: operation)
+        }
+        return .ignored
+    }
+
+    func dispatch(_ pointerScroll: PointerScroll, at date: Date = Date()) -> InputEventResult {
+        if recognition.dispatch(
+            .pointerScroll(pointerScroll),
+            at: date,
+            perform: performRecognitionAttachment,
+            invalidate: { [weak self] in self?.invalidated = true }
+        ) == .handled {
+            input.cancelDefaultGestureRecognition { path, operation in
+                withView(at: path, perform: operation)
+            }
+            return .handled
+        }
+
+        _ = input.dispatch(
             pointerScroll,
             at: date,
             perform: { path, operation in
                 withView(at: path, perform: operation)
             },
-            scroll: { path, pointerScroll in
-                dispatchScroll(pointerScroll, at: path)
-            }
+            scroll: { _, _ in .ignored }
         )
+        return .ignored
+    }
+
+    func dispatchSceneInactive() {
+        recognition.cancelAll(
+            .sceneInactive,
+            perform: performRecognitionAttachment
+        )
+        input.cancelInteractions { path, operation in
+            withView(at: path, perform: operation)
+        }
+    }
+
+    func endInputSession() {
+        recognition.cancelAll(
+            .sessionEnded,
+            perform: performRecognitionAttachment
+        )
+        input.cancelInteractions { path, operation in
+            withView(at: path, perform: operation)
+        }
     }
 
     var nextTapDeadline: Date? {
@@ -940,6 +1222,10 @@ final class StateRuntime {
 
     var nextLongPressDeadline: Date? {
         input.nextLongPressDeadline
+    }
+
+    var nextRecognitionDeadline: Date? {
+        recognition.nextDeadline
     }
 
     var nextScrollIndicatorFlashDeadline: Date? {
@@ -951,16 +1237,42 @@ final class StateRuntime {
         }.min()
     }
 
-    func dispatchExpiredTapActions(at date: Date = Date()) -> KeyPress.Result {
+    func dispatchExpiredTapActions(at date: Date = Date()) -> InputEventResult {
         input.dispatchExpiredTapActions(at: date) { path, operation in
             withView(at: path, perform: operation)
         }
     }
 
-    func dispatchExpiredLongPressActions(at date: Date = Date()) -> KeyPress.Result {
+    func dispatchExpiredLongPressActions(at date: Date = Date()) -> InputEventResult {
         input.dispatchExpiredLongPressActions(at: date) { path, operation in
             withView(at: path, perform: operation)
         }
+    }
+
+    func dispatchExpiredRecognitionActions(at date: Date = Date()) {
+        recognition.advance(
+            to: date,
+            perform: performRecognitionAttachment,
+            performViewDefinedGesture: { [self] isEligible in
+                guard isEligible else {
+                    input.cancelDefaultGestureRecognition { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                    return false
+                }
+                let tapResult = input.dispatchExpiredTapActions(at: date) {
+                    path, operation in
+                    withView(at: path, perform: operation)
+                }
+                let longPressResult = input.dispatchExpiredLongPressActions(
+                    at: date
+                ) { path, operation in
+                    withView(at: path, perform: operation)
+                }
+                return tapResult == .handled || longPressResult == .handled
+            },
+            invalidate: { [weak self] in self?.invalidated = true }
+        )
     }
 
     func dispatchExpiredScrollIndicatorFlashes(at date: Date = Date()) {
@@ -992,7 +1304,7 @@ final class StateRuntime {
         }
     }
 
-    func dispatchOpenURL(_ url: URL) -> KeyPress.Result {
+    func dispatchOpenURL(_ url: URL) -> InputEventResult {
         var handled = false
         for handler in openURLHandlers {
             EnvironmentRenderContext.withValues(handler.environment) {
@@ -1007,6 +1319,7 @@ final class StateRuntime {
 
     func updateRenderedFrame(_ frame: RenderedTerminalFrame) {
         input.updateRootFrame(frame)
+        recognition.updateRootFrame(frame)
     }
 
     func materializeDynamicProperties(in value: Any) {
@@ -1023,9 +1336,18 @@ final class StateRuntime {
 
     private func performKeyPress(
         at path: [Int],
-        operation: () -> KeyPress.Result
-    ) -> KeyPress.Result {
+        operation: () -> InputEventResult
+    ) -> InputEventResult {
         withView(at: path, perform: operation)
+    }
+
+    private func performRecognitionAttachment(
+        _ attachment: AnyRecognitionAttachment,
+        _ operation: () -> AttachmentDispatchOutcome
+    ) -> AttachmentDispatchOutcome {
+        EnvironmentRenderContext.withValues(attachment.environment) {
+            withView(at: attachment.actionPath, perform: operation)
+        }
     }
 
     private func performResolveKey(
@@ -1200,22 +1522,6 @@ final class StateRuntime {
             changed: { point in
                 EnvironmentRenderContext.withValues(environment) {
                     handler.changed(point)
-                }
-            }
-        )
-    }
-
-    private func environmentRestoringPointerDragHandler(
-        _ handler: PointerDragHandler
-    ) -> PointerDragHandler {
-        let environment = EnvironmentRenderContext.current
-        return PointerDragHandler(
-            actionPath: handler.actionPath,
-            button: handler.button,
-            coordinateSpace: handler.coordinateSpace,
-            action: { drag in
-                EnvironmentRenderContext.withValues(environment) {
-                    handler.action(drag)
                 }
             }
         )
@@ -1435,7 +1741,7 @@ final class StateRuntime {
     private func dispatchScroll(
         _ pointerScroll: PointerScroll,
         at path: [Int]
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         guard var state = scrollViewStates[path],
               let delta = scrollDelta(for: pointerScroll, axes: state.axes) else {
             return .ignored
@@ -1464,40 +1770,57 @@ final class StateRuntime {
         return .handled
     }
 
+    private func scrollOwner(for pointerScroll: PointerScroll) -> [Int]? {
+        renderedScrollRegions
+            .filter {
+                $0.frame.contains(
+                    column: pointerScroll.location.column,
+                    row: pointerScroll.location.row
+                )
+            }
+            .sorted {
+                if $0.path.count != $1.path.count {
+                    return $0.path.count > $1.path.count
+                }
+                return $0.frame.area < $1.frame.area
+            }
+            .lazy
+            .map(\.path)
+            .first { path in
+                guard let state = scrollViewStates[path],
+                      let delta = scrollDelta(
+                        for: pointerScroll,
+                        axes: state.axes
+                      ) else {
+                    return false
+                }
+                let current = state.binding?.wrappedValue.point ?? state.point
+                return clamped(
+                    current.x + delta.x,
+                    upperBound: state.maximumPoint.x
+                ) != current.x
+                    || clamped(
+                        current.y + delta.y,
+                        upperBound: state.maximumPoint.y
+                    ) != current.y
+            }
+    }
+
     private func scrollDelta(
         for pointerScroll: PointerScroll,
         axes: Axis.Set
     ) -> (x: Int, y: Int)? {
-        switch pointerScroll.direction {
-        case .up:
-            if axes.contains(.horizontal)
-                && (pointerScroll.modifiers.contains(.shift) || !axes.contains(.vertical)) {
-                return (x: -1, y: 0)
-            }
-            guard axes.contains(.vertical) else {
-                return nil
-            }
-            return (x: 0, y: -1)
-        case .down:
-            if axes.contains(.horizontal)
-                && (pointerScroll.modifiers.contains(.shift) || !axes.contains(.vertical)) {
-                return (x: 1, y: 0)
-            }
-            guard axes.contains(.vertical) else {
-                return nil
-            }
-            return (x: 0, y: 1)
-        case .left:
-            guard axes.contains(.horizontal) else {
-                return nil
-            }
-            return (x: -1, y: 0)
-        case .right:
-            guard axes.contains(.horizontal) else {
-                return nil
-            }
-            return (x: 1, y: 0)
+        var x = axes.contains(.horizontal) ? pointerScroll.delta.columns : 0
+        var y = axes.contains(.vertical) ? pointerScroll.delta.rows : 0
+
+        if pointerScroll.delta.rows != 0,
+           axes.contains(.horizontal),
+           pointerScroll.modifiers.contains(.shift) || !axes.contains(.vertical) {
+            x += pointerScroll.delta.rows
+            y = 0
         }
+
+        return x == 0 && y == 0 ? nil : (x: x, y: y)
     }
 
     private func clamped(_ value: Int, upperBound: Int) -> Int {

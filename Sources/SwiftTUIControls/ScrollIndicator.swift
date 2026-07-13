@@ -52,11 +52,28 @@ public nonisolated struct VerticalScrollIndicator: View {
 
 private struct ScrollIndicatorBody: View {
 
+    private struct DragState: Equatable {
+
+        var isActive = false
+
+        var grabbedHalfOffset: Int?
+    }
+
     let axis: Axis
 
     let configuration: ScrollIndicatorConfiguration
 
-    @State private var grabbedHalfOffset: Int?
+    @GestureState private var dragState = DragState()
+
+    init(axis: Axis, configuration: ScrollIndicatorConfiguration) {
+        self.axis = axis
+        self.configuration = configuration
+        _dragState = GestureState(wrappedValue: DragState()) { state, _ in
+            if state.isActive {
+                configuration.endInteraction()
+            }
+        }
+    }
 
     var body: some View {
         let metrics = ScrollIndicatorMetrics(configuration: configuration)
@@ -66,22 +83,28 @@ private struct ScrollIndicatorBody: View {
                 height: axis == .vertical ? configuration.viewportLength : 1,
                 alignment: .topLeading
             )
-            .onPointerDrag { drag in
-                handle(drag, metrics: metrics)
-            }
+            .gesture(
+                DragGesture().updating($dragState) { value, state, _ in
+                    updateDrag(value, state: &state, metrics: metrics)
+                }
+            )
     }
 
-    private func handle(_ drag: PointerDrag, metrics: ScrollIndicatorMetrics) {
+    private func updateDrag(
+        _ drag: DragGesture.Value,
+        state: inout DragState,
+        metrics: ScrollIndicatorMetrics
+    ) {
         let cell = axis == .horizontal ? drag.location.column : drag.location.row
         let half = metrics.halfCoordinate(forCell: cell)
-        switch drag.phase {
-        case .began:
+        if !state.isActive {
+            state.isActive = true
             configuration.beginInteraction()
             if let thumbHalf = metrics.thumbHalfCoordinate(forCell: cell) {
-                grabbedHalfOffset = thumbHalf - metrics.thumbStart
+                state.grabbedHalfOffset = thumbHalf - metrics.thumbStart
             }
             else {
-                grabbedHalfOffset = nil
+                state.grabbedHalfOffset = nil
                 configuration.scroll(
                     to: configuration.offset
                         + (half < metrics.thumbStart
@@ -89,20 +112,18 @@ private struct ScrollIndicatorBody: View {
                             : configuration.viewportLength)
                 )
             }
-        case .changed:
-            guard let grabbedHalfOffset else {
-                return
-            }
-            configuration.scroll(
-                to: metrics.scrollOffset(
-                    forThumbStart: half - grabbedHalfOffset,
-                    maximumOffset: configuration.maximumOffset
-                )
-            )
-        case .ended, .cancelled:
-            grabbedHalfOffset = nil
-            configuration.endInteraction()
+            return
         }
+
+        guard let grabbedHalfOffset = state.grabbedHalfOffset else {
+            return
+        }
+        configuration.scroll(
+            to: metrics.scrollOffset(
+                forThumbStart: half - grabbedHalfOffset,
+                maximumOffset: configuration.maximumOffset
+            )
+        )
     }
 }
 

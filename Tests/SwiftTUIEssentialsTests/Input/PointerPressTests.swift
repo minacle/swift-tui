@@ -169,7 +169,7 @@ struct PointerPressTests {
     }
 
     @Test
-    func `an ignored child pointer press propagates to a handling parent`() {
+    func `a handling parent prevents an ignored child pointer press from receiving input`() {
         let runtime = StateRuntime()
         let pointerProbe = PointerPressProbe()
         let view = VStack(spacing: 0) {
@@ -191,11 +191,11 @@ struct PointerPressTests {
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
-        #expect(pointerProbe.names == ["child", "parent"])
+        #expect(pointerProbe.names == ["parent"])
     }
 
     @Test
-    func `a handled child pointer press prevents parent propagation`() {
+    func `an ignored parent pointer press propagates to a handling child`() {
         let runtime = StateRuntime()
         let pointerProbe = PointerPressProbe()
         let view = VStack(spacing: 0) {
@@ -207,7 +207,7 @@ struct PointerPressTests {
         }
         .onPointerPress {
             pointerProbe.record("parent")
-            return .handled
+            return .ignored
         }
 
         _ = runtime.block(from: view)
@@ -217,7 +217,7 @@ struct PointerPressTests {
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
             ) == .handled
         )
-        #expect(pointerProbe.names == ["child"])
+        #expect(pointerProbe.names == ["parent", "child"])
     }
 
     @Test
@@ -239,7 +239,7 @@ struct PointerPressTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
@@ -269,12 +269,12 @@ struct PointerPressTests {
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down)
-            ) == .handled
+            ) == .ignored
         )
         #expect(
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up)
-            ) == .handled
+            ) == .ignored
         )
         #expect(pointerProbe.names == ["up"])
         #expect(tapProbe.events == ["tap"])

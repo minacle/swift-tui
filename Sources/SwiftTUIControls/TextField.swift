@@ -277,14 +277,14 @@ private struct TextFieldBody<Label: View>: View {
                 .placeholder {
                     placeholder
                 }
-                .onKeyPress(.return, action: submit)
+                .simultaneousInputEvent(submitEvent)
         }
         else {
             EditableText(text: text, mask: mask)
                 .placeholder {
                     placeholder
                 }
-                .onKeyPress(.return, action: submit)
+                .simultaneousInputEvent(submitEvent)
         }
     }
 
@@ -298,9 +298,13 @@ private struct TextFieldBody<Label: View>: View {
         }
     }
 
-    private func submit() -> KeyPress.Result {
-        submitAction?()
-        return .handled
+    private var submitEvent: some InputEvent<KeyPress> {
+        KeyPressEvent(.return)
+            .onRecognized { _ in
+                submitAction?()
+                return .ignored
+            }
+            .deferred(priority: .eager)
     }
 }
 

@@ -1382,35 +1382,36 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
 
         let environment = EnvironmentRenderContext.current
         runtime.registerFocusable(true, at: path)
-        runtime.registerKeyPressHandler(
-            KeyPressHandler(
-                actionPath: path,
-                matches: {
-                    $0.key == .return && [.down, .repeat].contains($0.phase)
-                },
-                action: { _ in
-                    activate(
-                        in: runtime,
-                        stackPath: stackPath,
-                        environment: environment
-                    )
-                }
-            ),
-            at: path
-        )
-        runtime.registerTapGestureHandler(
-            TapGestureHandler(
-                actionPath: path,
-                count: 1,
-                action: .plain {
+        _ = runtime.registerInputEvent(
+            KeyPressEvent(.return)
+                .onRecognized { _ in
                     _ = activate(
                         in: runtime,
                         stackPath: stackPath,
                         environment: environment
                     )
+                    return .ignored
                 }
-            ),
-            at: path
+                .deferred(priority: .eager),
+            at: path,
+            actionPath: path,
+            tier: .viewDefined
+        )
+        _ = runtime.registerInputEvent(
+            PointerPressEvent(.left)
+                .sequenced(before: PointerPressEvent(.left, phases: .up))
+                .onRecognized { _ in
+                    _ = activate(
+                        in: runtime,
+                        stackPath: stackPath,
+                        environment: environment
+                    )
+                    return .ignored
+                }
+                .deferred(priority: .eager),
+            at: path,
+            actionPath: path,
+            tier: .viewDefined
         )
     }
 
@@ -1422,7 +1423,7 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
         in runtime: StateRuntime,
         stackPath: [Int],
         environment: EnvironmentValues
-    ) -> KeyPress.Result {
+    ) -> InputEventResult {
         switch activation {
         case .destination(let destination):
             runtime.pushDirectNavigationDestination(
