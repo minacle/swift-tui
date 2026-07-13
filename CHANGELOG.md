@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ViewRenderer` and immutable `RenderedView` output for rendering one
+  view synchronously as content-local plain text or SGR-styled ANSI without
+  starting an application loop or terminal session.
 - Added `ResolveKeyAction` and `EnvironmentValues.resolveKey` for keyed
   key-down fallback handling. Resolvers run after focused and legacy global
   key handlers ignore an event, and nested declarations fall back from the

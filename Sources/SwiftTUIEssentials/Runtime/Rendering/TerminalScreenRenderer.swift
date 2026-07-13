@@ -54,7 +54,7 @@ enum TerminalScreenRenderer {
                 TerminalControl.caretPositionSequence(
                     row: frame.row + run.row,
                     column: frame.column + run.column
-                ) + styledText(for: run)
+                ) + TerminalOutputEncoder.styledText(for: run)
             }.joined()
             + caretSequence(for: block, in: frame, viewport: viewport)
     }
@@ -87,7 +87,7 @@ enum TerminalScreenRenderer {
             TerminalControl.caretPositionSequence(
                 row: run.row + 1,
                 column: run.column + 1
-            ) + styledText(for: run)
+            ) + TerminalOutputEncoder.styledText(for: run)
         }.joined()
             + caretSequence(for: block, in: frame, viewport: viewport)
     }
@@ -199,16 +199,6 @@ enum TerminalScreenRenderer {
             style: last.style,
             link: last.link
         )
-    }
-
-    private static func styledText(for run: RenderedRun) -> String {
-        guard !run.style.isPlain else {
-            return run.text
-        }
-
-        return TerminalControl.sgrSequence(for: run.style)
-            + run.text
-            + TerminalControl.resetSGRSequence(for: run.style)
     }
 
     private static func caretSequence(

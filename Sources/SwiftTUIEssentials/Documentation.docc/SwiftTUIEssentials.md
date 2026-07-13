@@ -93,6 +93,8 @@ rendering them because text APIs preserve terminal control characters.
 
 ### Rendering model
 
+- ``ViewRenderer``
+- ``RenderedView``
 - <doc:RenderingPipeline>
 
 ### Text, shapes, and decoration

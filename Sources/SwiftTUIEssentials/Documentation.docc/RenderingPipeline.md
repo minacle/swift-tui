@@ -17,9 +17,46 @@ AppRunner
   -> full or differential ANSI output
 ```
 
-The stages use internal types rather than public renderer extension points.
-Their boundaries explain the observable behavior of public layout, input, and
-state APIs without exposing the implementation as a compatibility contract.
+``ViewRenderer`` enters the same resolution and layout stages for a one-shot
+render, then serializes the resulting content-local block without projecting it
+into a terminal screen. The remaining stages use internal types rather than
+public renderer extension points. Their boundaries explain the observable
+behavior of public layout, input, and state APIs without exposing the
+implementation as a compatibility contract.
+
+## Render one view without an application loop
+
+Call ``ViewRenderer/render(_:proposedSize:)`` to perform one synchronous render
+pass. Layout can evaluate a body more than once while measuring and placing its
+content, but no invalidation starts another pass. The supplied
+``ProposedViewSize`` influences measurement, wrapping, and flexible layout, but
+it isn't a terminal viewport. `ViewRenderer` doesn't center or pad the block
+after resolution; an individual view or layout can still choose a proposed
+dimension as its resolved size. Add a `frame` modifier when the rendered
+fragment needs a fixed canvas.
+
+The returned ``RenderedView`` contains plain rows, joined plain text, ANSI text
+with SGR styling, and the resolved terminal-cell size. Its ANSI fragment writes
+positioned gaps as literal spaces. It doesn't contain screen clearing, cursor
+positioning or visibility, OSC links, alternate-screen transitions, or a final
+line feed, so a command-line caller decides how and where to write it.
+
+One-shot rendering has no `StateRuntime`. ``State`` and ``FocusState`` read
+their wrapper-local fallback values, while environment modifiers still scope
+body evaluation. Lifecycle and change callbacks, view tasks, input and focus
+registrations, Observation subscriptions, invalidation stabilization, and
+differential rendering don't run.
+
+```swift
+let output = ViewRenderer.render(
+    Text("Build succeeded")
+        .bold()
+        .foregroundStyle(.green),
+    proposedSize: ProposedViewSize(columns: 40, rows: nil)
+)
+
+print(output.ansiText, terminator: "")
+```
 
 ## Drive rendering until the frame is stable
 
@@ -126,7 +163,7 @@ invalidate the next frame and restart the pipeline.
 | Text layout | `TextLayoutRenderer` | Wrapping, selection styling, and positioned text runs |
 | Block representation | `RenderedBlock`, `RenderedRun` | Visible cells and interaction metadata |
 | Container layout | `StackRenderer`, `ZStackRenderer` | Measurement, placement, alignment, and composition |
-| Terminal output | `TerminalScreenRenderer` | Screen projection, diffing, ANSI output, and cursor presentation |
+| Terminal output | `TerminalOutputEncoder`, `TerminalScreenRenderer` | One-shot fragments, screen projection, diffing, ANSI output, and cursor presentation |
 
 > Important: SwiftTUI text preserves terminal control characters. Sanitize
 > untrusted strings before rendering them; the rendering pipeline does not
