@@ -19,6 +19,8 @@ enum RecognitionAttachmentKind: Hashable {
     case inputEvent
 
     case gesture
+
+    case shortcut
 }
 
 struct RecognitionAttachmentID: Hashable {
@@ -36,9 +38,9 @@ struct AttachmentDispatchOutcome {
 
     var participated = false
 
-    var gestureEnded = false
+    var recognitionEnded = false
 
-    var gestureClaimed = false
+    var recognitionClaimed = false
 
     var beginsCapture = false
 
@@ -84,9 +86,11 @@ class AnyRecognitionAttachment {
 
     var acceptsNewPointerDownWhileActive: Bool { false }
 
+    var acceptsNewKeyDownWhileActive: Bool { false }
+
     var nextDeadline: Date? { nil }
 
-    var isSimultaneousGesture: Bool { false }
+    var isSimultaneousRecognition: Bool { false }
 
     func process(
         _ sample: RecognitionSample,
@@ -197,7 +201,7 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
 
     let definition: _GestureDefinition<Value>
 
-    let node: GestureRecognitionNode<Value>
+    let node: StatefulRecognitionNode<Value>
 
     let simultaneous: Bool
 
@@ -238,7 +242,7 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
 
     override var nextDeadline: Date? { node.nextDeadline }
 
-    override var isSimultaneousGesture: Bool { simultaneous }
+    override var isSimultaneousRecognition: Bool { simultaneous }
 
     override func process(
         _ sample: RecognitionSample,
@@ -247,7 +251,7 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
         convert: @escaping (Point, CoordinateSpace) -> Point?,
         invalidate: @escaping () -> Void
     ) -> AttachmentDispatchOutcome {
-        let context = GestureRecognitionContext(
+        let context = StatefulRecognitionContext(
             date: date,
             isTargeted: isTargeted,
             convert: convert,
@@ -263,7 +267,7 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
         convert: @escaping (Point, CoordinateSpace) -> Point?,
         invalidate: @escaping () -> Void
     ) -> AttachmentDispatchOutcome {
-        let context = GestureRecognitionContext(
+        let context = StatefulRecognitionContext(
             date: date,
             isTargeted: true,
             convert: convert,
@@ -286,7 +290,7 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
     }
 
     private func outcome(
-        from output: GestureRecognitionOutput<Value>
+        from output: StatefulRecognitionOutput<Value>
     ) -> AttachmentDispatchOutcome {
         let ended: Bool
         switch output.phase {
@@ -297,10 +301,121 @@ final class GestureRecognitionAttachment<Value>: AnyRecognitionAttachment {
         }
         return AttachmentDispatchOutcome(
             participated: output.participated,
-            gestureEnded: ended,
-            gestureClaimed: output.claimsCompetition,
+            recognitionEnded: ended,
+            recognitionClaimed: output.claimsCompetition,
             beginsCapture: output.beginsCapture,
             endsCapture: output.endsCapture
+        )
+    }
+}
+
+@MainActor
+final class ShortcutRecognitionAttachment<Value>: AnyRecognitionAttachment {
+
+    let definition: _ShortcutDefinition<Value>
+
+    let node: StatefulRecognitionNode<Value>
+
+    let simultaneous: Bool
+
+    init(
+        id: RecognitionAttachmentID,
+        path: [Int],
+        tier: RecognitionAttachmentTier,
+        environment: EnvironmentValues,
+        actionPath: [Int],
+        isSimultaneous: Bool,
+        definition: _ShortcutDefinition<Value>
+    ) {
+        self.definition = definition
+        self.node = definition.makeNode()
+        self.simultaneous = isSimultaneous
+        super.init(
+            id: id,
+            path: path,
+            tier: tier,
+            environment: environment,
+            actionPath: actionPath
+        )
+    }
+
+    override var kind: RecognitionAttachmentKind { .shortcut }
+
+    override var configuration: AnyHashable {
+        AnyHashable(definition.configuration)
+    }
+
+    override var families: InputFamilies { .key }
+
+    override var isActive: Bool { node.isActive }
+
+    override var acceptsNewKeyDownWhileActive: Bool {
+        node.acceptsNewKeyDownWhileActive
+    }
+
+    override var nextDeadline: Date? { node.nextDeadline }
+
+    override var isSimultaneousRecognition: Bool { simultaneous }
+
+    override func process(
+        _ sample: RecognitionSample,
+        date: Date,
+        isTargeted: Bool,
+        convert: @escaping (Point, CoordinateSpace) -> Point?,
+        invalidate: @escaping () -> Void
+    ) -> AttachmentDispatchOutcome {
+        let context = StatefulRecognitionContext(
+            date: date,
+            isTargeted: isTargeted,
+            convert: convert,
+            invalidate: invalidate
+        )
+        let output = node.process(sample, context: context)
+        context.flush()
+        return outcome(from: output)
+    }
+
+    override func advance(
+        to date: Date,
+        convert: @escaping (Point, CoordinateSpace) -> Point?,
+        invalidate: @escaping () -> Void
+    ) -> AttachmentDispatchOutcome {
+        let context = StatefulRecognitionContext(
+            date: date,
+            isTargeted: true,
+            convert: convert,
+            invalidate: invalidate
+        )
+        let output = node.advance(to: date, context: context)
+        context.flush()
+        return outcome(from: output)
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        node.cancel(reason)
+    }
+
+    override func restoreState(from old: AnyRecognitionAttachment) {
+        guard let old = old as? ShortcutRecognitionAttachment<Value> else {
+            return
+        }
+        node.restoreState(from: old.node)
+    }
+
+    private func outcome(
+        from output: StatefulRecognitionOutput<Value>
+    ) -> AttachmentDispatchOutcome {
+        let ended: Bool
+        switch output.phase {
+        case .ended:
+            ended = true
+        case .none, .changed, .failed:
+            ended = false
+        }
+        return AttachmentDispatchOutcome(
+            participated: output.participated,
+            recognitionEnded: ended,
+            recognitionClaimed: output.claimsCompetition
         )
     }
 }
@@ -396,6 +511,29 @@ final class RecognitionRuntime {
         )
     }
 
+    func register<S: Shortcut>(
+        _ shortcut: S,
+        at path: [Int],
+        actionPath: [Int],
+        tier: RecognitionAttachmentTier,
+        environment: EnvironmentValues,
+        isSimultaneous: Bool = false
+    ) {
+        let definition = shortcut._makeShortcut()
+        let id = nextID(path: path, kind: .shortcut)
+        pendingAttachments.append(
+            ShortcutRecognitionAttachment(
+                id: id,
+                path: path,
+                tier: tier,
+                environment: environment,
+                actionPath: actionPath,
+                isSimultaneous: isSimultaneous,
+                definition: definition
+            )
+        )
+    }
+
     func finishRender(perform: Perform) {
         let pendingIDs = Set(pendingAttachments.map(\.id))
         for old in orderedAttachments where !pendingIDs.contains(old.id) {
@@ -455,6 +593,7 @@ final class RecognitionRuntime {
         at date: Date,
         perform: Perform,
         performViewDefinedGesture: (_ isEligible: Bool) -> Bool = { _ in false },
+        performViewDefinedShortcut: (_ isEligible: Bool) -> Bool = { _ in false },
         invalidate: @escaping () -> Void
     ) -> InputEventResult {
         let sample = rootSample(from: incomingSample)
@@ -462,6 +601,13 @@ final class RecognitionRuntime {
         if case .pointerPress(let press) = sample,
            press.phase == .down {
             cancelIncompatiblePointerRecognition(
+                reason: .superseded,
+                perform: perform
+            )
+        }
+        if case .keyPress(let press) = sample,
+           press.phase == .down {
+            cancelIncompatibleShortcutRecognition(
                 reason: .superseded,
                 perform: perform
             )
@@ -477,7 +623,10 @@ final class RecognitionRuntime {
                 )
         }
         var visited: Set<RecognitionAttachmentID> = []
-        var lowerGestureTiersAreBlocked = false
+        let statefulKind: RecognitionAttachmentKind = sample.families.contains(.key)
+            ? .shortcut
+            : .gesture
+        var lowerStatefulTiersAreBlocked = false
         for tier in RecognitionAttachmentTier.allCases {
             if dispatchInput(
                 sample,
@@ -516,10 +665,11 @@ final class RecognitionRuntime {
                 return .handled
             }
 
-            if !lowerGestureTiersAreBlocked {
-                lowerGestureTiersAreBlocked = dispatchGestures(
+            if !lowerStatefulTiersAreBlocked {
+                lowerStatefulTiersAreBlocked = dispatchStatefulRecognizers(
                     sample,
                     candidates: candidates,
+                    kind: statefulKind,
                     tier: tier,
                     date: date,
                     targetPath: targetPath,
@@ -530,11 +680,15 @@ final class RecognitionRuntime {
             }
 
             if tier == .viewDefined {
-                if lowerGestureTiersAreBlocked {
-                    _ = performViewDefinedGesture(false)
-                } else if performViewDefinedGesture(true) {
-                    lowerGestureTiersAreBlocked = true
-                    cancelNormalGestures(
+                let performViewDefined = statefulKind == .shortcut
+                    ? performViewDefinedShortcut
+                    : performViewDefinedGesture
+                if lowerStatefulTiersAreBlocked {
+                    _ = performViewDefined(false)
+                } else if performViewDefined(true) {
+                    lowerStatefulTiersAreBlocked = true
+                    cancelNormalRecognizers(
+                        kind: statefulKind,
                         reason: .consumed,
                         perform: perform
                     )
@@ -576,19 +730,43 @@ final class RecognitionRuntime {
         to date: Date,
         perform: Perform,
         performViewDefinedGesture: (_ isEligible: Bool) -> Bool = { _ in false },
+        performViewDefinedShortcut: (_ isEligible: Bool) -> Bool = { _ in false },
         invalidate: @escaping () -> Void
     ) {
-        var lowerGestureTiersAreBlocked = false
+        advance(
+            to: date,
+            kind: .gesture,
+            perform: perform,
+            performViewDefined: performViewDefinedGesture,
+            invalidate: invalidate
+        )
+        advance(
+            to: date,
+            kind: .shortcut,
+            perform: perform,
+            performViewDefined: performViewDefinedShortcut,
+            invalidate: invalidate
+        )
+    }
+
+    private func advance(
+        to date: Date,
+        kind: RecognitionAttachmentKind,
+        perform: Perform,
+        performViewDefined: (_ isEligible: Bool) -> Bool,
+        invalidate: @escaping () -> Void
+    ) {
+        var lowerTiersAreBlocked = false
         for tier in RecognitionAttachmentTier.allCases {
             let candidates = orderedAttachments
                 .filter {
                     $0.tier == tier
-                        && $0.kind == .gesture
+                        && $0.kind == kind
                         && $0.nextDeadline.map({ $0 <= date }) == true
                 }
-                .sorted(by: gesturePrecedes)
+                .sorted(by: statefulPrecedes)
             for attachment in candidates {
-                if lowerGestureTiersAreBlocked {
+                if lowerTiersAreBlocked {
                     continue
                 }
                 let outcome = perform(attachment) {
@@ -598,30 +776,30 @@ final class RecognitionRuntime {
                         invalidate: invalidate
                     )
                 }
-                if outcome.gestureClaimed {
-                    cancelCompetingGestures(
+                if outcome.recognitionClaimed {
+                    cancelCompetingRecognizers(
                         after: attachment,
+                        kind: kind,
                         reason: .consumed,
                         perform: perform
                     )
-                    if !attachment.isSimultaneousGesture {
-                        lowerGestureTiersAreBlocked = true
+                    if !attachment.isSimultaneousRecognition {
+                        lowerTiersAreBlocked = true
                     }
                 }
             }
 
             if tier == .viewDefined {
-                if lowerGestureTiersAreBlocked {
-                    _ = performViewDefinedGesture(false)
-                } else if performViewDefinedGesture(true) {
-                    lowerGestureTiersAreBlocked = true
-                    cancelNormalGestures(
+                if lowerTiersAreBlocked {
+                    _ = performViewDefined(false)
+                } else if performViewDefined(true) {
+                    lowerTiersAreBlocked = true
+                    cancelNormalRecognizers(
+                        kind: kind,
                         reason: .consumed,
                         perform: perform
                     )
                 }
-            } else if tier == .normal, lowerGestureTiersAreBlocked {
-                _ = performViewDefinedGesture(false)
             }
         }
     }
@@ -696,9 +874,10 @@ final class RecognitionRuntime {
         return .ignored
     }
 
-    private func dispatchGestures(
+    private func dispatchStatefulRecognizers(
         _ sample: RecognitionSample,
         candidates: [AnyRecognitionAttachment],
+        kind: RecognitionAttachmentKind,
         tier: RecognitionAttachmentTier,
         date: Date,
         targetPath: [Int]?,
@@ -707,11 +886,11 @@ final class RecognitionRuntime {
         invalidate: @escaping () -> Void
     ) -> Bool {
         var hasWinner = false
-        let gestureCandidates = candidates
-            .filter { $0.tier == tier && $0.kind == .gesture }
-            .sorted(by: gesturePrecedes)
-        for attachment in gestureCandidates {
-            if hasWinner && !attachment.isSimultaneousGesture {
+        let statefulCandidates = candidates
+            .filter { $0.tier == tier && $0.kind == kind }
+            .sorted(by: statefulPrecedes)
+        for attachment in statefulCandidates {
+            if hasWinner && !attachment.isSimultaneousRecognition {
                 continue
             }
             visited.insert(attachment.id)
@@ -722,7 +901,9 @@ final class RecognitionRuntime {
                     isTargeted: isDirectlyTargeted(
                         attachment,
                         targetPath: targetPath
-                    ),
+                    ) || (kind == .shortcut
+                        && targetPath == nil
+                        && attachment.path.isEmpty),
                     convert: coordinateConverter(for: attachment.path),
                     invalidate: invalidate
                 )
@@ -734,13 +915,14 @@ final class RecognitionRuntime {
             if outcome.endsCapture, capturedAttachmentID == attachment.id {
                 clearCapture()
             }
-            if outcome.gestureClaimed {
-                cancelCompetingGestures(
+            if outcome.recognitionClaimed {
+                cancelCompetingRecognizers(
                     after: attachment,
+                    kind: kind,
                     reason: .consumed,
                     perform: perform
                 )
-                if !attachment.isSimultaneousGesture {
+                if !attachment.isSimultaneousRecognition {
                     hasWinner = true
                 }
             }
@@ -748,17 +930,17 @@ final class RecognitionRuntime {
         return hasWinner
     }
 
-    /// Orders competing gestures from the deepest receiver toward its
+    /// Orders competing stateful recognizers from the deepest receiver toward its
     /// ancestors. At one path, the source-innermost modifier has the larger
     /// registration slot and receives the first opportunity to recognize.
     /// Simultaneous attachments remain observational and preserve render order.
-    private func gesturePrecedes(
+    private func statefulPrecedes(
         _ lhs: AnyRecognitionAttachment,
         _ rhs: AnyRecognitionAttachment
     ) -> Bool {
-        if lhs.isSimultaneousGesture || rhs.isSimultaneousGesture {
-            if lhs.isSimultaneousGesture != rhs.isSimultaneousGesture {
-                return lhs.isSimultaneousGesture
+        if lhs.isSimultaneousRecognition || rhs.isSimultaneousRecognition {
+            if lhs.isSimultaneousRecognition != rhs.isSimultaneousRecognition {
+                return lhs.isSimultaneousRecognition
             }
             if lhs.path.count != rhs.path.count {
                 return lhs.path.count < rhs.path.count
@@ -771,12 +953,13 @@ final class RecognitionRuntime {
         return lhs.id.slot > rhs.id.slot
     }
 
-    private func cancelNormalGestures(
+    private func cancelNormalRecognizers(
+        kind: RecognitionAttachmentKind,
         reason: RecognitionCancellationReason,
         perform: Perform
     ) {
         for attachment in orderedAttachments
-        where attachment.kind == .gesture
+        where attachment.kind == kind
             && attachment.tier == .normal
             && attachment.isActive {
             _ = perform(attachment) {
@@ -789,18 +972,19 @@ final class RecognitionRuntime {
         }
     }
 
-    private func cancelCompetingGestures(
+    private func cancelCompetingRecognizers(
         after winner: AnyRecognitionAttachment,
+        kind: RecognitionAttachmentKind,
         reason: RecognitionCancellationReason,
         perform: Perform
     ) {
-        guard !winner.isSimultaneousGesture else {
+        guard !winner.isSimultaneousRecognition else {
             return
         }
         for attachment in orderedAttachments
         where attachment.id != winner.id
-            && attachment.kind == .gesture
-            && !attachment.isSimultaneousGesture
+            && attachment.kind == kind
+            && !attachment.isSimultaneousRecognition
             && attachment.tier >= winner.tier
             && attachment.isActive {
             _ = perform(attachment) {
@@ -847,6 +1031,21 @@ final class RecognitionRuntime {
             }
             if capturedAttachmentID == attachment.id {
                 clearCapture()
+            }
+        }
+    }
+
+    private func cancelIncompatibleShortcutRecognition(
+        reason: RecognitionCancellationReason,
+        perform: Perform
+    ) {
+        for attachment in orderedAttachments
+        where attachment.kind == .shortcut
+            && attachment.isActive
+            && !attachment.acceptsNewKeyDownWhileActive {
+            _ = perform(attachment) {
+                attachment.cancel(reason)
+                return AttachmentDispatchOutcome()
             }
         }
     }
@@ -920,6 +1119,12 @@ final class RecognitionRuntime {
         sample: RecognitionSample
     ) -> Bool {
         if isDirectlyTargeted(attachment, targetPath: targetPath) {
+            return true
+        }
+        if attachment.kind == .shortcut,
+           targetPath == nil,
+           attachment.path.isEmpty,
+           sample.families.contains(.key) {
             return true
         }
         if attachment.kind == .gesture,
@@ -1052,6 +1257,8 @@ enum RecognitionRenderContext {
         var inputEventsEnabled = true
 
         var gesturesEnabled = true
+
+        var shortcutsEnabled = true
     }
 
     @TaskLocal static var values = Values()
@@ -1071,6 +1278,15 @@ enum RecognitionRenderContext {
     ) -> Value {
         var next = values
         next.gesturesEnabled = values.gesturesEnabled && enabled
+        return $values.withValue(next, operation: operation)
+    }
+
+    static func withShortcuts<Value>(
+        enabled: Bool,
+        perform operation: () -> Value
+    ) -> Value {
+        var next = values
+        next.shortcutsEnabled = values.shortcutsEnabled && enabled
         return $values.withValue(next, operation: operation)
     }
 }
@@ -1225,6 +1441,81 @@ struct GestureAttachmentView<Content: View, AttachedGesture: Gesture>: View,
             )
         }
         return block
+    }
+
+    func renderedElement(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        renderedBlock(in: proposal, path: path, runtime: runtime).map(RenderedElement.block)
+    }
+}
+
+struct ShortcutAttachmentView<Content: View, AttachedShortcut: Shortcut>: View,
+    InputModifierRenderable, LayoutTraitRenderable
+{
+    typealias Body = Never
+
+    let content: Content
+
+    let shortcut: AttachedShortcut
+
+    let tier: RecognitionAttachmentTier
+
+    let mask: ShortcutMask
+
+    let isSimultaneous: Bool
+
+    let actionPath: [Int]?
+
+    init(
+        content: Content,
+        shortcut: AttachedShortcut,
+        tier: RecognitionAttachmentTier,
+        mask: ShortcutMask,
+        isSimultaneous: Bool
+    ) {
+        self.content = content
+        self.shortcut = shortcut
+        self.tier = tier
+        self.mask = mask
+        self.isSimultaneous = isSimultaneous
+        self.actionPath = StateContext.currentPath
+    }
+
+    var layoutTraits: LayoutTraits {
+        ViewResolver.layoutTraits(from: content)
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
+        let canRegister = RecognitionRenderContext.values.shortcutsEnabled
+            && mask.contains(.shortcut)
+        if canRegister {
+            runtime?.registerShortcut(
+                shortcut,
+                at: interactionPath,
+                actionPath: actionPath,
+                tier: tier,
+                isSimultaneous: isSimultaneous
+            )
+        }
+        return RecognitionRenderContext.withShortcuts(
+            enabled: mask.contains(.subviews),
+            perform: {
+                ViewResolver.block(
+                    from: content,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
+        )
     }
 
     func renderedElement(

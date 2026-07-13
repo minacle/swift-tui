@@ -12,7 +12,7 @@ extension Never {
     ///
     /// A `Never` value cannot be constructed, so a valid program cannot invoke
     /// this getter. The concrete member serves as the shared `body` witness for
-    /// ``View``, ``InputEvent``, and ``Gesture``.
+    /// ``View``, ``InputEvent``, ``Gesture``, and ``Shortcut``.
     public var body: Never {
         switch self {}
     }

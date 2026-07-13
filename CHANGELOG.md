@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `ExclusiveGesture`, `SimultaneousGesture`, and `SequenceGesture`, plus
   `gesture`, `highPriorityGesture`, and `simultaneousGesture` attachments
   controlled by `GestureMask`.
+- Added the public `Shortcut` recognition graph for high-level logical key
+  input, including `TapShortcut`, `LongPressShortcut`, callbacks, transient
+  `ShortcutState`, composition, priority- and mask-aware attachments, and view
+  conveniences. Shortcuts observe key-down, repeat, and key-up sequences
+  without consuming existing low-level key handling.
 - Added public keyed view attachments for composing reusable container
   adornments and interactive custom views.
 - Added configurable horizontal and vertical scroll indicators with overlay,

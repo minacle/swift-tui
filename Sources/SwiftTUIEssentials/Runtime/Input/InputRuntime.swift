@@ -391,12 +391,12 @@ struct ViewDefinedTapGesture: Gesture {
             coordinateSpace = space
         }
         return _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "viewDefinedTap",
                 values: [handler.count, coordinateSpace ?? CoordinateSpace.global]
             ),
             makeNode: {
-                ViewDefinedTapGestureRecognitionNode(
+                ViewDefinedTapStatefulRecognitionNode(
                     count: handler.count,
                     coordinateSpace: coordinateSpace,
                     action: handler.action
@@ -406,13 +406,13 @@ struct ViewDefinedTapGesture: Gesture {
     }
 }
 
-final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
+final class ViewDefinedTapStatefulRecognitionNode: StatefulRecognitionNode<Void> {
 
     enum Storage {
 
-        case plain(TapGestureRecognitionNode<Void>)
+        case plain(TapStatefulRecognitionNode<Void>)
 
-        case location(TapGestureRecognitionNode<Point>)
+        case location(TapStatefulRecognitionNode<Point>)
     }
 
     let storage: Storage
@@ -426,7 +426,7 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
     ) {
         if let coordinateSpace {
             storage = .location(
-                TapGestureRecognitionNode(
+                TapStatefulRecognitionNode(
                     count: count,
                     coordinateSpace: coordinateSpace,
                     makeValue: { $0 }
@@ -434,7 +434,7 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
             )
         } else {
             storage = .plain(
-                TapGestureRecognitionNode(
+                TapStatefulRecognitionNode(
                     count: count,
                     coordinateSpace: nil,
                     makeValue: { _ in () }
@@ -465,8 +465,8 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Void> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Void> {
         switch storage {
         case .plain(let node):
             return observe(node.process(sample, context: context), context: context)
@@ -477,8 +477,8 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Void> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Void> {
         switch storage {
         case .plain(let node):
             return observe(node.advance(to: date, context: context), context: context)
@@ -497,10 +497,10 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
     }
 
     private func observe<Child>(
-        _ output: GestureRecognitionOutput<Child>,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Void> {
-        let phase: GestureRecognitionPhase<Void>
+        _ output: StatefulRecognitionOutput<Child>,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Void> {
+        let phase: StatefulRecognitionPhase<Void>
         switch output.phase {
         case .none:
             phase = .none
@@ -515,7 +515,7 @@ final class ViewDefinedTapGestureRecognitionNode: GestureRecognitionNode<Void> {
         case .failed:
             phase = .failed
         }
-        return GestureRecognitionOutput(
+        return StatefulRecognitionOutput(
             participated: output.participated,
             phase: phase,
             claimsCompetition: output.claimsCompetition,
@@ -601,7 +601,7 @@ struct ViewDefinedLongPressGesture: Gesture {
 
     func _makeGesture() -> _GestureDefinition<Bool> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "viewDefinedLongPress",
                 values: [
                     handler.minimumDuration.bitPattern,
@@ -610,23 +610,23 @@ struct ViewDefinedLongPressGesture: Gesture {
                 ]
             ),
             makeNode: {
-                ViewDefinedLongPressGestureRecognitionNode(handler: handler)
+                ViewDefinedLongPressStatefulRecognitionNode(handler: handler)
             }
         )
     }
 }
 
-final class ViewDefinedLongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
+final class ViewDefinedLongPressStatefulRecognitionNode: StatefulRecognitionNode<Bool> {
 
     let handler: LongPressGestureHandler
 
-    let base: LongPressGestureRecognitionNode
+    let base: LongPressStatefulRecognitionNode
 
     var isPressing = false
 
     init(handler: LongPressGestureHandler) {
         self.handler = handler
-        self.base = LongPressGestureRecognitionNode(
+        self.base = LongPressStatefulRecognitionNode(
             minimumDuration: handler.minimumDuration,
             maximumDistance: handler.maximumDistance
         )
@@ -639,8 +639,8 @@ final class ViewDefinedLongPressGestureRecognitionNode: GestureRecognitionNode<B
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Bool> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
         let wasActive = base.isActive
         let output = base.process(sample, context: context)
         if !wasActive, base.isActive {
@@ -656,8 +656,8 @@ final class ViewDefinedLongPressGestureRecognitionNode: GestureRecognitionNode<B
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Bool> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
         observe(base.advance(to: date, context: context), context: context)
     }
 
@@ -671,16 +671,16 @@ final class ViewDefinedLongPressGestureRecognitionNode: GestureRecognitionNode<B
     }
 
     private func observe(
-        _ output: GestureRecognitionOutput<Bool>,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Bool> {
+        _ output: StatefulRecognitionOutput<Bool>,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
         if case .ended = output.phase {
             context.appendEnded { [handler] in handler.action() }
         }
         return output
     }
 
-    private func finishPressing(context: GestureRecognitionContext) {
+    private func finishPressing(context: StatefulRecognitionContext) {
         guard isPressing else {
             return
         }

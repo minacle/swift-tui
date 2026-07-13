@@ -30,6 +30,39 @@ public nonisolated struct GestureMask: OptionSet, Sendable {
     public static let all: GestureMask = [.gesture, .subviews]
 }
 
+/// Options that select which shortcuts remain eligible under a shortcut attachment.
+///
+/// The mask is relative to modifier nesting. Existing modifiers and view
+/// content inside the receiver count as subviews of the new attachment, while
+/// modifiers applied later outside it aren't affected. Shortcut masks don't
+/// affect gestures or input events.
+public nonisolated struct ShortcutMask: OptionSet, Sendable {
+
+    /// The bit pattern backing this option set.
+    public let rawValue: Int
+
+    /// Creates a shortcut mask from a bit pattern.
+    ///
+    /// Unknown bits are preserved but don't select additional shortcut scopes.
+    ///
+    /// - Parameter rawValue: The bit pattern to store.
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    /// Disables the attachment and shortcuts nested inside its receiver.
+    public static let none = ShortcutMask([])
+
+    /// Enables only the shortcut introduced by the current modifier.
+    public static let shortcut = ShortcutMask(rawValue: 1 << 0)
+
+    /// Enables existing receiver shortcuts and descendant shortcuts, but not the current one.
+    public static let subviews = ShortcutMask(rawValue: 1 << 1)
+
+    /// Enables the current shortcut and all shortcuts inside its receiver.
+    public static let all: ShortcutMask = [.shortcut, .subviews]
+}
+
 /// Options that select which input events remain eligible under an event attachment.
 ///
 /// Input-event masks don't affect gestures or hover observation.
@@ -61,6 +94,111 @@ public nonisolated struct InputEventMask: OptionSet, Sendable {
 }
 
 extension View {
+
+    /// Attaches a shortcut in the normal-priority recognition tier.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - mask: The shortcut scopes eligible under this modifier.
+    /// - Returns: A view with a normal-priority shortcut attachment.
+    public func shortcut<S: Shortcut>(
+        _ shortcut: S,
+        including mask: ShortcutMask = .all
+    ) -> some View {
+        ShortcutAttachmentView(
+            content: self,
+            shortcut: shortcut,
+            tier: .normal,
+            mask: mask,
+            isSimultaneous: false
+        )
+    }
+
+    /// Conditionally attaches a shortcut in the normal-priority tier.
+    ///
+    /// Disabling the attachment is equivalent to an attachment mask of
+    /// ``ShortcutMask/subviews``: shortcuts already inside the receiver remain
+    /// eligible.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - isEnabled: Whether the current attachment is eligible.
+    /// - Returns: A view with a conditionally enabled shortcut attachment.
+    public func shortcut<S: Shortcut>(
+        _ shortcut: S,
+        isEnabled: Bool
+    ) -> some View {
+        self.shortcut(shortcut, including: isEnabled ? .all : .subviews)
+    }
+
+    /// Attaches a shortcut in the high-priority recognition tier.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - mask: The shortcut scopes eligible under this modifier.
+    /// - Returns: A view with a high-priority shortcut attachment.
+    public func highPriorityShortcut<S: Shortcut>(
+        _ shortcut: S,
+        including mask: ShortcutMask = .all
+    ) -> some View {
+        ShortcutAttachmentView(
+            content: self,
+            shortcut: shortcut,
+            tier: .high,
+            mask: mask,
+            isSimultaneous: false
+        )
+    }
+
+    /// Conditionally attaches a shortcut in the high-priority tier.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - isEnabled: Whether the current attachment is eligible.
+    /// - Returns: A view with a conditionally enabled high-priority shortcut.
+    public func highPriorityShortcut<S: Shortcut>(
+        _ shortcut: S,
+        isEnabled: Bool
+    ) -> some View {
+        highPriorityShortcut(shortcut, including: isEnabled ? .all : .subviews)
+    }
+
+    /// Attaches a shortcut in the view-defined and simultaneous tier.
+    ///
+    /// The attachment observes input without preventing another shortcut from
+    /// winning. It doesn't create a child ``SimultaneousShortcut``; use
+    /// ``Shortcut/simultaneously(with:)`` for explicit composition inside one
+    /// shortcut graph.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - mask: The shortcut scopes eligible under this modifier.
+    /// - Returns: A view with a simultaneous-tier shortcut attachment.
+    public func simultaneousShortcut<S: Shortcut>(
+        _ shortcut: S,
+        including mask: ShortcutMask = .all
+    ) -> some View {
+        ShortcutAttachmentView(
+            content: self,
+            shortcut: shortcut,
+            tier: .viewDefined,
+            mask: mask,
+            isSimultaneous: true
+        )
+    }
+
+    /// Conditionally attaches a shortcut in the view-defined simultaneous tier.
+    ///
+    /// - Parameters:
+    ///   - shortcut: The shortcut graph to attach.
+    ///   - isEnabled: Whether the current attachment is eligible.
+    /// - Returns: A view with a conditionally enabled simultaneous shortcut.
+    public func simultaneousShortcut<S: Shortcut>(
+        _ shortcut: S,
+        isEnabled: Bool
+    ) -> some View {
+        simultaneousShortcut(shortcut, including: isEnabled ? .all : .subviews)
+    }
 
     /// Attaches a gesture in the normal-priority recognition tier.
     ///

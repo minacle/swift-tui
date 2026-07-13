@@ -18,6 +18,8 @@ final class StateRuntime {
 
     private let recognition = RecognitionRuntime()
 
+    private let viewDefinedShortcuts = ViewDefinedShortcutRuntime()
+
     private let lifecycle = LifecycleRuntime()
 
     private let tasks = ViewTaskRuntime()
@@ -91,6 +93,7 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         recognition.beginRender()
+        viewDefinedShortcuts.beginRender()
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
@@ -99,6 +102,9 @@ final class StateRuntime {
         openURLHandlers = []
         defer {
             recognition.finishRender(perform: performRecognitionAttachment)
+            viewDefinedShortcuts.finishRender { path, operation in
+                withView(at: path, perform: operation)
+            }
             input.finishRender { path, operation in
                 withView(at: path, perform: operation)
             }
@@ -108,6 +114,9 @@ final class StateRuntime {
                     to: focus.activePath,
                     perform: performRecognitionAttachment
                 )
+                viewDefinedShortcuts.cancelAll { path, operation in
+                    withView(at: path, perform: operation)
+                }
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
@@ -164,6 +173,7 @@ final class StateRuntime {
         focus.beginRender(requests: currentFocusRequests())
         input.beginRender()
         recognition.beginRender()
+        viewDefinedShortcuts.beginRender()
         lifecycle.beginRender()
         tasks.beginRender()
         change.beginRender()
@@ -172,6 +182,9 @@ final class StateRuntime {
         openURLHandlers = []
         defer {
             recognition.finishRender(perform: performRecognitionAttachment)
+            viewDefinedShortcuts.finishRender { path, operation in
+                withView(at: path, perform: operation)
+            }
             input.finishRender { path, operation in
                 withView(at: path, perform: operation)
             }
@@ -181,6 +194,9 @@ final class StateRuntime {
                     to: focus.activePath,
                     perform: performRecognitionAttachment
                 )
+                viewDefinedShortcuts.cancelAll { path, operation in
+                    withView(at: path, perform: operation)
+                }
                 invalidated = true
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
@@ -429,6 +445,9 @@ final class StateRuntime {
                         to: focus.activePath,
                         perform: performRecognitionAttachment
                     )
+                    viewDefinedShortcuts.cancelAll { path, operation in
+                        withView(at: path, perform: operation)
+                    }
                     invalidated = true
                 }
                 return .ignored
@@ -508,6 +527,61 @@ final class StateRuntime {
             tier: tier,
             environment: EnvironmentRenderContext.current,
             isSimultaneous: isSimultaneous
+        )
+    }
+
+    func registerShortcut<S: Shortcut>(
+        _ shortcut: S,
+        at path: [Int],
+        actionPath: [Int]?,
+        tier: RecognitionAttachmentTier,
+        isSimultaneous: Bool = false
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.shortcutsEnabled else {
+            return
+        }
+
+        recognition.register(
+            shortcut,
+            at: path,
+            actionPath: actionPath ?? path,
+            tier: tier,
+            environment: EnvironmentRenderContext.current,
+            isSimultaneous: isSimultaneous
+        )
+    }
+
+    func registerTapShortcutHandler(
+        _ handler: TapShortcutHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.shortcutsEnabled else {
+            return
+        }
+
+        viewDefinedShortcuts.register(
+            environmentRestoringTapShortcutHandler(handler),
+            at: path
+        )
+    }
+
+    func registerLongPressShortcutHandler(
+        _ handler: LongPressShortcutHandler,
+        at path: [Int]
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled,
+              RecognitionRenderContext.values.shortcutsEnabled else {
+            return
+        }
+
+        viewDefinedShortcuts.register(
+            environmentRestoringLongPressShortcutHandler(handler),
+            at: path
         )
     }
 
@@ -1041,11 +1115,27 @@ final class StateRuntime {
     }
 
     func dispatch(_ keyPress: KeyPress) -> InputEventResult {
+        let date = now()
         if recognition.dispatch(
             .keyPress(keyPress),
             toward: focus.activePath,
-            at: now(),
+            at: date,
             perform: performRecognitionAttachment,
+            performViewDefinedShortcut: { [self] isEligible in
+                guard isEligible else {
+                    viewDefinedShortcuts.cancelAll { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                    return false
+                }
+                return viewDefinedShortcuts.dispatch(
+                    keyPress,
+                    toward: focus.activePath,
+                    at: date
+                ) { path, operation in
+                    withView(at: path, perform: operation)
+                }
+            },
             invalidate: { [weak self] in self?.invalidated = true }
         ) == .handled {
             return .handled
@@ -1201,6 +1291,9 @@ final class StateRuntime {
             .sceneInactive,
             perform: performRecognitionAttachment
         )
+        viewDefinedShortcuts.cancelAll { path, operation in
+            withView(at: path, perform: operation)
+        }
         input.cancelInteractions { path, operation in
             withView(at: path, perform: operation)
         }
@@ -1211,6 +1304,9 @@ final class StateRuntime {
             .sessionEnded,
             perform: performRecognitionAttachment
         )
+        viewDefinedShortcuts.cancelAll { path, operation in
+            withView(at: path, perform: operation)
+        }
         input.cancelInteractions { path, operation in
             withView(at: path, perform: operation)
         }
@@ -1225,7 +1321,9 @@ final class StateRuntime {
     }
 
     var nextRecognitionDeadline: Date? {
-        recognition.nextDeadline
+        [recognition.nextDeadline, viewDefinedShortcuts.nextDeadline]
+            .compactMap { $0 }
+            .min()
     }
 
     var nextScrollIndicatorFlashDeadline: Date? {
@@ -1270,6 +1368,19 @@ final class StateRuntime {
                     withView(at: path, perform: operation)
                 }
                 return tapResult == .handled || longPressResult == .handled
+            },
+            performViewDefinedShortcut: { [self] isEligible in
+                guard isEligible else {
+                    viewDefinedShortcuts.cancelAll { path, operation in
+                        withView(at: path, perform: operation)
+                    }
+                    return false
+                }
+                return viewDefinedShortcuts.dispatchExpiredActions(
+                    at: date
+                ) { path, operation in
+                    withView(at: path, perform: operation)
+                }
             },
             invalidate: { [weak self] in self?.invalidated = true }
         )
@@ -1451,6 +1562,23 @@ final class StateRuntime {
         )
     }
 
+    private func environmentRestoringTapShortcutHandler(
+        _ handler: TapShortcutHandler
+    ) -> TapShortcutHandler {
+        let environment = EnvironmentRenderContext.current
+        return TapShortcutHandler(
+            actionPath: handler.actionPath,
+            key: handler.key,
+            modifiers: handler.modifiers,
+            count: handler.count,
+            action: {
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action()
+                }
+            }
+        )
+    }
+
     private func environmentRestoringPointerPressHandler(
         _ handler: PointerPressHandler
     ) -> PointerPressHandler {
@@ -1475,6 +1603,32 @@ final class StateRuntime {
             actionPath: handler.actionPath,
             minimumDuration: handler.minimumDuration,
             maximumDistance: handler.maximumDistance,
+            action: {
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action()
+                }
+            },
+            onPressingChanged: handler.onPressingChanged.map { action in
+                {
+                    isPressing in
+
+                    EnvironmentRenderContext.withValues(environment) {
+                        action(isPressing)
+                    }
+                }
+            }
+        )
+    }
+
+    private func environmentRestoringLongPressShortcutHandler(
+        _ handler: LongPressShortcutHandler
+    ) -> LongPressShortcutHandler {
+        let environment = EnvironmentRenderContext.current
+        return LongPressShortcutHandler(
+            actionPath: handler.actionPath,
+            key: handler.key,
+            modifiers: handler.modifiers,
+            minimumDuration: handler.minimumDuration,
             action: {
                 EnvironmentRenderContext.withValues(environment) {
                     handler.action()

@@ -50,6 +50,19 @@ nonisolated private func simultaneousGestureValueFactory<First: Gesture, Second:
     }
 }
 
+nonisolated private func simultaneousShortcutValueFactory<
+    First: Shortcut,
+    Second: Shortcut
+>() -> BinaryRecognitionValueFactory<
+    First.Value?,
+    Second.Value?,
+    SimultaneousShortcut<First, Second>.Value
+> {
+    BinaryRecognitionValueFactory {
+        SimultaneousShortcut<First, Second>.Value(first: $0, second: $1)
+    }
+}
+
 /// A lowered input-event graph used by SwiftTUI's attachment runtime.
 ///
 /// This implementation type is intentionally opaque. Library clients define
@@ -96,13 +109,34 @@ public struct _InputEventDefinition<Value> {
 @_documentation(visibility: internal)
 public struct _GestureDefinition<Value> {
 
-    let configuration: GestureRecognitionConfiguration
+    let configuration: StatefulRecognitionConfiguration
 
-    let makeNode: () -> GestureRecognitionNode<Value>
+    let makeNode: () -> StatefulRecognitionNode<Value>
 
     init(
-        configuration: GestureRecognitionConfiguration,
-        makeNode: @escaping () -> GestureRecognitionNode<Value>
+        configuration: StatefulRecognitionConfiguration,
+        makeNode: @escaping () -> StatefulRecognitionNode<Value>
+    ) {
+        self.configuration = configuration
+        self.makeNode = makeNode
+    }
+}
+
+/// A lowered shortcut graph used by SwiftTUI's attachment runtime.
+///
+/// This implementation type is intentionally opaque. Library clients define
+/// custom ``Shortcut`` values through `body`; SwiftTUI creates definitions
+/// while rendering an attachment.
+@_documentation(visibility: internal)
+public struct _ShortcutDefinition<Value> {
+
+    let configuration: StatefulRecognitionConfiguration
+
+    let makeNode: () -> StatefulRecognitionNode<Value>
+
+    init(
+        configuration: StatefulRecognitionConfiguration,
+        makeNode: @escaping () -> StatefulRecognitionNode<Value>
     ) {
         self.configuration = configuration
         self.makeNode = makeNode
@@ -135,18 +169,18 @@ struct InputRecognitionConfiguration: Hashable {
     }
 }
 
-struct GestureRecognitionConfiguration: Hashable {
+struct StatefulRecognitionConfiguration: Hashable {
 
     var name: String
 
     var values: [AnyHashable]
 
-    var children: [GestureRecognitionConfiguration]
+    var children: [StatefulRecognitionConfiguration]
 
     init(
         _ name: String,
         values: [AnyHashable] = [],
-        children: [GestureRecognitionConfiguration] = []
+        children: [StatefulRecognitionConfiguration] = []
     ) {
         self.name = name
         self.values = values
@@ -155,7 +189,7 @@ struct GestureRecognitionConfiguration: Hashable {
 
     static func wrapper(
         _ name: String,
-        _ child: GestureRecognitionConfiguration
+        _ child: StatefulRecognitionConfiguration
     ) -> Self {
         Self(name, children: [child])
     }
@@ -693,6 +727,8 @@ enum BodyExpansionContext {
 
     @TaskLocal static var gestureTypes: [ObjectIdentifier] = []
 
+    @TaskLocal static var shortcutTypes: [ObjectIdentifier] = []
+
     static func input<Event: InputEvent, Value>(
         _ event: Event,
         make: () -> _InputEventDefinition<Value>
@@ -715,6 +751,18 @@ enum BodyExpansionContext {
             "Recursive Gesture.body expansion for \(Event.self)."
         )
         return $gestureTypes.withValue(gestureTypes + [type], operation: make)
+    }
+
+    static func shortcut<ValueType: Shortcut, Value>(
+        _ shortcut: ValueType,
+        make: () -> _ShortcutDefinition<Value>
+    ) -> _ShortcutDefinition<Value> {
+        let type = ObjectIdentifier(ValueType.self)
+        precondition(
+            !shortcutTypes.contains(type),
+            "Recursive Shortcut.body expansion for \(ValueType.self)."
+        )
+        return $shortcutTypes.withValue(shortcutTypes + [type], operation: make)
     }
 }
 
@@ -1045,7 +1093,7 @@ extension InputEventStage: Comparable {
 }
 
 @MainActor
-class GestureRecognitionNode<Value> {
+class StatefulRecognitionNode<Value> {
 
     init() {}
 
@@ -1053,28 +1101,30 @@ class GestureRecognitionNode<Value> {
 
     var acceptsNewPointerDownWhileActive: Bool { false }
 
+    var acceptsNewKeyDownWhileActive: Bool { false }
+
     var nextDeadline: Date? { nil }
 
     func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         .noMatch
     }
 
     func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         .noMatch
     }
 
     func cancel(_ reason: RecognitionCancellationReason) {}
 
-    func restoreState(from old: GestureRecognitionNode<Value>) {}
+    func restoreState(from old: StatefulRecognitionNode<Value>) {}
 }
 
-enum GestureRecognitionPhase<Value> {
+enum StatefulRecognitionPhase<Value> {
 
     case none
 
@@ -1085,11 +1135,11 @@ enum GestureRecognitionPhase<Value> {
     case failed
 }
 
-struct GestureRecognitionOutput<Value> {
+struct StatefulRecognitionOutput<Value> {
 
     var participated: Bool
 
-    var phase: GestureRecognitionPhase<Value>
+    var phase: StatefulRecognitionPhase<Value>
 
     /// Whether this transition establishes the node as the winner of its
     /// attachment lane. A changed value alone isn't sufficient because a
@@ -1159,7 +1209,7 @@ struct GestureRecognitionOutput<Value> {
 }
 
 @MainActor
-final class GestureRecognitionContext {
+final class StatefulRecognitionContext {
 
     let date: Date
 
@@ -1223,9 +1273,9 @@ final class GestureRecognitionContext {
     }
 }
 
-final class NeverGestureRecognitionNode: GestureRecognitionNode<Never> {}
+final class NeverStatefulRecognitionNode: StatefulRecognitionNode<Never> {}
 
-final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
+final class TapStatefulRecognitionNode<Value>: StatefulRecognitionNode<Value> {
 
     let count: Int
 
@@ -1264,8 +1314,8 @@ final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         guard case .pointerPress(let press) = sample,
               press.button == .left else {
             return .noMatch
@@ -1310,8 +1360,8 @@ final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         guard let deadline, date >= deadline else {
             return .noMatch
         }
@@ -1327,8 +1377,8 @@ final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
         deadline = nil
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? TapGestureRecognitionNode<Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? TapStatefulRecognitionNode<Value> else {
             return
         }
         isPressed = old.isPressed
@@ -1339,7 +1389,7 @@ final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
 
     private func convertedLocation(
         _ point: Point,
-        context: GestureRecognitionContext
+        context: StatefulRecognitionContext
     ) -> Point? {
         guard let coordinateSpace else {
             return point
@@ -1348,7 +1398,7 @@ final class TapGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
     }
 }
 
-final class LongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
+final class LongPressStatefulRecognitionNode: StatefulRecognitionNode<Bool> {
 
     let minimumDuration: Double
 
@@ -1372,8 +1422,8 @@ final class LongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Bool> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
         switch sample {
         case .pointerPress(let press) where press.button == .left && press.phase == .down:
             startLocation = press.location
@@ -1411,8 +1461,8 @@ final class LongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Bool> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
         guard startLocation != nil,
               !didRecognize,
               let deadline,
@@ -1428,8 +1478,8 @@ final class LongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
         reset()
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Bool>) {
-        guard let old = old as? LongPressGestureRecognitionNode else {
+    override func restoreState(from old: StatefulRecognitionNode<Bool>) {
+        guard let old = old as? LongPressStatefulRecognitionNode else {
             return
         }
         startLocation = old.startLocation
@@ -1444,7 +1494,199 @@ final class LongPressGestureRecognitionNode: GestureRecognitionNode<Bool> {
     }
 }
 
-final class DragGestureRecognitionNode: GestureRecognitionNode<DragGesture.Value> {
+final class TapShortcutRecognitionNode: StatefulRecognitionNode<Void> {
+
+    let key: KeyEquivalent
+
+    let modifiers: EventModifiers
+
+    let count: Int
+
+    var isPressed = false
+
+    var recognizedCount = 0
+
+    var deadline: Date?
+
+    init(key: KeyEquivalent, modifiers: EventModifiers, count: Int) {
+        self.key = key
+        self.modifiers = modifiers
+        self.count = count
+        super.init()
+    }
+
+    override var isActive: Bool {
+        isPressed || recognizedCount > 0
+    }
+
+    override var acceptsNewKeyDownWhileActive: Bool {
+        recognizedCount > 0 && !isPressed
+    }
+
+    override var nextDeadline: Date? { deadline }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Void> {
+        guard case .keyPress(let press) = sample,
+              press.key == key,
+              press.modifiers == modifiers else {
+            return .noMatch
+        }
+
+        if press.phase == .down {
+            isPressed = true
+            return .progress()
+        }
+        if press.phase == .repeat {
+            return isPressed ? .progress() : .noMatch
+        }
+
+        guard press.phase == .up, isPressed else {
+            return .noMatch
+        }
+        isPressed = false
+        guard context.isTargeted else {
+            recognizedCount = 0
+            deadline = nil
+            return .failed()
+        }
+        recognizedCount += 1
+        if recognizedCount < count {
+            deadline = context.date.addingTimeInterval(0.5)
+            return .progress()
+        }
+
+        recognizedCount = 0
+        deadline = nil
+        return .ended(())
+    }
+
+    override func advance(
+        to date: Date,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Void> {
+        guard let deadline, date >= deadline else {
+            return .noMatch
+        }
+        self.deadline = nil
+        recognizedCount = 0
+        return .failed()
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        isPressed = false
+        recognizedCount = 0
+        deadline = nil
+    }
+
+    override func restoreState(from old: StatefulRecognitionNode<Void>) {
+        guard let old = old as? TapShortcutRecognitionNode else {
+            return
+        }
+        isPressed = old.isPressed
+        recognizedCount = old.recognizedCount
+        deadline = old.deadline
+    }
+}
+
+final class LongPressShortcutRecognitionNode: StatefulRecognitionNode<Bool> {
+
+    let key: KeyEquivalent
+
+    let modifiers: EventModifiers
+
+    let minimumDuration: Double
+
+    var isPressed = false
+
+    var deadline: Date?
+
+    var didRecognize = false
+
+    init(
+        key: KeyEquivalent,
+        modifiers: EventModifiers,
+        minimumDuration: Double
+    ) {
+        self.key = key
+        self.modifiers = modifiers
+        self.minimumDuration = minimumDuration
+        super.init()
+    }
+
+    override var isActive: Bool { isPressed }
+
+    override var nextDeadline: Date? { didRecognize ? nil : deadline }
+
+    override func process(
+        _ sample: RecognitionSample,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
+        guard case .keyPress(let press) = sample,
+              press.key == key,
+              press.modifiers == modifiers else {
+            return .noMatch
+        }
+
+        if press.phase == .down {
+            isPressed = true
+            deadline = context.date.addingTimeInterval(minimumDuration)
+            didRecognize = false
+            return .changed(true)
+        }
+        if press.phase == .repeat {
+            return isPressed ? .progress() : .noMatch
+        }
+
+        guard press.phase == .up, isPressed else {
+            return .noMatch
+        }
+        if didRecognize {
+            reset()
+            return .progress()
+        }
+        reset()
+        return .failed()
+    }
+
+    override func advance(
+        to date: Date,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Bool> {
+        guard isPressed,
+              !didRecognize,
+              let deadline,
+              date >= deadline else {
+            return .noMatch
+        }
+        didRecognize = true
+        self.deadline = nil
+        return .ended(true)
+    }
+
+    override func cancel(_ reason: RecognitionCancellationReason) {
+        reset()
+    }
+
+    override func restoreState(from old: StatefulRecognitionNode<Bool>) {
+        guard let old = old as? LongPressShortcutRecognitionNode else {
+            return
+        }
+        isPressed = old.isPressed
+        deadline = old.deadline
+        didRecognize = old.didRecognize
+    }
+
+    private func reset() {
+        isPressed = false
+        deadline = nil
+        didRecognize = false
+    }
+}
+
+final class DragStatefulRecognitionNode: StatefulRecognitionNode<DragGesture.Value> {
 
     struct Sample {
 
@@ -1476,8 +1718,8 @@ final class DragGestureRecognitionNode: GestureRecognitionNode<DragGesture.Value
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<DragGesture.Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<DragGesture.Value> {
         switch sample {
         case .pointerPress(let press)
         where press.button == gesture.button && press.phase == .down:
@@ -1581,8 +1823,8 @@ final class DragGestureRecognitionNode: GestureRecognitionNode<DragGesture.Value
         reset()
     }
 
-    override func restoreState(from old: GestureRecognitionNode<DragGesture.Value>) {
-        guard let old = old as? DragGestureRecognitionNode else {
+    override func restoreState(from old: StatefulRecognitionNode<DragGesture.Value>) {
+        guard let old = old as? DragStatefulRecognitionNode else {
             return
         }
         start = old.start
@@ -1661,16 +1903,16 @@ final class DragGestureRecognitionNode: GestureRecognitionNode<DragGesture.Value
     }
 }
 
-final class ChangedGestureRecognitionNode<Value: Equatable>:
-    GestureRecognitionNode<Value>
+final class ChangedStatefulRecognitionNode<Value: Equatable>:
+    StatefulRecognitionNode<Value>
 {
-    let base: GestureRecognitionNode<Value>
+    let base: StatefulRecognitionNode<Value>
 
     let action: (Value) -> Void
 
     var previousValue: Value?
 
-    init(base: GestureRecognitionNode<Value>, action: @escaping (Value) -> Void) {
+    init(base: StatefulRecognitionNode<Value>, action: @escaping (Value) -> Void) {
         self.base = base
         self.action = action
         super.init()
@@ -1682,19 +1924,23 @@ final class ChangedGestureRecognitionNode<Value: Equatable>:
         base.acceptsNewPointerDownWhileActive
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        base.acceptsNewKeyDownWhileActive
+    }
+
     override var nextDeadline: Date? { base.nextDeadline }
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.process(sample, context: context), context: context)
     }
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.advance(to: date, context: context), context: context)
     }
 
@@ -1703,8 +1949,8 @@ final class ChangedGestureRecognitionNode<Value: Equatable>:
         base.cancel(reason)
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? ChangedGestureRecognitionNode<Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? ChangedStatefulRecognitionNode<Value> else {
             return
         }
         previousValue = old.previousValue
@@ -1712,9 +1958,9 @@ final class ChangedGestureRecognitionNode<Value: Equatable>:
     }
 
     private func observe(
-        _ output: GestureRecognitionOutput<Value>,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<Value>,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if case .changed(let value) = output.phase,
            previousValue != value {
             previousValue = value
@@ -1730,13 +1976,13 @@ final class ChangedGestureRecognitionNode<Value: Equatable>:
     }
 }
 
-final class EndedGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
+final class EndedStatefulRecognitionNode<Value>: StatefulRecognitionNode<Value> {
 
-    let base: GestureRecognitionNode<Value>
+    let base: StatefulRecognitionNode<Value>
 
     let action: (Value) -> Void
 
-    init(base: GestureRecognitionNode<Value>, action: @escaping (Value) -> Void) {
+    init(base: StatefulRecognitionNode<Value>, action: @escaping (Value) -> Void) {
         self.base = base
         self.action = action
         super.init()
@@ -1748,19 +1994,23 @@ final class EndedGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
         base.acceptsNewPointerDownWhileActive
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        base.acceptsNewKeyDownWhileActive
+    }
+
     override var nextDeadline: Date? { base.nextDeadline }
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.process(sample, context: context), context: context)
     }
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.advance(to: date, context: context), context: context)
     }
 
@@ -1768,17 +2018,17 @@ final class EndedGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
         base.cancel(reason)
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? EndedGestureRecognitionNode<Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? EndedStatefulRecognitionNode<Value> else {
             return
         }
         base.restoreState(from: old.base)
     }
 
     private func observe(
-        _ output: GestureRecognitionOutput<Value>,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<Value>,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if case .ended(let value) = output.phase {
             context.appendEnded { [action] in action(value) }
         }
@@ -1786,19 +2036,19 @@ final class EndedGestureRecognitionNode<Value>: GestureRecognitionNode<Value> {
     }
 }
 
-final class GestureStateRecognitionNode<Value, State>: GestureRecognitionNode<Value> {
+final class StatefulRecognitionStateNode<Value, State>: StatefulRecognitionNode<Value> {
 
-    let base: GestureRecognitionNode<Value>
+    let base: StatefulRecognitionNode<Value>
 
-    let storage: GestureStateStorage<State>
+    let storage: RecognitionStateStorage<State>
 
     let update: (Value, inout State, inout Transaction) -> Void
 
     var didUpdate = false
 
     init(
-        base: GestureRecognitionNode<Value>,
-        storage: GestureStateStorage<State>,
+        base: StatefulRecognitionNode<Value>,
+        storage: RecognitionStateStorage<State>,
         update: @escaping (Value, inout State, inout Transaction) -> Void
     ) {
         self.base = base
@@ -1813,19 +2063,23 @@ final class GestureStateRecognitionNode<Value, State>: GestureRecognitionNode<Va
         base.acceptsNewPointerDownWhileActive
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        base.acceptsNewKeyDownWhileActive
+    }
+
     override var nextDeadline: Date? { base.nextDeadline }
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.process(sample, context: context), context: context)
     }
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         observe(base.advance(to: date, context: context), context: context)
     }
 
@@ -1834,8 +2088,8 @@ final class GestureStateRecognitionNode<Value, State>: GestureRecognitionNode<Va
         resetIfNeeded()
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? GestureStateRecognitionNode<Value, State> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? StatefulRecognitionStateNode<Value, State> else {
             return
         }
         didUpdate = old.didUpdate
@@ -1843,9 +2097,9 @@ final class GestureStateRecognitionNode<Value, State>: GestureRecognitionNode<Va
     }
 
     private func observe(
-        _ output: GestureRecognitionOutput<Value>,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<Value>,
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         switch output.phase {
         case .changed(let value):
             var transaction = Transaction()
@@ -1902,8 +2156,8 @@ extension Never {
     /// gesture declarations and never evaluates it for an input sample.
     public func _makeGesture() -> _GestureDefinition<Never> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration("never"),
-            makeNode: NeverGestureRecognitionNode.init
+            configuration: StatefulRecognitionConfiguration("never"),
+            makeNode: NeverStatefulRecognitionNode.init
         )
     }
 }
@@ -1915,12 +2169,12 @@ extension TapGesture {
     /// SwiftTUI calls this implementation hook while registering an attachment.
     public func _makeGesture() -> _GestureDefinition<Void> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "tap",
                 values: [count]
             ),
             makeNode: {
-                TapGestureRecognitionNode(
+                TapStatefulRecognitionNode(
                     count: count,
                     coordinateSpace: nil,
                     makeValue: { _ in () }
@@ -1937,12 +2191,12 @@ extension SpatialTapGesture {
     /// Recognized locations are reported in the gesture's coordinate space.
     public func _makeGesture() -> _GestureDefinition<Value> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "spatialTap",
                 values: [count, coordinateSpace]
             ),
             makeNode: {
-                TapGestureRecognitionNode(
+                TapStatefulRecognitionNode(
                     count: count,
                     coordinateSpace: coordinateSpace,
                     makeValue: Value.init(location:)
@@ -1959,7 +2213,7 @@ extension LongPressGesture {
     /// SwiftTUI calls this implementation hook while registering an attachment.
     public func _makeGesture() -> _GestureDefinition<Bool> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "longPress",
                 values: [
                     minimumDuration.bitPattern,
@@ -1968,7 +2222,7 @@ extension LongPressGesture {
                 ]
             ),
             makeNode: {
-                LongPressGestureRecognitionNode(
+                LongPressStatefulRecognitionNode(
                     minimumDuration: minimumDuration,
                     maximumDistance: maximumDistance
                 )
@@ -1984,12 +2238,12 @@ extension DragGesture {
     /// SwiftTUI calls this implementation hook while registering an attachment.
     public func _makeGesture() -> _GestureDefinition<Value> {
         _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "drag",
                 values: [button, minimumDistance, coordinateSpace]
             ),
             makeNode: {
-                DragGestureRecognitionNode(gesture: self)
+                DragStatefulRecognitionNode(gesture: self)
             }
         )
     }
@@ -2002,7 +2256,7 @@ extension ChangedGesture {
         return _GestureDefinition(
             configuration: .wrapper("changed", definition.configuration),
             makeNode: {
-                ChangedGestureRecognitionNode(
+                ChangedStatefulRecognitionNode(
                     base: definition.makeNode(),
                     action: action
                 )
@@ -2018,7 +2272,7 @@ extension EndedGesture {
         return _GestureDefinition(
             configuration: .wrapper("ended", definition.configuration),
             makeNode: {
-                EndedGestureRecognitionNode(
+                EndedStatefulRecognitionNode(
                     base: definition.makeNode(),
                     action: action
                 )
@@ -2038,7 +2292,7 @@ extension GestureStateGesture {
         return _GestureDefinition(
             configuration: .wrapper("updating", definition.configuration),
             makeNode: {
-                GestureStateRecognitionNode(
+                StatefulRecognitionStateNode(
                     base: definition.makeNode(),
                     storage: state.storage,
                     update: update
@@ -2048,8 +2302,8 @@ extension GestureStateGesture {
     }
 }
 
-final class ExclusiveGestureRecognitionNode<First, Second, Value>:
-    GestureRecognitionNode<Value>
+final class ExclusiveStatefulRecognitionNode<First, Second, Value>:
+    StatefulRecognitionNode<Value>
 {
     struct ReplaySample {
 
@@ -2060,9 +2314,9 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
         var isTargeted: Bool
     }
 
-    let first: GestureRecognitionNode<First>
+    let first: StatefulRecognitionNode<First>
 
-    let second: GestureRecognitionNode<Second>
+    let second: StatefulRecognitionNode<Second>
 
     let firstValue: (First) -> Value
 
@@ -2073,8 +2327,8 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
     var replaySamples: [ReplaySample] = []
 
     init(
-        first: GestureRecognitionNode<First>,
-        second: GestureRecognitionNode<Second>,
+        first: StatefulRecognitionNode<First>,
+        second: StatefulRecognitionNode<Second>,
         firstValue: @escaping (First) -> Value,
         secondValue: @escaping (Second) -> Value
     ) {
@@ -2099,10 +2353,16 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
             : first.acceptsNewPointerDownWhileActive
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        usesSecond
+            ? second.acceptsNewKeyDownWhileActive
+            : first.acceptsNewKeyDownWhileActive
+    }
+
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if usesSecond {
             return finishSecondIfNeeded(
                 second.process(sample, context: context)
@@ -2131,8 +2391,8 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if usesSecond {
             return finishSecondIfNeeded(
                 second.advance(to: date, context: context)
@@ -2154,8 +2414,8 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
         replaySamples = []
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? ExclusiveGestureRecognitionNode<First, Second, Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? ExclusiveStatefulRecognitionNode<First, Second, Value> else {
             return
         }
         usesSecond = old.usesSecond
@@ -2166,11 +2426,11 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
 
     private func replaySecond(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
-        var latest: GestureRecognitionOutput<Second> = .noMatch
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
+        var latest: StatefulRecognitionOutput<Second> = .noMatch
         for replay in replaySamples {
-            let replayContext = GestureRecognitionContext(
+            let replayContext = StatefulRecognitionContext(
                 date: replay.date,
                 isTargeted: replay.isTargeted,
                 convert: context.convert,
@@ -2192,7 +2452,7 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
 
         if second.nextDeadline.map({ $0 <= date }) == true,
            !isTerminal(latest) {
-            let advanceContext = GestureRecognitionContext(
+            let advanceContext = StatefulRecognitionContext(
                 date: date,
                 isTargeted: context.isTargeted,
                 convert: context.convert,
@@ -2213,8 +2473,8 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
     }
 
     private func finishSecondIfNeeded(
-        _ output: GestureRecognitionOutput<Second>
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<Second>
+    ) -> StatefulRecognitionOutput<Value> {
         let mapped = mapSecond(output)
         if isTerminal(output) {
             usesSecond = false
@@ -2223,7 +2483,7 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
     }
 
     private func isTerminal<Child>(
-        _ output: GestureRecognitionOutput<Child>
+        _ output: StatefulRecognitionOutput<Child>
     ) -> Bool {
         switch output.phase {
         case .ended, .failed:
@@ -2234,22 +2494,22 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
     }
 
     private func mapFirst(
-        _ output: GestureRecognitionOutput<First>
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<First>
+    ) -> StatefulRecognitionOutput<Value> {
         map(output, transform: firstValue)
     }
 
     private func mapSecond(
-        _ output: GestureRecognitionOutput<Second>
-    ) -> GestureRecognitionOutput<Value> {
+        _ output: StatefulRecognitionOutput<Second>
+    ) -> StatefulRecognitionOutput<Value> {
         map(output, transform: secondValue)
     }
 
     private func map<Child>(
-        _ output: GestureRecognitionOutput<Child>,
+        _ output: StatefulRecognitionOutput<Child>,
         transform: (Child) -> Value
-    ) -> GestureRecognitionOutput<Value> {
-        let phase: GestureRecognitionPhase<Value>
+    ) -> StatefulRecognitionOutput<Value> {
+        let phase: StatefulRecognitionPhase<Value>
         switch output.phase {
         case .none:
             phase = .none
@@ -2260,7 +2520,7 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
         case .failed:
             phase = .failed
         }
-        return GestureRecognitionOutput(
+        return StatefulRecognitionOutput(
             participated: output.participated,
             phase: phase,
             claimsCompetition: output.claimsCompetition,
@@ -2270,12 +2530,12 @@ final class ExclusiveGestureRecognitionNode<First, Second, Value>:
     }
 }
 
-final class SimultaneousGestureRecognitionNode<First, Second, Value>:
-    GestureRecognitionNode<Value>
+final class SimultaneousStatefulRecognitionNode<First, Second, Value>:
+    StatefulRecognitionNode<Value>
 {
-    let first: GestureRecognitionNode<First>
+    let first: StatefulRecognitionNode<First>
 
-    let second: GestureRecognitionNode<Second>
+    let second: StatefulRecognitionNode<Second>
 
     let makeValue: (First?, Second?) -> Value
 
@@ -2292,8 +2552,8 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
     var secondSucceeded = false
 
     init(
-        first: GestureRecognitionNode<First>,
-        second: GestureRecognitionNode<Second>,
+        first: StatefulRecognitionNode<First>,
+        second: StatefulRecognitionNode<Second>,
         makeValue: @escaping (First?, Second?) -> Value
     ) {
         self.first = first
@@ -2315,37 +2575,42 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
             && (secondTerminal || !second.isActive || second.acceptsNewPointerDownWhileActive)
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        (firstTerminal || !first.isActive || first.acceptsNewKeyDownWhileActive)
+            && (secondTerminal || !second.isActive || second.acceptsNewKeyDownWhileActive)
+    }
+
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         let firstOutput = firstTerminal
-            ? GestureRecognitionOutput<First>.noMatch
+            ? StatefulRecognitionOutput<First>.noMatch
             : first.process(sample, context: context)
         let secondOutput = secondTerminal
-            ? GestureRecognitionOutput<Second>.noMatch
+            ? StatefulRecognitionOutput<Second>.noMatch
             : second.process(sample, context: context)
         return combine(
             firstOutput,
             secondOutput,
-            endsPointerSequence: sample.endsPointerSequence
+            endsSequence: sample.endsStatefulRecognitionSequence
         )
     }
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         let firstOutput = firstTerminal
-            ? GestureRecognitionOutput<First>.noMatch
+            ? StatefulRecognitionOutput<First>.noMatch
             : first.advance(to: date, context: context)
         let secondOutput = secondTerminal
-            ? GestureRecognitionOutput<Second>.noMatch
+            ? StatefulRecognitionOutput<Second>.noMatch
             : second.advance(to: date, context: context)
         return combine(
             firstOutput,
             secondOutput,
-            endsPointerSequence: false
+            endsSequence: false
         )
     }
 
@@ -2355,8 +2620,8 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
         reset()
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? SimultaneousGestureRecognitionNode<First, Second, Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? SimultaneousStatefulRecognitionNode<First, Second, Value> else {
             return
         }
         latestFirst = old.latestFirst
@@ -2370,10 +2635,10 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
     }
 
     private func combine(
-        _ firstOutput: GestureRecognitionOutput<First>,
-        _ secondOutput: GestureRecognitionOutput<Second>,
-        endsPointerSequence: Bool
-    ) -> GestureRecognitionOutput<Value> {
+        _ firstOutput: StatefulRecognitionOutput<First>,
+        _ secondOutput: StatefulRecognitionOutput<Second>,
+        endsSequence: Bool
+    ) -> StatefulRecognitionOutput<Value> {
         update(
             firstOutput,
             latest: &latestFirst,
@@ -2386,13 +2651,13 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
             terminal: &secondTerminal,
             succeeded: &secondSucceeded
         )
-        if endsPointerSequence,
+        if endsSequence,
            !firstTerminal,
            !first.isActive,
            !firstOutput.participated {
             firstTerminal = true
         }
-        if endsPointerSequence,
+        if endsSequence,
            !secondTerminal,
            !second.isActive,
            !secondOutput.participated {
@@ -2424,7 +2689,7 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
     }
 
     private func update<Child>(
-        _ output: GestureRecognitionOutput<Child>,
+        _ output: StatefulRecognitionOutput<Child>,
         latest: inout Child?,
         terminal: inout Bool,
         succeeded: inout Bool
@@ -2455,22 +2720,26 @@ final class SimultaneousGestureRecognitionNode<First, Second, Value>:
 
 extension RecognitionSample {
 
-    /// Whether this sample closes the terminal's current single-pointer press
-    /// sequence for recognizers that never became active.
-    var endsPointerSequence: Bool {
-        guard case .pointerPress(let press) = self else {
-            return false
+    /// Whether this sample closes the current stateful recognition sequence
+    /// for recognizers that never became active.
+    var endsStatefulRecognitionSequence: Bool {
+        switch self {
+        case .keyPress(let press):
+            press.phase == .up
+        case .pointerPress(let press):
+            press.phase == .up
+        case .pointerMotion, .pointerScroll:
+            false
         }
-        return press.phase == .up
     }
 }
 
-final class SequenceGestureRecognitionNode<First, Second, Value>:
-    GestureRecognitionNode<Value>
+final class SequenceStatefulRecognitionNode<First, Second, Value>:
+    StatefulRecognitionNode<Value>
 {
-    let first: GestureRecognitionNode<First>
+    let first: StatefulRecognitionNode<First>
 
-    let second: GestureRecognitionNode<Second>
+    let second: StatefulRecognitionNode<Second>
 
     let firstPhase: (First) -> Value
 
@@ -2479,8 +2748,8 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
     var retainedFirst: First?
 
     init(
-        first: GestureRecognitionNode<First>,
-        second: GestureRecognitionNode<Second>,
+        first: StatefulRecognitionNode<First>,
+        second: StatefulRecognitionNode<Second>,
         firstPhase: @escaping (First) -> Value,
         secondPhase: @escaping (First, Second?) -> Value
     ) {
@@ -2499,14 +2768,18 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
         retainedFirst != nil || first.acceptsNewPointerDownWhileActive
     }
 
+    override var acceptsNewKeyDownWhileActive: Bool {
+        retainedFirst != nil || first.acceptsNewKeyDownWhileActive
+    }
+
     override var nextDeadline: Date? {
         retainedFirst == nil ? first.nextDeadline : second.nextDeadline
     }
 
     override func process(
         _ sample: RecognitionSample,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if let retainedFirst {
             return mapSecond(
                 second.process(sample, context: context),
@@ -2518,8 +2791,8 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
 
     override func advance(
         to date: Date,
-        context: GestureRecognitionContext
-    ) -> GestureRecognitionOutput<Value> {
+        context: StatefulRecognitionContext
+    ) -> StatefulRecognitionOutput<Value> {
         if let retainedFirst {
             return mapSecond(
                 second.advance(to: date, context: context),
@@ -2535,8 +2808,8 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
         retainedFirst = nil
     }
 
-    override func restoreState(from old: GestureRecognitionNode<Value>) {
-        guard let old = old as? SequenceGestureRecognitionNode<First, Second, Value> else {
+    override func restoreState(from old: StatefulRecognitionNode<Value>) {
+        guard let old = old as? SequenceStatefulRecognitionNode<First, Second, Value> else {
             return
         }
         retainedFirst = old.retainedFirst
@@ -2545,9 +2818,9 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
     }
 
     private func mapFirst(
-        _ output: GestureRecognitionOutput<First>
-    ) -> GestureRecognitionOutput<Value> {
-        let phase: GestureRecognitionPhase<Value>
+        _ output: StatefulRecognitionOutput<First>
+    ) -> StatefulRecognitionOutput<Value> {
+        let phase: StatefulRecognitionPhase<Value>
         switch output.phase {
         case .none:
             phase = .none
@@ -2559,7 +2832,7 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
         case .failed:
             phase = .failed
         }
-        return GestureRecognitionOutput(
+        return StatefulRecognitionOutput(
             participated: output.participated,
             phase: phase,
             claimsCompetition: output.claimsCompetition,
@@ -2569,10 +2842,10 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
     }
 
     private func mapSecond(
-        _ output: GestureRecognitionOutput<Second>,
+        _ output: StatefulRecognitionOutput<Second>,
         first: First
-    ) -> GestureRecognitionOutput<Value> {
-        let phase: GestureRecognitionPhase<Value>
+    ) -> StatefulRecognitionOutput<Value> {
+        let phase: StatefulRecognitionPhase<Value>
         switch output.phase {
         case .none:
             phase = .none
@@ -2585,7 +2858,7 @@ final class SequenceGestureRecognitionNode<First, Second, Value>:
             retainedFirst = nil
             phase = .failed
         }
-        return GestureRecognitionOutput(
+        return StatefulRecognitionOutput(
             participated: output.participated,
             phase: phase,
             claimsCompetition: output.claimsCompetition,
@@ -2604,7 +2877,7 @@ extension ExclusiveGesture {
         let firstDefinition = first._makeGesture()
         let secondDefinition = second._makeGesture()
         return _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "exclusive",
                 children: [
                     firstDefinition.configuration,
@@ -2612,7 +2885,7 @@ extension ExclusiveGesture {
                 ]
             ),
             makeNode: {
-                ExclusiveGestureRecognitionNode(
+                ExclusiveStatefulRecognitionNode(
                     first: firstDefinition.makeNode(),
                     second: secondDefinition.makeNode(),
                     firstValue: Value.first,
@@ -2635,7 +2908,7 @@ extension SimultaneousGesture {
             First.Value?, Second.Value?, Value
         > = simultaneousGestureValueFactory()
         return _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "simultaneous",
                 children: [
                     firstDefinition.configuration,
@@ -2643,7 +2916,7 @@ extension SimultaneousGesture {
                 ]
             ),
             makeNode: {
-                SimultaneousGestureRecognitionNode(
+                SimultaneousStatefulRecognitionNode(
                     first: firstDefinition.makeNode(),
                     second: secondDefinition.makeNode(),
                     makeValue: valueFactory.makeValue
@@ -2662,7 +2935,7 @@ extension SequenceGesture {
         let firstDefinition = first._makeGesture()
         let secondDefinition = second._makeGesture()
         return _GestureDefinition(
-            configuration: GestureRecognitionConfiguration(
+            configuration: StatefulRecognitionConfiguration(
                 "sequence",
                 children: [
                     firstDefinition.configuration,
@@ -2670,7 +2943,223 @@ extension SequenceGesture {
                 ]
             ),
             makeNode: {
-                SequenceGestureRecognitionNode(
+                SequenceStatefulRecognitionNode(
+                    first: firstDefinition.makeNode(),
+                    second: secondDefinition.makeNode(),
+                    firstPhase: Value.first,
+                    secondPhase: Value.second
+                )
+            }
+        )
+    }
+}
+
+extension Shortcut where Value == Body.Value {
+
+    /// Recursively lowers a custom shortcut body into an opaque recognition definition.
+    ///
+    /// SwiftTUI calls this implementation hook while registering an attachment.
+    public func _makeShortcut() -> _ShortcutDefinition<Value> {
+        BodyExpansionContext.shortcut(self) {
+            let definition = body._makeShortcut()
+            return _ShortcutDefinition(
+                configuration: .wrapper(
+                    "body:\(String(reflecting: Self.self))",
+                    definition.configuration
+                ),
+                makeNode: definition.makeNode
+            )
+        }
+    }
+}
+
+extension Never {
+
+    /// Builds the empty recognition definition for the uninhabited shortcut.
+    ///
+    /// SwiftTUI uses this implementation hook as the terminal body of primitive
+    /// shortcut declarations and never evaluates it for an input sample.
+    public func _makeShortcut() -> _ShortcutDefinition<Never> {
+        _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration("never"),
+            makeNode: NeverStatefulRecognitionNode.init
+        )
+    }
+}
+
+extension TapShortcut {
+
+    /// Builds a recognition definition for this key combination and tap count.
+    ///
+    /// SwiftTUI calls this implementation hook while registering an attachment.
+    public func _makeShortcut() -> _ShortcutDefinition<Void> {
+        _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration(
+                "tap",
+                values: [key, modifiers.rawValue, count]
+            ),
+            makeNode: {
+                TapShortcutRecognitionNode(
+                    key: key,
+                    modifiers: modifiers,
+                    count: count
+                )
+            }
+        )
+    }
+}
+
+extension LongPressShortcut {
+
+    /// Builds a recognition definition for this key combination and hold duration.
+    ///
+    /// SwiftTUI calls this implementation hook while registering an attachment.
+    public func _makeShortcut() -> _ShortcutDefinition<Bool> {
+        _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration(
+                "longPress",
+                values: [key, modifiers.rawValue, minimumDuration.bitPattern]
+            ),
+            makeNode: {
+                LongPressShortcutRecognitionNode(
+                    key: key,
+                    modifiers: modifiers,
+                    minimumDuration: minimumDuration
+                )
+            }
+        )
+    }
+}
+
+extension ChangedShortcut {
+
+    func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let definition = base._makeShortcut()
+        return _ShortcutDefinition(
+            configuration: .wrapper("changed", definition.configuration),
+            makeNode: {
+                ChangedStatefulRecognitionNode(
+                    base: definition.makeNode(),
+                    action: action
+                )
+            }
+        )
+    }
+}
+
+extension EndedShortcut {
+
+    func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let definition = base._makeShortcut()
+        return _ShortcutDefinition(
+            configuration: .wrapper("ended", definition.configuration),
+            makeNode: {
+                EndedStatefulRecognitionNode(
+                    base: definition.makeNode(),
+                    action: action
+                )
+            }
+        )
+    }
+}
+
+extension ShortcutStateShortcut {
+
+    /// Builds a recognition definition that updates this shortcut's transient state.
+    ///
+    /// The wrapper preserves the base shortcut's recognition behavior and
+    /// resets state through the shared stateful-recognition lifecycle.
+    public func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let definition = base._makeShortcut()
+        return _ShortcutDefinition(
+            configuration: .wrapper("updating", definition.configuration),
+            makeNode: {
+                StatefulRecognitionStateNode(
+                    base: definition.makeNode(),
+                    storage: state.storage,
+                    update: update
+                )
+            }
+        )
+    }
+}
+
+extension ExclusiveShortcut {
+
+    /// Builds a recognition definition that gives the first shortcut precedence.
+    ///
+    /// The second shortcut is eligible only after actual recognition failure.
+    public func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let firstDefinition = first._makeShortcut()
+        let secondDefinition = second._makeShortcut()
+        return _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration(
+                "exclusive",
+                children: [
+                    firstDefinition.configuration,
+                    secondDefinition.configuration,
+                ]
+            ),
+            makeNode: {
+                ExclusiveStatefulRecognitionNode(
+                    first: firstDefinition.makeNode(),
+                    second: secondDefinition.makeNode(),
+                    firstValue: Value.first,
+                    secondValue: Value.second
+                )
+            }
+        )
+    }
+}
+
+extension SimultaneousShortcut {
+
+    /// Builds a recognition definition that runs both shortcuts independently.
+    ///
+    /// Either child can update, succeed, or fail without cancelling its sibling.
+    public func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let firstDefinition = first._makeShortcut()
+        let secondDefinition = second._makeShortcut()
+        let valueFactory: BinaryRecognitionValueFactory<
+            First.Value?, Second.Value?, Value
+        > = simultaneousShortcutValueFactory()
+        return _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration(
+                "simultaneous",
+                children: [
+                    firstDefinition.configuration,
+                    secondDefinition.configuration,
+                ]
+            ),
+            makeNode: {
+                SimultaneousStatefulRecognitionNode(
+                    first: firstDefinition.makeNode(),
+                    second: secondDefinition.makeNode(),
+                    makeValue: valueFactory.makeValue
+                )
+            }
+        )
+    }
+}
+
+extension SequenceShortcut {
+
+    /// Builds a recognition definition that activates the second shortcut after the first.
+    ///
+    /// The definition retains the first shortcut's value while the second runs.
+    public func _makeShortcut() -> _ShortcutDefinition<Value> {
+        let firstDefinition = first._makeShortcut()
+        let secondDefinition = second._makeShortcut()
+        return _ShortcutDefinition(
+            configuration: StatefulRecognitionConfiguration(
+                "sequence",
+                children: [
+                    firstDefinition.configuration,
+                    secondDefinition.configuration,
+                ]
+            ),
+            makeNode: {
+                SequenceStatefulRecognitionNode(
                     first: firstDefinition.makeNode(),
                     second: secondDefinition.makeNode(),
                     firstPhase: Value.first,

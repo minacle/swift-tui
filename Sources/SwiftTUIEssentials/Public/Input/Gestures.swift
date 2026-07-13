@@ -269,10 +269,14 @@ public nonisolated struct DragGesture: Gesture, Equatable, Sendable {
     }
 }
 
-/// Transaction metadata supplied while updating or resetting gesture state.
+/// Transaction metadata supplied while updating or resetting recognition state.
+///
+/// ``GestureState`` and ``ShortcutState`` share this value so their update and
+/// reset callbacks can distinguish continuous samples from terminal lifecycle
+/// transitions.
 public nonisolated struct Transaction: Sendable {
 
-    /// Whether the transaction represents a continuous changed sample.
+    /// Whether the transaction represents a continuous recognition sample.
     public var isContinuous: Bool
 
     /// Creates a noncontinuous transaction.
@@ -281,7 +285,7 @@ public nonisolated struct Transaction: Sendable {
     }
 }
 
-final class GestureStateStorage<Value> {
+final class RecognitionStateStorage<Value> {
 
     let initialValue: Value
 
@@ -330,7 +334,7 @@ final class GestureStateStorage<Value> {
 @propertyWrapper
 public struct GestureState<Value>: DynamicProperty {
 
-    let storage: GestureStateStorage<Value>
+    let storage: RecognitionStateStorage<Value>
 
     /// The current transient gesture value.
     public var wrappedValue: Value {
@@ -346,7 +350,7 @@ public struct GestureState<Value>: DynamicProperty {
     ///
     /// - Parameter value: The value restored when recognition ends.
     public init(wrappedValue value: Value) {
-        storage = GestureStateStorage(
+        storage = RecognitionStateStorage(
             initialValue: value,
             resetTransaction: Transaction(),
             resetAction: nil
@@ -366,7 +370,7 @@ public struct GestureState<Value>: DynamicProperty {
     ///   - value: The value restored when recognition ends.
     ///   - resetTransaction: The transaction supplied during reset.
     public init(wrappedValue value: Value, resetTransaction: Transaction) {
-        storage = GestureStateStorage(
+        storage = RecognitionStateStorage(
             initialValue: value,
             resetTransaction: resetTransaction,
             resetAction: nil
@@ -394,7 +398,7 @@ public struct GestureState<Value>: DynamicProperty {
         wrappedValue value: Value,
         reset: @escaping (Value, inout Transaction) -> Void
     ) {
-        storage = GestureStateStorage(
+        storage = RecognitionStateStorage(
             initialValue: value,
             resetTransaction: Transaction(),
             resetAction: reset

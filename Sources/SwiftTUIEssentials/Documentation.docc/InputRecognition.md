@@ -1,21 +1,24 @@
 # Input Recognition
 
-Match terminal input, recognize gestures, and control which view receives each
-sample.
+Match terminal input, recognize gestures and shortcuts, and control which view
+receives each sample.
 
 ## Overview
 
-SwiftTUI separates raw terminal input from stateful gestures. An
+SwiftTUI separates raw terminal input from stateful recognition. An
 ``InputEvent`` matches one decoded value such as ``KeyPress``,
-``PointerPress``, ``PointerMotion``, or ``PointerScroll``. A ``Gesture``
-recognizes one or more pointer samples and can publish changed and ended values.
+``PointerPress``, ``PointerMotion``, or ``PointerScroll``. A ``Shortcut``
+recognizes logical key sequences derived from key events, while a ``Gesture``
+recognizes pointer sequences. Both recognition layers can publish changed and
+ended values without inheriting from their low-level event types.
 
-Attach a configured event with ``View/inputEvent(_:including:)`` or attach a
-gesture with ``View/gesture(_:including:)``. High-priority variants run in the
-high tier, `simultaneous` variants share the view-defined tier, and the plain
-attachment methods run in the normal tier. Within each tier, SwiftTUI evaluates
-immediate input events, eager deferred events, gestures, and lazy deferred
-events in that order.
+Attach a configured event with ``View/inputEvent(_:including:)``, a shortcut
+with ``View/shortcut(_:including:)``, or a gesture with
+``View/gesture(_:including:)``. High-priority variants run in the high tier,
+`simultaneous` variants share the view-defined tier, and the plain attachment
+methods run in the normal tier. Within each tier, SwiftTUI evaluates immediate
+input events, eager deferred events, stateful recognizers, view-defined
+convenience actions, and lazy deferred events in that order.
 
 ```swift
 struct InputStatus: View {
@@ -28,6 +31,12 @@ struct InputStatus: View {
                     .onRecognized { _ in
                         status = "return"
                         return .ignored
+                    }
+            )
+            .shortcut(
+                TapShortcut("s", modifiers: .control)
+                    .onEnded {
+                        status = "save"
                     }
             )
             .simultaneousGesture(
@@ -44,17 +53,23 @@ struct InputStatus: View {
 current explicit composite and prevents lower tiers from receiving that raw
 sample. It reports propagation intent, not whether the callback changed state.
 Return ``InputEventResult/ignored`` after an action when later input events,
-gestures, global-key fallback, or key resolution should still run. Hover
-observation is reconciled after pointer motion and remains independent of this
-result.
+shortcuts, gestures, global-key fallback, or key resolution should still run.
+Shortcut success claims only competing shortcuts: the same key sample still
+reaches later low-level key handlers, global-key fallback, and key resolution.
+Hover observation is reconciled after pointer motion and remains independent
+of this result.
 
 ### Target paths and capture
 
 Key input travels from the root of the focused branch toward the focused input
-target. Pointer presses use the deepest hit-tested target, while buttonless
-motion and scroll retarget on every sample. A captured drag keeps button motion
-and the matching release on its original target even outside the rendered
-bounds; scroll input never follows pointer capture.
+target. Shortcuts on that branch compete by tier, then by proximity to the
+focused target and source-modifier nesting. Without a focused target, only
+shortcuts attached directly at the rendered root remain eligible; existing
+low-level key handlers retain their focus requirements. Pointer presses use the
+deepest hit-tested target, while buttonless motion and scroll retarget on every
+sample. A captured drag keeps button motion and the matching release on its
+original target even outside the rendered bounds; scroll input never follows
+pointer capture.
 
 Coordinates are zero-based terminal columns and rows. Primitive pointer events
 convert a location to their requested ``CoordinateSpace`` immediately before a
@@ -62,19 +77,38 @@ callback. A missing named space is a programming error when direct recognition
 begins; if a named space disappears during an active recognition sequence,
 SwiftTUI cancels that sequence instead of invoking its completion callback.
 
+### Shortcut recognition
+
+``TapShortcut`` completes one or more exact key-down and key-up pairs. Repeat
+phases don't increase its count, and consecutive presses can be separated by at
+most 0.5 seconds. ``LongPressShortcut`` starts from an exact key-down, reports a
+single changed value, and succeeds at its configured deadline without requiring
+a repeat event. The key and modifier set must exactly match on every phase that
+participates in either primitive.
+
+Use ``View/onTapShortcut(_:modifiers:count:perform:)`` and
+``View/onLongPressShortcut(_:modifiers:minimumDuration:perform:onPressingChanged:)``
+for view-defined actions. For one key combination, higher tap counts can defer
+lower-count fallbacks, while the shortest long-press deadline receives the
+first opportunity to succeed. Different key and modifier combinations compete
+independently.
+
 ### Composition and transient state
 
 Use `exclusively(before:)`, `simultaneously(with:)`, and `sequenced(before:)`
-to build a single recognition graph. Explicit simultaneous siblings finish
-their callbacks before an aggregated handled result affects outside consumers.
+to build one input-event, gesture, or shortcut recognition graph. An exclusive
+shortcut replays stored samples into its second branch only after actual first-
+branch failure. Simultaneous shortcut branches observe the same key sequence
+independently and retain an early result until both branches terminate.
 Sequences retain their first value until a later input completes them or their
-attachment is cancelled.
+attachment is cancelled; they don't add an implicit timeout.
 
-``GestureState`` stores transient gesture data. The `updating(_:body:)` callback
-runs before the same sample's `onChanged(_:)` callback. Successful completion
-invokes `onEnded(_:)`; failure and cancellation don't. SwiftTUI resets gesture
-state after success, failure, disabling, removal, focus or scene loss, and
-session shutdown.
+``GestureState`` and ``ShortcutState`` store transient recognition data. The
+`updating(_:body:)` callback runs before the same sample's distinct
+`onChanged(_:)` callback. Successful completion invokes `onEnded(_:)`; failure
+and cancellation don't. SwiftTUI resets updated transient state exactly once
+after success, failure, disabling, removal, configuration replacement,
+competition loss, focus or scene loss, and session shutdown.
 
 ### Terminal limitations
 
@@ -132,3 +166,18 @@ ends.
 - ``SimultaneousGesture``
 - ``SequenceGesture``
 - ``GestureMask``
+
+### Shortcut graph
+
+- ``Shortcut``
+- ``TapShortcut``
+- ``LongPressShortcut``
+- ``ShortcutState``
+- ``ShortcutStateShortcut``
+
+### Shortcut composition
+
+- ``ExclusiveShortcut``
+- ``SimultaneousShortcut``
+- ``SequenceShortcut``
+- ``ShortcutMask``
