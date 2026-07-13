@@ -1895,7 +1895,7 @@ final class InputRuntime {
         at path: [Int],
         perform: ([Int], () -> Void) -> Void
     ) {
-        for handler in hoverHandlersByPath[path] ?? [] {
+        for handler in (hoverHandlersByPath[path] ?? []).reversed() {
             perform(handler.actionPath ?? path) {
                 handler.action.performExit()
             }

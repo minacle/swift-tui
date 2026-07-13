@@ -949,6 +949,11 @@ extension View {
     /// `false` when later motion exits it. Movement that remains inside the
     /// region doesn't repeatedly invoke this Boolean form.
     ///
+    /// When multiple hover modifiers share an interaction path, SwiftTUI
+    /// invokes all of them. Entry callbacks proceed from the outermost
+    /// modifier inward, and exit callbacks proceed from the innermost modifier
+    /// outward.
+    ///
     /// - Parameter action: The action to perform with the current hover state.
     /// - Returns: A view with a hover handler attached.
     public func onHover(perform action: @escaping (Bool) -> Void) -> some View {
@@ -968,6 +973,13 @@ extension View {
     /// motion within the region, then ``HoverPhase/ended`` on exit. Active
     /// phases report zero-based terminal-cell coordinates in the requested
     /// coordinate space.
+    ///
+    /// Hover modifiers at the same interaction path all remain active.
+    /// ``HoverPhase/active(_:)`` callbacks proceed from the outermost modifier
+    /// inward, including on continued motion, while ``HoverPhase/ended``
+    /// callbacks proceed from the innermost modifier outward. Boolean
+    /// ``onHover(perform:)`` callbacks in the same chain participate in the
+    /// corresponding entry and exit order without repeating during motion.
     ///
     /// - Parameters:
     ///   - coordinateSpace: The coordinate space for active hover locations.

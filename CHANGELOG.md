@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   long presses use earliest-deadline precedence and prefer the innermost
   modifier on ties. A recognized tap, long press, or button action suppresses
   competing default gestures.
+- **Breaking:** Changed overlapping `onHover` and `onContinuousHover`
+  modifiers to end innermost-first. Entry and continuous movement remain
+  outermost-first, while exit now unwinds the modifier chain from the inside
+  out.
 
 ### Deprecated
 

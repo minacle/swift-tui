@@ -46,6 +46,77 @@ struct HoverTrackingTests {
     }
 
     @Test
+    func `stacked onHover modifiers enter outermost first and exit innermost first`() {
+        let runtime = StateRuntime()
+        let hoverProbe = HoverProbe()
+        let view = Text("A")
+            .onHover {
+                hoverProbe.record($0 ? "first-true" : "first-false")
+            }
+            .onHover {
+                hoverProbe.record($0 ? "second-true" : "second-false")
+            }
+            .onHover {
+                hoverProbe.record($0 ? "third-true" : "third-false")
+            }
+
+        _ = runtime.block(from: view)
+
+        dispatchHover(to: runtime, column: 1, row: 1)
+        dispatchHover(to: runtime, column: 2, row: 1)
+
+        #expect(
+            hoverProbe.events == [
+                "third-true",
+                "second-true",
+                "first-true",
+                "first-false",
+                "second-false",
+                "third-false",
+            ]
+        )
+    }
+
+    @Test
+    func `mixed hover modifiers repeat continuous motion and exit innermost first`() {
+        let runtime = StateRuntime()
+        let hoverProbe = HoverProbe()
+        let view = Text("AB")
+            .onHover {
+                hoverProbe.record($0 ? "inner-true" : "inner-false")
+            }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    hoverProbe.record("continuous-active")
+                case .ended:
+                    hoverProbe.record("continuous-ended")
+                }
+            }
+            .onHover {
+                hoverProbe.record($0 ? "outer-true" : "outer-false")
+            }
+
+        _ = runtime.block(from: view)
+
+        dispatchHover(to: runtime, column: 1, row: 1)
+        dispatchHover(to: runtime, column: 2, row: 1)
+        dispatchHover(to: runtime, column: 3, row: 1)
+
+        #expect(
+            hoverProbe.events == [
+                "outer-true",
+                "continuous-active",
+                "inner-true",
+                "continuous-active",
+                "inner-false",
+                "continuous-ended",
+                "outer-false",
+            ]
+        )
+    }
+
+    @Test
     func `continuous hover reports each active location and a single ended phase on exit`() {
         let runtime = StateRuntime()
         let hoverProbe = HoverProbe()
