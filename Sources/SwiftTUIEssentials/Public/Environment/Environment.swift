@@ -183,6 +183,112 @@ public nonisolated struct PasteAction {
     }
 }
 
+/// An environment action that resolves an unhandled key-down event.
+///
+/// Install handlers for individual keys with a writable environment subscript:
+///
+/// ```swift
+/// Text("Dismiss")
+///     .environment(\.resolveKey[.escape]) { key in
+///         .handled
+///     }
+/// ```
+///
+/// A handler applies only to its selected ``KeyEquivalent``. When nested
+/// environment modifiers select the same key, SwiftTUI invokes the closest
+/// handler first and continues toward its ancestors while handlers return
+/// ``Result/ignored``. A ``Result/handled`` result stops the chain.
+///
+/// The input runtime invokes this action only for key-down events that focused
+/// and legacy global key handlers ignored. The handler receives only the
+/// normalized key equivalent, so it can't distinguish inputs that normalize to
+/// the same value by their text, modifiers, or source device.
+///
+/// When a view has focus, only declarations on that focused branch participate,
+/// beginning with the closest declaration. Without focus, SwiftTUI anchors
+/// resolution at the deepest rendered declaration for the key and visits only
+/// that declaration's ancestors. The first rendered path wins a depth tie;
+/// sibling paths aren't alternative fallbacks. Disabled or measurement-only
+/// subtrees don't register resolvers.
+public nonisolated struct ResolveKeyAction {
+
+    /// Indicates whether a key resolver stops or continues fallback handling.
+    public nonisolated enum Result: Equatable, Hashable, Sendable {
+
+        /// The resolver consumed the key and fallback handling should stop.
+        case handled
+
+        /// The resolver declined the key and the next enclosing resolver can run.
+        case ignored
+    }
+
+    /// A synchronous handler for one normalized key equivalent.
+    ///
+    /// The closure is retained by the action value. It can capture mutable
+    /// state, but the type doesn't promise concurrent invocation or sendability.
+    public typealias Handler = (KeyEquivalent) -> Result
+
+    nonisolated final class Registration {
+
+        let key: KeyEquivalent
+
+        let handler: Handler
+
+        init(key: KeyEquivalent, handler: @escaping Handler) {
+            self.key = key
+            self.handler = handler
+        }
+    }
+
+    private var handlers: [KeyEquivalent: [Handler]] = [:]
+
+    private(set) var registrations: [Registration] = []
+
+    /// Creates an action with no installed key resolvers.
+    public init() {}
+
+    /// Reads or adds a resolver for one normalized key.
+    ///
+    /// Assigning a handler adds it ahead of any handler inherited for the same
+    /// key. Reading the subscript returns a handler that preserves that
+    /// key-specific chain. Handlers for other keys aren't inspected.
+    ///
+    /// - Parameter key: The normalized key whose fallback chain to access.
+    public subscript(_ key: KeyEquivalent) -> Handler {
+        get {
+            let handlers = handlers[key] ?? []
+            return {
+                invokedKey in
+
+                Self.resolve(invokedKey, with: handlers)
+            }
+        }
+        set {
+            handlers[key, default: []].insert(newValue, at: 0)
+            registrations.append(Registration(key: key, handler: newValue))
+        }
+    }
+
+    /// Offers a normalized key to its closest installed resolver first.
+    ///
+    /// - Parameter key: The normalized key to resolve and pass to each matching
+    ///   handler.
+    /// - Returns: ``Result/handled`` when a handler consumes the key; otherwise,
+    ///   ``Result/ignored`` when no handler is installed or every handler
+    ///   declines it.
+    public func callAsFunction(_ key: KeyEquivalent) -> Result {
+        Self.resolve(key, with: handlers[key] ?? [])
+    }
+
+    private static func resolve(_ key: KeyEquivalent, with handlers: [Handler]) -> Result {
+        for handler in handlers where handler(key) == .handled {
+            return .handled
+        }
+
+        return .ignored
+    }
+}
+
 /// A type-level key for storing a value in ``EnvironmentValues``.
 ///
 /// Define a distinct key type for each value. When no override is present,
@@ -323,6 +429,22 @@ extension EnvironmentValues {
         }
         set {
             self[PasteActionKey.self] = newValue
+        }
+    }
+
+    /// The key-down fallback action for this environment scope.
+    ///
+    /// The default action has no handlers and returns
+    /// ``ResolveKeyAction/Result/ignored``. Assign a handler through a keyed
+    /// subscript, such as `environment(\.resolveKey[.escape], handler)`, to add
+    /// a downstream-scoped resolver while retaining enclosing resolvers as
+    /// fallbacks.
+    public nonisolated var resolveKey: ResolveKeyAction {
+        get {
+            self[ResolveKeyActionKey.self]
+        }
+        set {
+            self[ResolveKeyActionKey.self] = newValue
         }
     }
 
@@ -580,6 +702,20 @@ nonisolated struct EnvironmentValueView<Content: View, Value>: View,
 
     let value: Value
 
+    let actionPath: [Int]?
+
+    init(
+        content: Content,
+        keyPath: WritableKeyPath<EnvironmentValues, Value>,
+        value: Value,
+        actionPath: [Int]? = StateContext.currentPath
+    ) {
+        self.content = content
+        self.keyPath = keyPath
+        self.value = value
+        self.actionPath = actionPath
+    }
+
     var layoutTraits: LayoutTraits {
         render(
             path: keyPath,
@@ -596,6 +732,9 @@ nonisolated struct EnvironmentValueView<Content: View, Value>: View,
     ) -> RenderedBlock? {
         render(
             path: keyPath,
+            renderedPath: path,
+            actionPath: actionPath,
+            runtime: runtime,
             transform: { $0 = value }
         ) {
             ViewResolver.block(from: content, in: proposal, path: path, runtime: runtime)
@@ -609,6 +748,9 @@ nonisolated struct EnvironmentValueView<Content: View, Value>: View,
     ) -> RenderedElement? {
         render(
             path: keyPath,
+            renderedPath: path,
+            actionPath: actionPath,
+            runtime: runtime,
             transform: { $0 = value }
         ) {
             ViewResolver.element(from: content, in: proposal, path: path, runtime: runtime)
@@ -628,6 +770,20 @@ nonisolated struct TransformedEnvironmentView<Content: View, Value>: View,
 
     let transform: (inout Value) -> Void
 
+    let actionPath: [Int]?
+
+    init(
+        content: Content,
+        keyPath: WritableKeyPath<EnvironmentValues, Value>,
+        transform: @escaping (inout Value) -> Void,
+        actionPath: [Int]? = StateContext.currentPath
+    ) {
+        self.content = content
+        self.keyPath = keyPath
+        self.transform = transform
+        self.actionPath = actionPath
+    }
+
     var layoutTraits: LayoutTraits {
         render(
             path: keyPath,
@@ -644,6 +800,9 @@ nonisolated struct TransformedEnvironmentView<Content: View, Value>: View,
     ) -> RenderedBlock? {
         render(
             path: keyPath,
+            renderedPath: path,
+            actionPath: actionPath,
+            runtime: runtime,
             transform: transform
         ) {
             ViewResolver.block(from: content, in: proposal, path: path, runtime: runtime)
@@ -657,6 +816,9 @@ nonisolated struct TransformedEnvironmentView<Content: View, Value>: View,
     ) -> RenderedElement? {
         render(
             path: keyPath,
+            renderedPath: path,
+            actionPath: actionPath,
+            runtime: runtime,
             transform: transform
         ) {
             ViewResolver.element(from: content, in: proposal, path: path, runtime: runtime)
@@ -861,12 +1023,36 @@ extension EnvironmentModifierRenderable {
 
     func render<Value, Result>(
         path keyPath: WritableKeyPath<EnvironmentValues, Value>,
+        renderedPath: [Int]? = nil,
+        actionPath: [Int]? = nil,
+        runtime: StateRuntime? = nil,
         transform: (inout Value) -> Void,
         perform operation: () -> Result
     ) -> Result {
         var values = EnvironmentRenderContext.current
+        let inheritedRegistrations = Set(
+            values.resolveKey.registrations.map(ObjectIdentifier.init)
+        )
         transform(&values[keyPath: keyPath])
-        return EnvironmentRenderContext.withValues(values, perform: operation)
+        let registrations = values.resolveKey.registrations
+            .filter {
+                !inheritedRegistrations.contains(ObjectIdentifier($0))
+            }
+        return EnvironmentRenderContext.withValues(values) {
+            if let renderedPath {
+                let interactionPath = values.focusPath ?? renderedPath
+                for registration in registrations {
+                    runtime?.registerResolveKeyHandler(
+                        registration.handler,
+                        for: registration.key,
+                        at: interactionPath,
+                        actionPath: actionPath
+                    )
+                }
+            }
+
+            return operation()
+        }
     }
 
     func render<Value, Result>(
@@ -1067,6 +1253,13 @@ private struct PasteActionKey: EnvironmentKey {
 
     nonisolated static var defaultValue: PasteAction {
         PasteAction { nil }
+    }
+}
+
+private struct ResolveKeyActionKey: EnvironmentKey {
+
+    nonisolated static var defaultValue: ResolveKeyAction {
+        ResolveKeyAction()
     }
 }
 

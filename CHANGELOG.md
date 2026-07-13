@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ResolveKeyAction` and `EnvironmentValues.resolveKey` for keyed
+  key-down fallback handling. Resolvers run after focused and legacy global
+  key handlers ignore an event, and nested declarations fall back from the
+  closest matching environment scope outward.
 - Added public `InputEvent`, `KeyEvent`, and `PointerEvent` matcher protocols with
   configurable `KeyPressEvent` and `PointerPressEvent` primitives.
 - Added public keyed view attachments and captured pointer drags for composing
@@ -34,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- Deprecated all five `onGlobalKeyPress` overloads. Use
+  `environment(\.resolveKey[key], _:)` for key-down fallback handling; legacy
+  global handlers continue to run before `resolveKey`.
 - Deprecated Foundation `AttributedString` text initialization, SwiftTUI
   attributed-string keys and scopes, and attributed text alignment. These APIs
   will be removed in a future release.

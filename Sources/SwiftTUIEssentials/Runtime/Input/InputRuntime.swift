@@ -405,6 +405,14 @@ nonisolated struct KeyPressHandler {
     let action: (KeyPress) -> KeyPress.Result
 }
 
+/// A key-down fallback closure together with the state path that declared it.
+nonisolated struct ResolveKeyHandler {
+
+    let actionPath: [Int]?
+
+    let action: ResolveKeyAction.Handler
+}
+
 struct TapGestureHandler {
 
     let actionPath: [Int]?
@@ -561,6 +569,17 @@ final class InputRuntime {
         var handler: KeyPressHandler
     }
 
+    /// One rendered key resolver. `path` controls branch selection, while
+    /// `order` provides stable render-order and same-path modifier precedence.
+    private struct ResolveKeyHandlerEntry {
+
+        var path: [Int]
+
+        var order: Int
+
+        var handler: ResolveKeyHandler
+    }
+
     private struct ActivePointerDownPositionTarget {
 
         var capture: PointerCapture
@@ -613,6 +632,8 @@ final class InputRuntime {
     private var handlersByPath: [[Int]: [KeyPressHandler]] = [:]
 
     private var globalHandlers: [GlobalKeyPressHandler] = []
+
+    private var resolveKeyHandlers: [KeyEquivalent: [ResolveKeyHandlerEntry]] = [:]
 
     private var defaultGestureHandlersByPath: [[Int]: [DefaultGestureHandler]] = [:]
 
@@ -676,6 +697,7 @@ final class InputRuntime {
     func beginRender() {
         handlersByPath = [:]
         globalHandlers = []
+        resolveKeyHandlers = [:]
         defaultGestureHandlersByPath = [:]
         pointerPressHandlersByPath = [:]
         pointerDragHandlersByPath = [:]
@@ -703,6 +725,17 @@ final class InputRuntime {
                 order: globalHandlers.count,
                 handler: handler
             )
+        )
+    }
+
+    func registerResolveKey(
+        _ handler: ResolveKeyHandler,
+        for key: KeyEquivalent,
+        at path: [Int]
+    ) {
+        let order = resolveKeyHandlers[key, default: []].count
+        resolveKeyHandlers[key, default: []].append(
+            ResolveKeyHandlerEntry(path: path, order: order, handler: handler)
         )
     }
 
@@ -793,6 +826,43 @@ final class InputRuntime {
         return .ignored
     }
 
+    /// Resolves one key along the focused branch, or along one selected
+    /// deepest rendered branch when no view has focus.
+    func resolve(
+        _ key: KeyEquivalent,
+        toward focusedPath: [Int]?,
+        perform: ([Int], () -> ResolveKeyAction.Result) -> ResolveKeyAction.Result
+    ) -> ResolveKeyAction.Result {
+        guard let entries = resolveKeyHandlers[key], !entries.isEmpty else {
+            return .ignored
+        }
+
+        let anchorPath: [Int]
+        if let focusedPath {
+            anchorPath = focusedPath
+        } else {
+            guard let entry = entries.max(by: resolveKeyAnchorPrecedes) else {
+                return .ignored
+            }
+            anchorPath = entry.path
+        }
+
+        let candidates = entries
+            .filter {
+                anchorPath.starts(with: $0.path)
+            }
+            .sorted(by: resolveKeyHandlerPrecedes)
+
+        for entry in candidates {
+            let actionPath = entry.handler.actionPath ?? entry.path
+            if perform(actionPath, { entry.handler.action(key) }) == .handled {
+                return .handled
+            }
+        }
+
+        return .ignored
+    }
+
     private func globalHandlerPrecedes(
         _ lhs: GlobalKeyPressHandler,
         _ rhs: GlobalKeyPressHandler
@@ -802,6 +872,30 @@ final class InputRuntime {
         }
 
         return lhs.order < rhs.order
+    }
+
+    /// Orders candidates so `max(by:)` selects the deepest path and then the
+    /// first registration among paths at the same depth.
+    private func resolveKeyAnchorPrecedes(
+        _ lhs: ResolveKeyHandlerEntry,
+        _ rhs: ResolveKeyHandlerEntry
+    ) -> Bool {
+        if lhs.path.count != rhs.path.count {
+            return lhs.path.count < rhs.path.count
+        }
+
+        return lhs.order > rhs.order
+    }
+
+    private func resolveKeyHandlerPrecedes(
+        _ lhs: ResolveKeyHandlerEntry,
+        _ rhs: ResolveKeyHandlerEntry
+    ) -> Bool {
+        if lhs.path.count != rhs.path.count {
+            return lhs.path.count > rhs.path.count
+        }
+
+        return lhs.order > rhs.order
     }
 
     private func dispatch(

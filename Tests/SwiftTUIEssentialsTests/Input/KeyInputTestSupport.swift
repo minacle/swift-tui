@@ -161,16 +161,45 @@ struct NestedGlobalKeyPressView: View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 Text("C")
-                    .onGlobalKeyPress("a") {
+                    ._onGlobalKeyPress("a") {
                         keyProbe.record("inner")
                         return innerResult
                     }
             }
         }
-        .onGlobalKeyPress("a") {
+        ._onGlobalKeyPress("a") {
             keyProbe.record("outer")
             return .handled
         }
+    }
+}
+
+struct GlobalKeyPressOverloadView: View {
+
+    let keyProbe: KeyPressProbe
+
+    var body: some View {
+        Text("A")
+            ._onGlobalKeyPress("a") {
+                keyProbe.record("plain")
+                return .handled
+            }
+            ._onGlobalKeyPress(phases: .up) { _ in
+                keyProbe.record("phase")
+                return .handled
+            }
+            ._onGlobalKeyPress("b", phases: .repeat) { _ in
+                keyProbe.record("exact")
+                return .handled
+            }
+            ._onGlobalKeyPress(keys: ["c", "d"], phases: .down) { _ in
+                keyProbe.record("set")
+                return .handled
+            }
+            ._onGlobalKeyPress(characters: .decimalDigits, phases: .down) { _ in
+                keyProbe.record("characters")
+                return .handled
+            }
     }
 }
 
@@ -202,7 +231,7 @@ struct CapturedDisabledInputModifiersText: View {
                 keyProbe.record("focused")
                 return .handled
             }
-            .onGlobalKeyPress("g") {
+            ._onGlobalKeyPress("g") {
                 keyProbe.record("global")
                 return .handled
             }
@@ -305,7 +334,7 @@ struct CapturedFocusedAndGlobalKeyPressText: View {
                 keyProbe.record("focused")
                 return focusedResult
             }
-            .onGlobalKeyPress("a") {
+            ._onGlobalKeyPress("a") {
                 keyProbe.record("global")
                 return .handled
             }
@@ -318,7 +347,7 @@ struct GlobalEnvironmentTerminateView: View {
 
     var body: some View {
         Text("A")
-            .onGlobalKeyPress(.escape) {
+            ._onGlobalKeyPress(.escape) {
                 terminate()
                 return .handled
             }

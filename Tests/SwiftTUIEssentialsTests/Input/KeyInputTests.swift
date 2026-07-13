@@ -242,7 +242,7 @@ struct KeyInputTests {
         let runtime = StateRuntime()
         let keyProbe = KeyPressProbe()
         let view = Text("A")
-            .onGlobalKeyPress(.escape) {
+            ._onGlobalKeyPress(.escape) {
                 keyProbe.record("global")
                 return .handled
             }
@@ -250,6 +250,31 @@ struct KeyInputTests {
         #expect(runtime.block(from: view)?.text == "A")
         #expect(runtime.dispatch(KeyPress(key: .escape, characters: "\u{001B}")) == .handled)
         #expect(keyProbe.events == ["global"])
+    }
+
+    @Test
+    func `global key-handler overloads retain key set character and phase matching`() {
+        let runtime = StateRuntime()
+        let keyProbe = KeyPressProbe()
+        let view = GlobalKeyPressOverloadView(keyProbe: keyProbe)
+
+        _ = runtime.block(from: view)
+
+        #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: "q", characters: "q", phase: .up)
+            ) == .handled
+        )
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: "b", characters: "b", phase: .repeat)
+            ) == .handled
+        )
+        #expect(runtime.dispatch(KeyPress(key: "c", characters: "c")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: "5", characters: "5")) == .handled)
+        #expect(runtime.dispatch(KeyPress(key: "z", characters: "z")) == .ignored)
+        #expect(keyProbe.events == ["plain", "phase", "exact", "set", "characters"])
     }
 
     @Test

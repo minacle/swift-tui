@@ -399,6 +399,26 @@ final class StateRuntime {
         )
     }
 
+    func registerResolveKeyHandler(
+        _ action: @escaping ResolveKeyAction.Handler,
+        for key: KeyEquivalent,
+        at path: [Int],
+        actionPath: [Int]?
+    ) {
+        guard !isSuppressingInteractiveRenderRegistrations,
+              EnvironmentRenderContext.current.isEnabled else {
+            return
+        }
+
+        input.registerResolveKey(
+            environmentRestoringResolveKeyHandler(
+                ResolveKeyHandler(actionPath: actionPath, action: action)
+            ),
+            for: key,
+            at: path
+        )
+    }
+
     func registerTapGestureHandler(_ handler: TapGestureHandler, at path: [Int]) {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled else {
@@ -851,7 +871,24 @@ final class StateRuntime {
             return .handled
         }
 
-        return input.dispatchGlobal(keyPress, perform: performKeyPress)
+        if input.dispatchGlobal(keyPress, perform: performKeyPress) == .handled {
+            return .handled
+        }
+
+        guard keyPress.phase == .down else {
+            return .ignored
+        }
+
+        switch input.resolve(
+            keyPress.key,
+            toward: focus.activePath,
+            perform: performResolveKey
+        ) {
+        case .handled:
+            return .handled
+        case .ignored:
+            return .ignored
+        }
     }
 
     func dispatch(_ pointerPress: PointerPress, at date: Date = Date()) -> KeyPress.Result {
@@ -991,6 +1028,13 @@ final class StateRuntime {
         withView(at: path, perform: operation)
     }
 
+    private func performResolveKey(
+        at path: [Int],
+        operation: () -> ResolveKeyAction.Result
+    ) -> ResolveKeyAction.Result {
+        withView(at: path, perform: operation)
+    }
+
     private func performLifecycleHandler(_ handler: LifecycleHandler) {
         EnvironmentRenderContext.withValues(handler.environment) {
             withView(at: handler.actionPath) {
@@ -1055,6 +1099,20 @@ final class StateRuntime {
             action: { keyPress in
                 EnvironmentRenderContext.withValues(environment) {
                     handler.action(keyPress)
+                }
+            }
+        )
+    }
+
+    private func environmentRestoringResolveKeyHandler(
+        _ handler: ResolveKeyHandler
+    ) -> ResolveKeyHandler {
+        let environment = EnvironmentRenderContext.current
+        return ResolveKeyHandler(
+            actionPath: handler.actionPath,
+            action: { key in
+                EnvironmentRenderContext.withValues(environment) {
+                    handler.action(key)
                 }
             }
         )

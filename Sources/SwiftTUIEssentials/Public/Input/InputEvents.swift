@@ -1080,7 +1080,7 @@ extension View {
     ///   - key: The key to match.
     ///   - action: The action to perform for matching key-down or repeat events.
     ///     Return ``KeyPress/Result/handled`` to stop propagation toward the
-    ///     focused view and to global handlers.
+    ///     focused view, global handlers, and key-resolution fallbacks.
     /// - Returns: A view with a focused key handler attached.
     public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
@@ -1198,15 +1198,16 @@ extension View {
     ///   - action: The action to perform for matching key-down or repeat events.
     ///     Return ``KeyPress/Result/handled`` to stop later global handlers.
     /// - Returns: A view with a global key handler attached.
+    @available(
+        *,
+        deprecated,
+        message: "Use environment(\\.resolveKey[key], _:) for key-down fallback handling."
+    )
     public func onGlobalKeyPress(
         _ key: KeyEquivalent,
         action: @escaping () -> KeyPress.Result
     ) -> some View {
-        onGlobalKeyPress(key, phases: [.down, .repeat]) {
-            _ in
-
-            action()
-        }
+        _onGlobalKeyPress(key, action: action)
     }
 
     /// Performs an action for any matching key phase after focused dispatch
@@ -1217,7 +1218,102 @@ extension View {
     ///     repeat; an empty set never matches.
     ///   - action: The action to perform for matching key presses.
     /// - Returns: A view with a global key handler attached.
+    @available(
+        *,
+        deprecated,
+        message: "Use environment(\\.resolveKey[key], _:) for key-down fallback handling."
+    )
     public func onGlobalKeyPress(
+        phases: KeyPress.Phases = [.down, .repeat],
+        action: @escaping (KeyPress) -> KeyPress.Result
+    ) -> some View {
+        _onGlobalKeyPress(phases: phases, action: action)
+    }
+
+    /// Performs an action for a matching key and phase after focused dispatch
+    /// ignores the event.
+    ///
+    /// - Parameters:
+    ///   - key: The key to match.
+    ///   - phases: The key phases to match. An empty set never matches.
+    ///   - action: The action to perform for matching key presses.
+    /// - Returns: A view with a global key handler attached.
+    @available(
+        *,
+        deprecated,
+        message: "Use environment(\\.resolveKey[key], _:) for key-down fallback handling."
+    )
+    public func onGlobalKeyPress(
+        _ key: KeyEquivalent,
+        phases: KeyPress.Phases,
+        action: @escaping (KeyPress) -> KeyPress.Result
+    ) -> some View {
+        _onGlobalKeyPress(key, phases: phases, action: action)
+    }
+
+    /// Performs an action for any key in a set after focused dispatch ignores
+    /// the event.
+    ///
+    /// - Parameters:
+    ///   - keys: The set of keys to match. An empty set never matches.
+    ///   - phases: The key phases to match. The default matches key-down and
+    ///     repeat; an empty set never matches.
+    ///   - action: The action to perform for matching key presses.
+    /// - Returns: A view with a global key handler attached.
+    @available(
+        *,
+        deprecated,
+        message: "Use environment(\\.resolveKey[key], _:) for key-down fallback handling."
+    )
+    public func onGlobalKeyPress(
+        keys: Set<KeyEquivalent>,
+        phases: KeyPress.Phases = [.down, .repeat],
+        action: @escaping (KeyPress) -> KeyPress.Result
+    ) -> some View {
+        _onGlobalKeyPress(keys: keys, phases: phases, action: action)
+    }
+
+    /// Performs an action after focused dispatch for key events whose nonempty
+    /// text payload contains only Unicode scalars in a character set.
+    ///
+    /// - Parameters:
+    ///   - characters: The character set that all generated Unicode scalars
+    ///     must belong to.
+    ///   - phases: The key phases to match. The default matches key-down and
+    ///     repeat; an empty set never matches.
+    ///   - action: The action to perform for matching key presses.
+    /// - Returns: A view with a global key handler attached.
+    @available(
+        *,
+        deprecated,
+        message: "Use environment(\\.resolveKey[key], _:) for key-down fallback handling."
+    )
+    public func onGlobalKeyPress(
+        characters: CharacterSet,
+        phases: KeyPress.Phases = [.down, .repeat],
+        action: @escaping (KeyPress) -> KeyPress.Result
+    ) -> some View {
+        _onGlobalKeyPress(characters: characters, phases: phases, action: action)
+    }
+}
+
+extension View {
+
+    // These internal overloads retain the complete legacy global-dispatch
+    // contract without exposing deprecation warnings to the library's tests
+    // and internal callers.
+    func _onGlobalKeyPress(
+        _ key: KeyEquivalent,
+        action: @escaping () -> KeyPress.Result
+    ) -> some View {
+        _onGlobalKeyPress(key, phases: [.down, .repeat]) {
+            _ in
+
+            action()
+        }
+    }
+
+    func _onGlobalKeyPress(
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
     ) -> some View {
@@ -1233,32 +1329,15 @@ extension View {
         )
     }
 
-    /// Performs an action for a matching key and phase after focused dispatch
-    /// ignores the event.
-    ///
-    /// - Parameters:
-    ///   - key: The key to match.
-    ///   - phases: The key phases to match. An empty set never matches.
-    ///   - action: The action to perform for matching key presses.
-    /// - Returns: A view with a global key handler attached.
-    public func onGlobalKeyPress(
+    func _onGlobalKeyPress(
         _ key: KeyEquivalent,
         phases: KeyPress.Phases,
         action: @escaping (KeyPress) -> KeyPress.Result
     ) -> some View {
-        onGlobalKeyPress(keys: [key], phases: phases, action: action)
+        _onGlobalKeyPress(keys: [key], phases: phases, action: action)
     }
 
-    /// Performs an action for any key in a set after focused dispatch ignores
-    /// the event.
-    ///
-    /// - Parameters:
-    ///   - keys: The set of keys to match. An empty set never matches.
-    ///   - phases: The key phases to match. The default matches key-down and
-    ///     repeat; an empty set never matches.
-    ///   - action: The action to perform for matching key presses.
-    /// - Returns: A view with a global key handler attached.
-    public func onGlobalKeyPress(
+    func _onGlobalKeyPress(
         keys: Set<KeyEquivalent>,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result
@@ -1275,17 +1354,7 @@ extension View {
         )
     }
 
-    /// Performs an action after focused dispatch for key events whose nonempty
-    /// text payload contains only Unicode scalars in a character set.
-    ///
-    /// - Parameters:
-    ///   - characters: The character set that all generated Unicode scalars
-    ///     must belong to.
-    ///   - phases: The key phases to match. The default matches key-down and
-    ///     repeat; an empty set never matches.
-    ///   - action: The action to perform for matching key presses.
-    /// - Returns: A view with a global key handler attached.
-    public func onGlobalKeyPress(
+    func _onGlobalKeyPress(
         characters: CharacterSet,
         phases: KeyPress.Phases = [.down, .repeat],
         action: @escaping (KeyPress) -> KeyPress.Result

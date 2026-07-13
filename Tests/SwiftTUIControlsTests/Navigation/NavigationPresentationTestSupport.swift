@@ -43,7 +43,7 @@ struct NavigationPresentedBoolStateGlobalKeyView: View {
                 .navigationDestination(isPresented: $isPresented) {
                     Text("Presented")
                 }
-                .onGlobalKeyPress("a") {
+                ._onGlobalKeyPress("a") {
                     isPresented = true
                     return .handled
                 }
@@ -68,7 +68,7 @@ struct NavigationPresentedBoolStateCharacterGlobalKeyOnAppearView: View {
                 .onAppear {
                     didAppear = true
                 }
-                .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+                ._onGlobalKeyPress(characters: .init(charactersIn: "a")) {
                     _ in
 
                     isPresented = true
@@ -104,7 +104,7 @@ struct NavigationPresentedBoolStateDirectDestinationDetailView: View {
             .navigationDestination(isPresented: $isPresented) {
                 Text("Presented")
             }
-            .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+            ._onGlobalKeyPress(characters: .init(charactersIn: "a")) {
                 _ in
 
                 isPresented = true
@@ -143,7 +143,7 @@ struct NavigationPresentedBoolStateDirectDestinationInputDetailView: View {
             .navigationDestination(isPresented: $isPresented) {
                 NavigationPresentedBoolStateDirectDestinationInputPresentedView(probe: probe)
             }
-            .onGlobalKeyPress(characters: .init(charactersIn: "a")) {
+            ._onGlobalKeyPress(characters: .init(charactersIn: "a")) {
                 _ in
 
                 isPresented = true
