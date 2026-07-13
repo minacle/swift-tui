@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added configurable horizontal and vertical scroll indicators with overlay,
   reserved-space, flash, proportional thumb-drag, and page-scroll behavior.
 
+### Changed
+
+- **Breaking:** Changed focused `onKeyPress` propagation to visit handlers from
+  the outermost ancestor inward toward the focused view. A handled ancestor now
+  prevents delivery to focused descendants.
+
 ### Deprecated
 
 - Deprecated Foundation `AttributedString` text initialization, SwiftTUI

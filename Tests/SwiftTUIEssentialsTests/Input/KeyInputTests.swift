@@ -126,32 +126,14 @@ struct KeyInputTests {
     }
 
     @Test
-    func `an ignored focused key handler continues propagation to its ancestor`() {
+    func `an ignored ancestor key handler continues propagation toward the focused view`() {
         let runtime = StateRuntime()
         let keyProbe = KeyPressProbe()
         let focusProbe = FocusBindingProbe<Bool>()
         let view = ParentKeyPressView(
             focusProbe: focusProbe,
             keyProbe: keyProbe,
-            childResult: .ignored
-        )
-
-        _ = runtime.block(from: view)
-        focusProbe.binding?.wrappedValue = true
-        _ = runtime.block(from: view)
-
-        #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
-        #expect(keyProbe.events == ["child", "parent"])
-    }
-
-    @Test
-    func `a handled focused key handler prevents ancestor propagation`() {
-        let runtime = StateRuntime()
-        let keyProbe = KeyPressProbe()
-        let focusProbe = FocusBindingProbe<Bool>()
-        let view = ParentKeyPressView(
-            focusProbe: focusProbe,
-            keyProbe: keyProbe,
+            parentResult: .ignored,
             childResult: .handled
         )
 
@@ -160,7 +142,45 @@ struct KeyInputTests {
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
-        #expect(keyProbe.events == ["child"])
+        #expect(keyProbe.events == ["parent", "child"])
+    }
+
+    @Test
+    func `a handled ancestor key handler prevents propagation to the focused view`() {
+        let runtime = StateRuntime()
+        let keyProbe = KeyPressProbe()
+        let focusProbe = FocusBindingProbe<Bool>()
+        let view = ParentKeyPressView(
+            focusProbe: focusProbe,
+            keyProbe: keyProbe,
+            parentResult: .handled,
+            childResult: .handled
+        )
+
+        _ = runtime.block(from: view)
+        focusProbe.binding?.wrappedValue = true
+        _ = runtime.block(from: view)
+
+        #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+        #expect(keyProbe.events == ["parent"])
+    }
+
+    @Test
+    func `focused key dispatch proceeds from the outermost ancestor toward the focused view`() {
+        let runtime = StateRuntime()
+        let keyProbe = KeyPressProbe()
+        let focusProbe = FocusBindingProbe<Bool>()
+        let view = NestedFocusedKeyPressView(
+            focusProbe: focusProbe,
+            keyProbe: keyProbe
+        )
+
+        _ = runtime.block(from: view)
+        focusProbe.binding?.wrappedValue = true
+        _ = runtime.block(from: view)
+
+        #expect(runtime.dispatch(KeyPress(key: "a", characters: "a")) == .handled)
+        #expect(keyProbe.events == ["outer", "middle", "child"])
     }
 
     @Test

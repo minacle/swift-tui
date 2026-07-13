@@ -744,24 +744,27 @@ final class InputRuntime {
         self.rootFrame = frame
     }
 
+    /// Offers a key press to each identity path from the root toward the focused view.
+    ///
+    /// Dispatch stops as soon as a handler consumes the event.
     func dispatch(
         _ keyPress: KeyPress,
-        from focusedPath: [Int],
+        toward focusedPath: [Int],
         perform: ([Int], () -> KeyPress.Result) -> KeyPress.Result
     ) -> KeyPress.Result {
-        var path = focusedPath
+        var path: [Int] = []
+        if dispatch(keyPress, at: path, perform: perform) == .handled {
+            return .handled
+        }
 
-        while true {
+        for component in focusedPath {
+            path.append(component)
             if dispatch(keyPress, at: path, perform: perform) == .handled {
                 return .handled
             }
-
-            guard !path.isEmpty else {
-                return .ignored
-            }
-
-            path.removeLast()
         }
+
+        return .ignored
     }
 
     func dispatchGlobal(

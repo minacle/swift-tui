@@ -12,6 +12,8 @@ struct ParentKeyPressView: View {
 
     let keyProbe: KeyPressProbe
 
+    let parentResult: KeyPress.Result
+
     let childResult: KeyPress.Result
 
     var body: some View {
@@ -25,7 +27,37 @@ struct ParentKeyPressView: View {
         }
         .onKeyPress("a") {
             keyProbe.record("parent")
-            return .handled
+            return parentResult
+        }
+    }
+}
+
+struct NestedFocusedKeyPressView: View {
+
+    @FocusState var isFocused: Bool
+
+    let focusProbe: FocusBindingProbe<Bool>
+
+    let keyProbe: KeyPressProbe
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                CapturedParentChildKeyPressText(
+                    focusBinding: $isFocused,
+                    focusProbe: focusProbe,
+                    keyProbe: keyProbe,
+                    result: .handled
+                )
+            }
+            .onKeyPress("a") {
+                keyProbe.record("middle")
+                return .ignored
+            }
+        }
+        .onKeyPress("a") {
+            keyProbe.record("outer")
+            return .ignored
         }
     }
 }

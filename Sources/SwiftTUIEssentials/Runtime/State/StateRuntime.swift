@@ -847,7 +847,7 @@ final class StateRuntime {
 
     func dispatch(_ keyPress: KeyPress) -> KeyPress.Result {
         if let activePath = focus.activePath,
-           input.dispatch(keyPress, from: activePath, perform: performKeyPress) == .handled {
+           input.dispatch(keyPress, toward: activePath, perform: performKeyPress) == .handled {
             return .handled
         }
 

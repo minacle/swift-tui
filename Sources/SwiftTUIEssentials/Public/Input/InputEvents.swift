@@ -271,8 +271,8 @@ public nonisolated struct KeyEquivalent: Equatable, Hashable, Sendable,
 
 /// A normalized terminal key event delivered through SwiftTUI input handling.
 ///
-/// Focused handlers receive the event first, beginning at the focused view and
-/// continuing through its ancestors until one returns ``Result/handled``.
+/// Focused dispatch begins at the outermost handler on the branch containing
+/// the focused view and continues inward until one returns ``Result/handled``.
 /// Handlers at the same identity path run in registration order. If the focused
 /// chain ignores the event, SwiftTUI offers it to global handlers, ordered by
 /// deepest rendered path first and then registration order.
@@ -314,7 +314,8 @@ public nonisolated struct KeyPress: Equatable, Sendable {
 
         /// The handler didn't consume the event. Dispatch continues with later
         /// matching handlers registered at the same view path, then with
-        /// matching ancestor handlers, and finally with global handlers.
+        /// matching handlers farther inward toward the focused view, and
+        /// finally with global handlers.
         case ignored
     }
 
@@ -1043,8 +1044,8 @@ extension View {
     /// - Parameters:
     ///   - key: The key to match.
     ///   - action: The action to perform for matching key-down or repeat events.
-    ///     Return ``KeyPress/Result/handled`` to stop ancestor and global
-    ///     propagation.
+    ///     Return ``KeyPress/Result/handled`` to stop propagation toward the
+    ///     focused view and to global handlers.
     /// - Returns: A view with a focused key handler attached.
     public nonisolated func onKeyPress(
         _ key: KeyEquivalent,
