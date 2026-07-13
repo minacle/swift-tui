@@ -323,11 +323,11 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
                 set: { selection = $0 }
             )
         )
-        .onTapGesture {
-            tapSelection = selection
-        }
         .onLongPressGesture(minimumDuration: 0.5) {
             longPressSelection = selection
+        }
+        .onTapGesture {
+            tapSelection = selection
         }
 
         _ = runtime.block(from: view)

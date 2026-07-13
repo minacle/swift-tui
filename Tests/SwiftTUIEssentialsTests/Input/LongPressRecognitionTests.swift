@@ -132,6 +132,273 @@ struct LongPressRecognitionTests {
     }
 
     @Test
+    func `equal-duration long presses run only the innermost action and publish pressing changes outermost first`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("A")
+            .onLongPressGesture(
+                minimumDuration: 0,
+                perform: {
+                    tapProbe.record("inner-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "inner-true" : "inner-false")
+                }
+            )
+            .onLongPressGesture(
+                minimumDuration: 0,
+                perform: {
+                    tapProbe.record("middle-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "middle-true" : "middle-false")
+                }
+            )
+            .onLongPressGesture(
+                minimumDuration: 0,
+                perform: {
+                    tapProbe.record("outer-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "outer-true" : "outer-false")
+                }
+            )
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+        #expect(
+            tapProbe.events == [
+                "outer-true",
+                "middle-true",
+                "inner-true",
+                "inner-action",
+            ]
+        )
+        #expect(runtime.nextLongPressDeadline == nil)
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(1)) == .ignored)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
+                at: date.addingTimeInterval(1)
+            ) == .handled
+        )
+        #expect(
+            tapProbe.events == [
+                "outer-true",
+                "middle-true",
+                "inner-true",
+                "inner-action",
+                "outer-false",
+                "middle-false",
+                "inner-false",
+            ]
+        )
+    }
+
+    @Test
+    func `an inner tap runs after an outer long press ends without recognizing`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("A")
+            .onTapGesture {
+                tapProbe.record("inner-tap")
+            }
+            .onLongPressGesture(
+                minimumDuration: 0,
+                perform: {
+                    tapProbe.record("outer-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "outer-true" : "outer-false")
+                }
+            )
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["outer-true"])
+        #expect(runtime.nextLongPressDeadline == nil)
+        #expect(runtime.dispatchExpiredLongPressActions(at: date) == .ignored)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
+                at: date.addingTimeInterval(0.1)
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["outer-true", "outer-false", "inner-tap"])
+    }
+
+    @Test
+    func `an outer tap runs before a timed-out inner long press ends`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("A")
+            .onLongPressGesture(
+                minimumDuration: 10,
+                perform: {
+                    tapProbe.record("inner-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "inner-true" : "inner-false")
+                }
+            )
+            .onTapGesture {
+                tapProbe.record("outer-tap")
+            }
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["inner-true"])
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
+                at: date.addingTimeInterval(0.1)
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["inner-true", "outer-tap", "inner-false"])
+    }
+
+    @Test
+    func `an earlier innermost long press prevents a later outer action`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("A")
+            .onLongPressGesture(minimumDuration: 0.1) {
+                tapProbe.record("inner")
+            }
+            .onLongPressGesture(minimumDuration: 0.2) {
+                tapProbe.record("outer")
+            }
+
+        _ = runtime.block(from: view)
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
+        #expect(tapProbe.events == ["inner"])
+        #expect(runtime.nextLongPressDeadline == nil)
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.2)) == .ignored)
+        #expect(tapProbe.events == ["inner"])
+    }
+
+    @Test
+    func `an earlier outer long press prevents a later innermost action`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("A")
+            .onLongPressGesture(minimumDuration: 0.2) {
+                tapProbe.record("inner")
+            }
+            .onLongPressGesture(minimumDuration: 0.1) {
+                tapProbe.record("outer")
+            }
+
+        _ = runtime.block(from: view)
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.1)) == .handled)
+        #expect(tapProbe.events == ["outer"])
+        #expect(runtime.nextLongPressDeadline == nil)
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.2)) == .ignored)
+        #expect(tapProbe.events == ["outer"])
+    }
+
+    @Test
+    func `movement rejects one long press while a surviving candidate still recognizes`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Text("AB")
+            .onLongPressGesture(
+                minimumDuration: 0.5,
+                maximumDistance: .zero,
+                perform: {
+                    tapProbe.record("inner-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "inner-true" : "inner-false")
+                }
+            )
+            .onLongPressGesture(
+                minimumDuration: 0.5,
+                maximumDistance: Size(columns: 1, rows: 0),
+                perform: {
+                    tapProbe.record("outer-action")
+                },
+                onPressingChanged: {
+                    tapProbe.record($0 ? "outer-true" : "outer-false")
+                }
+            )
+
+        _ = runtime.block(from: view)
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+        #expect(
+            runtime.dispatch(
+                PointerMotion(button: .left, location: Point(column: 1, row: 0), modifiers: []),
+                at: date.addingTimeInterval(0.1)
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["outer-true", "inner-true", "inner-false"])
+
+        #expect(runtime.dispatchExpiredLongPressActions(at: date.addingTimeInterval(0.5)) == .handled)
+        #expect(tapProbe.events == ["outer-true", "inner-true", "inner-false", "outer-action"])
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 1, row: 0), phase: .up),
+                at: date.addingTimeInterval(0.6)
+            ) == .handled
+        )
+        #expect(
+            tapProbe.events == [
+                "outer-true",
+                "inner-true",
+                "inner-false",
+                "outer-action",
+                "outer-false",
+            ]
+        )
+    }
+
+    @Test
     func `long-press hit testing selects the deepest region and excludes content clipped by a frame`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
@@ -173,16 +440,16 @@ struct LongPressRecognitionTests {
     }
 
     @Test
-    func `a recognized long press suppresses the competing tap on release`() {
+    func `a recognized inner long press suppresses an outer tap on release`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
         let view = Text("A")
-            .onTapGesture {
-                tapProbe.record("tap")
-            }
             .onLongPressGesture(minimumDuration: 0.1) {
                 tapProbe.record("long")
+            }
+            .onTapGesture {
+                tapProbe.record("tap")
             }
 
         _ = runtime.block(from: view)

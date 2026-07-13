@@ -70,6 +70,44 @@ struct ButtonBehaviorTests {
     }
 
     @Test
+    func `a button runs after an outer long press ends without recognizing`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+        let view = Button("Run") {
+            tapProbe.record("button")
+        }
+        .onLongPressGesture(
+            minimumDuration: 0,
+            perform: {
+                tapProbe.record("long")
+            },
+            onPressingChanged: {
+                tapProbe.record($0 ? "pressing" : "ended")
+            }
+        )
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .down),
+                at: date
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["pressing"])
+        #expect(runtime.nextLongPressDeadline == nil)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
+                at: date.addingTimeInterval(0.1)
+            ) == .handled
+        )
+        #expect(tapProbe.events == ["pressing", "ended", "button"])
+    }
+
+    @Test
     func `a button ignores clicks outside its hit region`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()

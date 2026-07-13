@@ -994,6 +994,22 @@ extension View {
     /// independently along the terminal column and row axes rather than as a
     /// Euclidean radius.
     ///
+    /// Long presses in the selected default-gesture chain compete by their
+    /// recognition deadline. The earliest deadline wins; equal deadlines use
+    /// the innermost modifier. A winner suppresses every other long-press
+    /// action and any competing tap or `Button` action. A tap or `Button` that
+    /// is deeper than a long press prevents that outer long press from
+    /// recognizing, while still receiving its pressing-state callbacks. If no
+    /// long press recognizes before release, the tap or `Button` can run as a
+    /// fallback.
+    ///
+    /// Pressing-state callbacks begin from the outermost modifier and proceed
+    /// inward. They end in the same modifier order, interleaved with a fallback
+    /// tap or `Button` according to that order. Moving outside one handler's
+    /// extent ends only that handler; other long presses can continue to
+    /// compete. Once a long press recognizes, later movement doesn't cancel
+    /// the winner.
+    ///
     /// - Parameters:
     ///   - minimumDuration: The minimum duration of the long press, in seconds.
     ///     Negative values are treated as zero.
@@ -1003,7 +1019,8 @@ extension View {
     ///   - action: The action to perform when the long press is recognized.
     ///   - onPressingChanged: An optional closure that receives `true` on a
     ///     matching pointer-down and `false` on release, cancellation, or
-    ///     movement beyond the allowed extent.
+    ///     movement beyond this handler's allowed extent. Each transition is
+    ///     delivered at most once for a press sequence.
     /// - Returns: A view with a long-press gesture handler attached.
     public func onLongPressGesture(
         minimumDuration: Double = 0.5,

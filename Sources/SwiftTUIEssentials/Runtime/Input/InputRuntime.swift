@@ -614,13 +614,11 @@ final class InputRuntime {
 
     private var globalHandlers: [GlobalKeyPressHandler] = []
 
-    private var tapHandlersByPath: [[Int]: [TapGestureHandler]] = [:]
+    private var defaultGestureHandlersByPath: [[Int]: [DefaultGestureHandler]] = [:]
 
     private var pointerPressHandlersByPath: [[Int]: [PointerPressHandler]] = [:]
 
     private var pointerDragHandlersByPath: [[Int]: PointerDragHandler] = [:]
-
-    private var longPressHandlersByPath: [[Int]: [LongPressGestureHandler]] = [:]
 
     private var hoverHandlersByPath: [[Int]: [HoverGestureHandler]] = [:]
 
@@ -638,7 +636,7 @@ final class InputRuntime {
 
     private var rootFrame = RenderedTerminalFrame(text: "", row: 1, column: 1)
 
-    private var pressedTapTarget: [Int]?
+    private var pressedDefaultGestureTarget: DefaultGesturePressTarget?
 
     private var pressedLinkTarget: [Int]?
 
@@ -659,16 +657,28 @@ final class InputRuntime {
     }
 
     var nextLongPressDeadline: Date? {
-        longPressSequence?.nextDeadline
+        guard let sequence = longPressSequence,
+              !sequence.didPerform else {
+            return nil
+        }
+
+        return sequence.candidates
+            .filter {
+                !isBlockedByInnerTap(
+                    $0,
+                    in: pressedDefaultGestureTarget
+                )
+            }
+            .map(\.deadline)
+            .min()
     }
 
     func beginRender() {
         handlersByPath = [:]
         globalHandlers = []
-        tapHandlersByPath = [:]
+        defaultGestureHandlersByPath = [:]
         pointerPressHandlersByPath = [:]
         pointerDragHandlersByPath = [:]
-        longPressHandlersByPath = [:]
         hoverHandlersByPath = [:]
         linkHandlersByPath = [:]
         pointerDownPositionHandlersByPath = [:]
@@ -697,7 +707,7 @@ final class InputRuntime {
     }
 
     func register(_ handler: TapGestureHandler, at path: [Int]) {
-        tapHandlersByPath[path, default: []].append(handler)
+        defaultGestureHandlersByPath[path, default: []].append(.tap(handler))
     }
 
     func register(_ handler: PointerPressHandler, at path: [Int]) {
@@ -709,7 +719,7 @@ final class InputRuntime {
     }
 
     func register(_ handler: LongPressGestureHandler, at path: [Int]) {
-        longPressHandlersByPath[path, default: []].append(handler)
+        defaultGestureHandlersByPath[path, default: []].append(.longPress(handler))
     }
 
     func register(_ handler: HoverGestureHandler, at path: [Int]) {
@@ -838,7 +848,7 @@ final class InputRuntime {
            beginPointerDrag(pointerPress, perform: perform) {
             _ = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
-            pressedTapTarget = nil
+            pressedDefaultGestureTarget = nil
             pressedLinkTarget = nil
             resetTapSequence()
             return .handled
@@ -847,7 +857,7 @@ final class InputRuntime {
         guard pointerPress.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
-            pressedTapTarget = nil
+            pressedDefaultGestureTarget = nil
             pressedLinkTarget = nil
             let pointerPressResult = dispatchPointerPress(pointerPress, perform: perform)
             return pointerPressResult == .handled || cancelled ? .handled : .ignored
@@ -865,9 +875,11 @@ final class InputRuntime {
                 perform: perform
             )
             pressedLinkTarget = linkTarget(at: pointerPress)
-            pressedTapTarget = tapTarget(at: pointerPress)
+            let defaultGestureTarget = defaultGestureTarget(at: pointerPress)
+            pressedDefaultGestureTarget = defaultGestureTarget
             let longPressStarted = beginLongPress(
-                at: pointerPress,
+                at: defaultGestureTarget,
+                location: rootPoint(for: pointerPress),
                 date: date,
                 perform: perform
             )
@@ -879,7 +891,7 @@ final class InputRuntime {
             return focusedPath != nil
                 || positioned
                 || pressedLinkTarget != nil
-                || pressedTapTarget != nil
+                || pressedDefaultGestureTarget != nil
                 || longPressStarted
                 || longPressRecognized
                 || pointerPressResult == .handled
@@ -892,25 +904,26 @@ final class InputRuntime {
                 activePointerDownPositionTarget = nil
                 _ = cancelLongPress(perform: perform)
                 pressedLinkTarget = nil
-                pressedTapTarget = nil
+                pressedDefaultGestureTarget = nil
                 resetTapSequence()
                 return .handled
             }
 
-            let longPressWasActive = longPressSequence != nil
+            let defaultGestureWasActive = pressedDefaultGestureTarget != nil
             let pointerDownPositionWasActive = activePointerDownPositionTarget != nil
-            let longPressSucceeded = endLongPress(perform: perform)
-            if longPressSucceeded {
+            if longPressSequence?.didPerform == true {
+                _ = endLongPress(perform: perform)
                 activePointerDownPositionTarget = nil
                 pressedLinkTarget = nil
-                pressedTapTarget = nil
+                pressedDefaultGestureTarget = nil
                 return .handled
             }
 
             if let pressedLinkTarget {
+                _ = cancelLongPress(perform: perform)
                 defer {
                     self.pressedLinkTarget = nil
-                    self.pressedTapTarget = nil
+                    self.pressedDefaultGestureTarget = nil
                 }
 
                 guard linkTarget(at: pointerPress) == pressedLinkTarget else {
@@ -926,36 +939,50 @@ final class InputRuntime {
                 return linkResult == .handled || positioned ? .handled : .ignored
             }
 
-            guard let pressedTapTarget else {
+            guard let pressedDefaultGestureTarget else {
+                _ = cancelLongPress(perform: perform)
                 let positioned = finishActivePointerDownPosition(
                     at: pointerPress,
                     perform: perform
                 )
-                return longPressWasActive || pointerDownPositionWasActive || positioned
+                return defaultGestureWasActive || pointerDownPositionWasActive || positioned
                     ? .handled : .ignored
             }
 
             defer {
-                self.pressedTapTarget = nil
+                self.pressedDefaultGestureTarget = nil
             }
 
-            guard tapTarget(at: pointerPress) == pressedTapTarget else {
+            let releasePoint = rootPoint(for: pointerPress)
+            guard pressedDefaultGestureTarget.frame.contains(
+                column: releasePoint.column,
+                row: releasePoint.row
+            ) else {
                 activePointerDownPositionTarget = nil
+                _ = cancelLongPress(perform: perform)
                 resetTapSequence()
                 return .ignored
             }
 
-            let tapResult = dispatchTap(
-                at: pressedTapTarget,
-                location: rootPoint(for: pointerPress),
-                date: date,
+            let tapOutcome = recognizeTap(
+                at: pressedDefaultGestureTarget,
+                location: releasePoint,
+                date: date
+            )
+            finishDefaultGesturePress(
+                pressedDefaultGestureTarget,
+                tapOutcome: tapOutcome,
+                rootPoint: releasePoint,
                 perform: perform
             )
             let positioned = finishActivePointerDownPosition(
                 at: pointerPress,
                 perform: perform
             )
-            return tapResult == .handled || positioned ? .handled : .ignored
+            return tapOutcome.result == .handled
+                || defaultGestureWasActive
+                || positioned
+                ? .handled : .ignored
         }
 
         return .ignored
@@ -986,7 +1013,7 @@ final class InputRuntime {
         guard pointerMotion.button == .left else {
             let cancelled = cancelLongPress(perform: perform)
             activePointerDownPositionTarget = nil
-            pressedTapTarget = nil
+            pressedDefaultGestureTarget = nil
             pressedLinkTarget = nil
             return hoverResult == .handled || cancelled ? .handled : .ignored
         }
@@ -997,7 +1024,7 @@ final class InputRuntime {
         )
         if positioned {
             pressedLinkTarget = nil
-            pressedTapTarget = nil
+            pressedDefaultGestureTarget = nil
         }
         let longPressResult = dispatchLongPressMotion(pointerMotion, perform: perform)
         return hoverResult == .handled
@@ -1018,7 +1045,7 @@ final class InputRuntime {
 
         let cancelled = cancelLongPress(perform: perform)
         activePointerDownPositionTarget = nil
-        pressedTapTarget = nil
+        pressedDefaultGestureTarget = nil
         pressedLinkTarget = nil
         let result = dispatchScroll(pointerScroll, scroll: scroll)
         return result == .handled || cancelled ? .handled : .ignored
@@ -1135,24 +1162,26 @@ final class InputRuntime {
         at date: Date,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
-        guard var sequence = longPressSequence else {
+        guard var sequence = longPressSequence,
+              !sequence.didPerform,
+              let candidate = sequence.candidates
+                .filter({
+                    date >= $0.deadline
+                        && !isBlockedByInnerTap(
+                            $0,
+                            in: pressedDefaultGestureTarget
+                        )
+                })
+                .min(by: longPressCandidatePrecedes) else {
             return .ignored
         }
 
-        var handled = false
-        for index in sequence.candidates.indices
-            where !sequence.candidates[index].didPerform
-                && date >= sequence.candidates[index].deadline {
-            let handler = sequence.candidates[index].handler
-            perform(handler.actionPath ?? sequence.path) {
-                handler.action()
-            }
-            sequence.candidates[index].didPerform = true
-            handled = true
+        perform(candidate.handler.actionPath ?? candidate.path) {
+            candidate.handler.action()
         }
-
+        sequence.winnerOrder = candidate.order
         longPressSequence = sequence
-        return handled ? .handled : .ignored
+        return .handled
     }
 
     func dispatchExpiredTapActions(
@@ -1168,16 +1197,18 @@ final class InputRuntime {
             resetTapSequence()
         }
 
-        guard let handler = tapHandler(
-            at: sequence.path,
-            recognizing: sequence.count
-        ) else {
+        guard let target = defaultGestureTarget(atRootPoint: sequence.location),
+              target.path == sequence.path,
+              let recognized = tapHandler(
+                  in: target,
+                  recognizing: sequence.count
+              ) else {
             return .ignored
         }
 
         performTapAction(
-            handler,
-            at: sequence.path,
+            recognized.handler,
+            at: recognized.path,
             rootPoint: sequence.location,
             perform: perform
         )
@@ -1185,31 +1216,40 @@ final class InputRuntime {
     }
 
     private func beginLongPress(
-        at pointerPress: PointerPress,
+        at target: DefaultGesturePressTarget?,
+        location: Point,
         date: Date,
         perform: ([Int], () -> Void) -> Void
     ) -> Bool {
-        guard let path = longPressTarget(at: pointerPress),
-              let handlers = longPressHandlersByPath[path] else {
+        guard let target else {
             return false
         }
 
-        let location = rootPoint(for: pointerPress)
-        let candidates = handlers.map {
-            LongPressCandidate(
-                handler: $0,
-                deadline: date.addingTimeInterval($0.minimumDuration)
-            )
+        let candidates: [LongPressCandidate] = target.handlers.enumerated()
+            .compactMap { order, registered in
+
+                guard case .longPress(let handler) = registered.handler else {
+                    return nil
+                }
+                return LongPressCandidate(
+                    order: order,
+                    path: registered.path,
+                    handler: handler,
+                    deadline: date.addingTimeInterval(handler.minimumDuration)
+                )
+            }
+        guard !candidates.isEmpty else {
+            return false
         }
         longPressSequence = LongPressSequence(
-            path: path,
+            path: target.path,
             startLocation: location,
             candidates: candidates
         )
 
-        for handler in handlers {
-            perform(handler.actionPath ?? path) {
-                handler.onPressingChanged?(true)
+        for candidate in candidates {
+            perform(candidate.handler.actionPath ?? candidate.path) {
+                candidate.handler.onPressingChanged?(true)
             }
         }
         return true
@@ -1223,20 +1263,23 @@ final class InputRuntime {
             return .ignored
         }
 
+        if sequence.didPerform {
+            return .handled
+        }
+
         let location = rootPoint(for: pointerMotion)
         var remaining: [LongPressCandidate] = []
         var handled = false
         for candidate in sequence.candidates {
-            if candidate.didPerform
-                || isWithinExtent(
-                    from: sequence.startLocation,
-                    to: location,
-                    maximumDistance: candidate.handler.maximumDistance
-                ) {
+            if isWithinExtent(
+                from: sequence.startLocation,
+                to: location,
+                maximumDistance: candidate.handler.maximumDistance
+            ) {
                 remaining.append(candidate)
             }
             else {
-                perform(candidate.handler.actionPath ?? sequence.path) {
+                perform(candidate.handler.actionPath ?? candidate.path) {
                     candidate.handler.onPressingChanged?(false)
                 }
                 handled = true
@@ -1246,6 +1289,33 @@ final class InputRuntime {
         sequence.candidates = remaining
         longPressSequence = remaining.isEmpty ? nil : sequence
         return handled || !remaining.isEmpty ? .handled : .ignored
+    }
+
+    private func longPressCandidatePrecedes(
+        _ lhs: LongPressCandidate,
+        _ rhs: LongPressCandidate
+    ) -> Bool {
+        if lhs.deadline != rhs.deadline {
+            return lhs.deadline < rhs.deadline
+        }
+        return lhs.order > rhs.order
+    }
+
+    private func isBlockedByInnerTap(
+        _ candidate: LongPressCandidate,
+        in target: DefaultGesturePressTarget?
+    ) -> Bool {
+        guard let target,
+              target.path == longPressSequence?.path,
+              candidate.order + 1 < target.handlers.count else {
+            return false
+        }
+        return target.handlers[(candidate.order + 1)...].contains {
+            if case .tap = $0.handler {
+                return true
+            }
+            return false
+        }
     }
 
     private func dispatchHoverMotion(
@@ -1344,44 +1414,79 @@ final class InputRuntime {
         perform: ([Int], () -> Void) -> Void
     ) {
         for candidate in sequence.candidates {
-            perform(candidate.handler.actionPath ?? sequence.path) {
+            perform(candidate.handler.actionPath ?? candidate.path) {
                 candidate.handler.onPressingChanged?(false)
             }
         }
     }
 
-    private func tapTarget(at pointerPress: PointerPress) -> [Int]? {
-        let point = rootPoint(for: pointerPress)
-        return hitRegions
-            .filter {
-                tapHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: point.column, row: point.row)
-            }
-            .max {
-                if $0.path.count != $1.path.count {
-                    return $0.path.count < $1.path.count
-                }
-
-                return $0.frame.area > $1.frame.area
-            }?
-            .path
+    private func defaultGestureTarget(
+        at pointerPress: PointerPress
+    ) -> DefaultGesturePressTarget? {
+        defaultGestureTarget(atRootPoint: rootPoint(for: pointerPress))
     }
 
-    private func longPressTarget(at pointerPress: PointerPress) -> [Int]? {
-        let point = rootPoint(for: pointerPress)
-        return hitRegions
-            .filter {
-                longPressHandlersByPath[$0.path] != nil
-                    && $0.frame.contains(column: point.column, row: point.row)
+    private func defaultGestureTarget(
+        atRootPoint point: Point
+    ) -> DefaultGesturePressTarget? {
+        let matchingRegions = hitRegions.filter {
+            defaultGestureHandlersByPath[$0.path] != nil
+                && $0.frame.contains(column: point.column, row: point.row)
+        }
+        guard let region = matchingRegions.max(by: {
+            if $0.path.count != $1.path.count {
+                return $0.path.count < $1.path.count
             }
-            .max {
-                if $0.path.count != $1.path.count {
-                    return $0.path.count < $1.path.count
-                }
 
-                return $0.frame.area > $1.frame.area
-            }?
-            .path
+            return $0.frame.area > $1.frame.area
+        }),
+              let deepestHandlers = defaultGestureHandlersByPath[region.path] else {
+            return nil
+        }
+
+        let hasTap = deepestHandlers.contains {
+            if case .tap = $0 {
+                return true
+            }
+            return false
+        }
+        let hasLongPress = deepestHandlers.contains {
+            if case .longPress = $0 {
+                return true
+            }
+            return false
+        }
+        let matchingPaths = Set(matchingRegions.map(\.path))
+        // The deepest hit region owns every gesture kind it registers. A kind
+        // missing there can still compete from an ancestor, which lets a
+        // control's internal tap arbitrate with a modifier outside its body
+        // without restoring same-kind bubbling between structural regions.
+        let ancestorHandlers = matchingPaths
+            .filter {
+                $0 != region.path && region.path.starts(with: $0)
+            }
+            .sorted { $0.count < $1.count }
+            .flatMap { path in
+                (defaultGestureHandlersByPath[path] ?? []).map {
+                    RegisteredDefaultGestureHandler(path: path, handler: $0)
+                }
+            }
+            .filter {
+                switch $0.handler {
+                case .tap:
+                    return !hasTap
+                case .longPress:
+                    return !hasLongPress
+                }
+            }
+        let handlers = ancestorHandlers + deepestHandlers.map {
+            RegisteredDefaultGestureHandler(path: region.path, handler: $0)
+        }
+        return DefaultGesturePressTarget(
+            path: region.path,
+            frame: region.frame,
+            handlers: handlers
+        )
     }
 
     private func linkTarget(at pointerPress: PointerPress) -> [Int]? {
@@ -1640,19 +1745,26 @@ final class InputRuntime {
             .map(\.path)
     }
 
-    private func dispatchTap(
-        at path: [Int],
+    private func recognizeTap(
+        at target: DefaultGesturePressTarget,
         location: Point,
-        date: Date,
-        perform: ([Int], () -> Void) -> Void
-    ) -> KeyPress.Result {
-        guard let handler = tapHandlersByPath[path]?.last else {
+        date: Date
+    ) -> TapDispatchOutcome {
+        guard let recognized = target.handlers.enumerated().reversed().compactMap({
+            order, registered -> (Int, [Int], TapGestureHandler)? in
+
+            guard case .tap(let handler) = registered.handler else {
+                return nil
+            }
+            return (order, registered.path, handler)
+        }).first else {
             resetTapSequence()
             return .ignored
         }
+        let (order, path, handler) = recognized
 
-        if tapSequence?.path != path || tapSequence?.isExpired(at: date) == true {
-            tapSequence = TapSequence(path: path)
+        if tapSequence?.path != target.path || tapSequence?.isExpired(at: date) == true {
+            tapSequence = TapSequence(path: target.path)
         }
 
         tapSequence?.count += 1
@@ -1664,19 +1776,14 @@ final class InputRuntime {
         }
 
         if sequence.count == handler.count {
-            performTapAction(
-                handler,
-                at: path,
-                rootPoint: location,
-                perform: perform
-            )
             resetTapSequence()
+            return .recognized(order: order, path: path, handler: handler)
         }
-        else if sequence.count > handler.count {
+        if sequence.count > handler.count {
             resetTapSequence()
         }
 
-        return .handled
+        return .pending
     }
 
     private func dispatchLink(
@@ -1692,12 +1799,16 @@ final class InputRuntime {
     }
 
     private func tapHandler(
-        at path: [Int],
+        in target: DefaultGesturePressTarget,
         recognizing count: Int
-    ) -> TapGestureHandler? {
-        tapHandlersByPath[path]?.last {
-            $0.count == count
-        }
+    ) -> (path: [Int], handler: TapGestureHandler)? {
+        target.handlers.reversed().compactMap {
+            guard case .tap(let handler) = $0.handler,
+                  handler.count == count else {
+                return nil
+            }
+            return ($0.path, handler)
+        }.first
     }
 
     private func performTapAction(
@@ -1710,6 +1821,47 @@ final class InputRuntime {
         perform(handler.actionPath ?? path) {
             handler.action.perform(at: location)
         }
+    }
+
+    private func finishDefaultGesturePress(
+        _ target: DefaultGesturePressTarget,
+        tapOutcome: TapDispatchOutcome,
+        rootPoint: Point,
+        perform: ([Int], () -> Void) -> Void
+    ) {
+        let candidatesByOrder = Dictionary(
+            uniqueKeysWithValues: (longPressSequence?.candidates ?? []).map {
+                ($0.order, $0)
+            }
+        )
+
+        for (order, registered) in target.handlers.enumerated() {
+            switch registered.handler {
+            case .tap:
+                guard case .recognized(
+                    let recognizedOrder,
+                    let path,
+                    let handler
+                ) = tapOutcome,
+                      order == recognizedOrder else {
+                    continue
+                }
+                performTapAction(
+                    handler,
+                    at: path,
+                    rootPoint: rootPoint,
+                    perform: perform
+                )
+            case .longPress:
+                guard let candidate = candidatesByOrder[order] else {
+                    continue
+                }
+                perform(candidate.handler.actionPath ?? candidate.path) {
+                    candidate.handler.onPressingChanged?(false)
+                }
+            }
+        }
+        longPressSequence = nil
     }
 
     private func performHoverEnter(
@@ -1872,6 +2024,47 @@ extension HoverGestureAction {
     }
 }
 
+private enum DefaultGestureHandler {
+
+    case tap(TapGestureHandler)
+
+    case longPress(LongPressGestureHandler)
+}
+
+private struct RegisteredDefaultGestureHandler {
+
+    let path: [Int]
+
+    let handler: DefaultGestureHandler
+}
+
+private struct DefaultGesturePressTarget {
+
+    let path: [Int]
+
+    let frame: RenderedRect
+
+    let handlers: [RegisteredDefaultGestureHandler]
+}
+
+private enum TapDispatchOutcome {
+
+    case ignored
+
+    case pending
+
+    case recognized(order: Int, path: [Int], handler: TapGestureHandler)
+
+    var result: KeyPress.Result {
+        switch self {
+        case .ignored:
+            return .ignored
+        case .pending, .recognized:
+            return .handled
+        }
+    }
+}
+
 private struct TapSequence {
 
     let path: [Int]
@@ -1895,23 +2088,20 @@ private struct LongPressSequence {
 
     var candidates: [LongPressCandidate]
 
-    var nextDeadline: Date? {
-        candidates
-            .filter { !$0.didPerform }
-            .map(\.deadline)
-            .min()
-    }
+    var winnerOrder: Int?
 
     var didPerform: Bool {
-        candidates.contains { $0.didPerform }
+        winnerOrder != nil
     }
 }
 
 private struct LongPressCandidate {
 
+    let order: Int
+
+    let path: [Int]
+
     let handler: LongPressGestureHandler
 
     let deadline: Date
-
-    var didPerform = false
 }

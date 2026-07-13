@@ -21,9 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** Changed focused `onKeyPress` propagation to visit handlers from
   the outermost ancestor inward toward the focused view. A handled ancestor now
   prevents delivery to focused descendants.
-- **Breaking:** Changed overlapping `onTapGesture` modifiers at the same view
-  path to use innermost-first precedence. A recognized inner tap now suppresses
-  outer taps, which receive the sequence only when inner taps time out.
+- **Breaking:** Changed overlapping `onLongPressGesture`, `onTapGesture`, and
+  `Button` interactions to use one default-gesture chain. Taps use
+  innermost-first precedence with matching outer handlers as timeout fallbacks;
+  long presses use earliest-deadline precedence and prefer the innermost
+  modifier on ties. A recognized tap, long press, or button action suppresses
+  competing default gestures.
 
 ### Deprecated
 
