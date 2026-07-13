@@ -290,29 +290,6 @@ struct LayeredViewTests {
     }
 
     @Test
-    func `an internal background style propagates through the environment to descendant text`() {
-        let block = ViewResolver.block(
-            from: VStack(alignment: .leading, spacing: 0) {
-                Text("A")
-                Text("B")
-            }
-            ._backgroundStyle(.red)
-        )
-
-        #expect(block?.runs == [
-            RenderedRun(
-                text: "A",
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
-            ),
-            RenderedRun(
-                text: "B",
-                row: 1,
-                style: TextStyle(backgroundStyle: AnyColor(Color16.red))
-            ),
-        ])
-    }
-
-    @Test
     func `an overlay renders in front of its base view without changing the base size`() {
         let block = ViewResolver.block(
             from: Text("A")

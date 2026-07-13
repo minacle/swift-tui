@@ -781,76 +781,6 @@ extension View {
         foregroundStyle(AnyColor(style))
     }
 
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// SwiftTUI currently accepts terminal color styles only.
-    /// This overload is deprecated; use
-    /// ``View/background(_:)-(Color16)`` to fill the modified view's rendered
-    /// bounds.
-    ///
-    /// - Parameter style: A 16-color terminal SGR style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle(_ style: Color16) -> some View {
-        _backgroundStyle(style)
-    }
-
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// SwiftTUI currently accepts terminal color styles only.
-    /// This overload is deprecated; use
-    /// ``View/background(_:)-(Color256)`` to fill the modified view's rendered
-    /// bounds.
-    ///
-    /// - Parameter style: A 256-color terminal SGR style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle(_ style: Color256) -> some View {
-        _backgroundStyle(style)
-    }
-
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// SwiftTUI currently accepts terminal color styles only.
-    /// This overload is deprecated; use
-    /// ``View/background(_:)-(TrueColor)`` to fill the modified view's rendered
-    /// bounds.
-    ///
-    /// - Parameter style: A true-color terminal SGR style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle(_ style: TrueColor) -> some View {
-        _backgroundStyle(style)
-    }
-
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// SwiftTUI currently accepts terminal color styles only.
-    /// This overload is deprecated; use
-    /// ``View/background(_:)-(DefaultColor)`` to fill the modified view's
-    /// rendered bounds.
-    ///
-    /// - Parameter style: The terminal default color reset style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle(_ style: DefaultColor) -> some View {
-        _backgroundStyle(style)
-    }
-
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// SwiftTUI currently accepts terminal color styles only.
-    /// This overload is deprecated; use ``View/background(_:)-(S)`` to fill the
-    /// modified view's rendered bounds.
-    ///
-    /// - Parameter style: A terminal SGR color style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle<S>(_ style: S) -> some View
-    where S: Color & ShapeStyle {
-        _backgroundStyle(style)
-    }
-
     /// Sets the inherited base foreground color for this view's descendants.
     ///
     /// Plain ``Text`` runs use this color unless an attributed run supplies its
@@ -862,46 +792,6 @@ extension View {
     public func foregroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
             $0.foregroundStyle = style
-        }
-    }
-
-    /// Sets the terminal background style for text within this view.
-    ///
-    /// This overload is deprecated; use
-    /// ``View/background(_:)-(AnyColor)`` to fill the modified view's rendered
-    /// bounds.
-    ///
-    /// - Parameter style: A type-erased terminal SGR color style.
-    /// - Returns: A view that renders descendant text with the given style.
-    @available(*, deprecated, renamed: "background(_:)")
-    public func backgroundStyle(_ style: AnyColor) -> some View {
-        _backgroundStyle(style)
-    }
-
-    internal func _backgroundStyle(_ style: Color16) -> some View {
-        _backgroundStyle(AnyColor(style))
-    }
-
-    internal func _backgroundStyle(_ style: Color256) -> some View {
-        _backgroundStyle(AnyColor(style))
-    }
-
-    internal func _backgroundStyle(_ style: TrueColor) -> some View {
-        _backgroundStyle(AnyColor(style))
-    }
-
-    internal func _backgroundStyle(_ style: DefaultColor) -> some View {
-        _backgroundStyle(AnyColor(style))
-    }
-
-    internal func _backgroundStyle<S>(_ style: S) -> some View
-    where S: Color & ShapeStyle {
-        _backgroundStyle(AnyColor(style))
-    }
-
-    internal func _backgroundStyle(_ style: AnyColor) -> some View {
-        transformEnvironment(\.textStyle) {
-            $0.backgroundStyle = style
         }
     }
 

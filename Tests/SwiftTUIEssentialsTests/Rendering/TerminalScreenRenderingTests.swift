@@ -149,29 +149,6 @@ struct TerminalScreenRenderingTests {
     }
 
     @Test
-    func `an explicit default background overrides an inherited background with reset SGR sequences`() {
-        let output = TerminalScreenRenderer.screen(
-            for: ViewResolver.block(
-                from: VStack(alignment: .leading, spacing: 0) {
-                    Text("A")
-                    Text("B")
-                        ._backgroundStyle(.default)
-                }
-                ._backgroundStyle(.red)
-            )!,
-            in: TerminalViewportSize(columns: 1, rows: 2)
-        )
-
-        #expect(
-            output
-                == "\u{001B}[2J"
-                + "\u{001B}[1;1H\u{001B}[41mA\u{001B}[49m"
-                + "\u{001B}[2;1H\u{001B}[49mB\u{001B}[49m"
-                + "\u{001B}[?25l"
-        )
-    }
-
-    @Test
     func `screen output renders bold SGR`() {
         let output = TerminalScreenRenderer.screen(
             for: ViewResolver.block(from: Text("A").bold())!,

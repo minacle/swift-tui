@@ -162,13 +162,12 @@ struct BoxRenderingTests {
     }
 
     @Test
-    func `box borders preserve only foreground color, background color, and dim styling`() {
+    func `box borders preserve only foreground color and dim styling`() {
         let block = ViewResolver.block(
             from: Box {
                 Text("A")
             }
             .foregroundStyle(.red)
-            ._backgroundStyle(.blue)
             .bold()
             .dim()
             .italic()
@@ -181,7 +180,6 @@ struct BoxRenderingTests {
                 text: "┌─┐",
                 style: TextStyle(
                     foregroundStyle: AnyColor(Color16.red),
-                    backgroundStyle: AnyColor(Color16.blue),
                     isDim: true
                 )
             ),
@@ -190,7 +188,6 @@ struct BoxRenderingTests {
                 row: 1,
                 style: TextStyle(
                     foregroundStyle: AnyColor(Color16.red),
-                    backgroundStyle: AnyColor(Color16.blue),
                     isDim: true
                 )
             ),
@@ -200,7 +197,6 @@ struct BoxRenderingTests {
                 column: 2,
                 style: TextStyle(
                     foregroundStyle: AnyColor(Color16.red),
-                    backgroundStyle: AnyColor(Color16.blue),
                     isDim: true
                 )
             ),
@@ -209,7 +205,6 @@ struct BoxRenderingTests {
                 row: 2,
                 style: TextStyle(
                     foregroundStyle: AnyColor(Color16.red),
-                    backgroundStyle: AnyColor(Color16.blue),
                     isDim: true
                 )
             ),
@@ -219,7 +214,6 @@ struct BoxRenderingTests {
                 column: 1,
                 style: TextStyle(
                     foregroundStyle: AnyColor(Color16.red),
-                    backgroundStyle: AnyColor(Color16.blue),
                     isBold: true,
                     isDim: true,
                     isItalic: true,
@@ -231,13 +225,12 @@ struct BoxRenderingTests {
     }
 
     @Test
-    func `box border terminal output emits only foreground, background, and dim SGR styles`() {
+    func `box border terminal output emits only foreground and dim SGR styles`() {
         let output = TerminalScreenRenderer.screen(
             for: ViewResolver.block(
                 from: Box()
                     .frame(width: 1, height: 1)
                     .foregroundStyle(.red)
-                    ._backgroundStyle(.blue)
                     .bold()
                     .dim()
                     .italic()
@@ -249,7 +242,7 @@ struct BoxRenderingTests {
 
         #expect(
             output == "\u{001B}[2J\u{001B}[1;1H"
-                + "\u{001B}[2m\u{001B}[31m\u{001B}[44m┼\u{001B}[22m\u{001B}[39m\u{001B}[49m"
+                + "\u{001B}[2m\u{001B}[31m┼\u{001B}[22m\u{001B}[39m"
                 + "\u{001B}[?25l"
         )
     }

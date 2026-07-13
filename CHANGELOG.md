@@ -74,6 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attributed-string keys and scopes, and attributed text alignment. These APIs
   will be removed in a future release.
 
+### Removed
+
+- **Breaking:** Removed all six `View.backgroundStyle(_:)` overloads deprecated
+  in 0.5.0. Use `View.background(_:)` instead.
+
 ## [0.9.0] - 2026-07-12
 
 ### Added

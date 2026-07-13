@@ -154,24 +154,19 @@ struct TextContentAndLinkTests {
     }
 
     @Test
-    func `attributed colors take precedence over inherited text colors`() {
+    func `an attributed foreground color overrides inherited foregroundStyle`() {
         var attributed = AttributedString("Styled")
         attributed.setSwiftTUIForegroundColor(.color16(.green))
-        attributed.setSwiftTUIBackgroundColor(.color256(196))
 
         let block = ViewResolver.block(
             from: Text(attributedContent: attributed)
                 .foregroundStyle(.red)
-                ._backgroundStyle(.blue)
         )
 
         #expect(block?.runs == [
             RenderedRun(
                 text: "Styled",
-                style: TextStyle(
-                    foregroundStyle: AnyColor(Color16.green),
-                    backgroundStyle: AnyColor(Color256(rawValue: 196))
-                )
+                style: TextStyle(foregroundStyle: AnyColor(Color16.green))
             ),
         ])
     }
