@@ -81,6 +81,80 @@ struct TapRecognitionTests {
     }
 
     @Test
+    func `the innermost default tap handler alone reports its location at the same view path`() {
+        let runtime = StateRuntime()
+        let locationProbe = TapLocationProbe()
+        let view = Text("AB")
+            .onTapGesture(coordinateSpace: .local) { location in
+                locationProbe.record("inner", location)
+            }
+            .onTapGesture(coordinateSpace: .global) { location in
+                locationProbe.record("middle", location)
+            }
+            .onTapGesture(coordinateSpace: .local) { location in
+                locationProbe.record("outer", location)
+            }
+
+        _ = runtime.block(from: view)
+
+        dispatchClick(to: runtime, column: 2, row: 1)
+
+        #expect(
+            locationProbe.events == [
+                TapLocationEvent(name: "inner", location: Point(column: 1, row: 0))
+            ]
+        )
+    }
+
+    @Test
+    func `an innermost single tap prevents an outer double tap from accumulating`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let view = Text("A")
+            .onTapGesture(count: 1) {
+                tapProbe.record("inner-one")
+            }
+            .onTapGesture(count: 2) {
+                tapProbe.record("outer-two")
+            }
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        _ = runtime.block(from: view)
+
+        dispatchClick(to: runtime, column: 1, row: 1, at: date)
+        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(0.1))
+
+        #expect(tapProbe.events == ["inner-one", "inner-one"])
+    }
+
+    @Test
+    func `an outer single tap runs only after an innermost double tap fails`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let view = Text("A")
+            .onTapGesture(count: 2) {
+                tapProbe.record("inner-two")
+            }
+            .onTapGesture(count: 1) {
+                tapProbe.record("outer-one")
+            }
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        _ = runtime.block(from: view)
+
+        dispatchClick(to: runtime, column: 1, row: 1, at: date)
+        #expect(tapProbe.events.isEmpty)
+        #expect(
+            runtime.dispatchExpiredTapActions(at: date.addingTimeInterval(0.51)) == .handled
+        )
+
+        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(1))
+        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(1.1))
+
+        #expect(tapProbe.events == ["outer-one", "inner-two"])
+    }
+
+    @Test
     func `a frame clips the tap region of its descendant`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
@@ -106,11 +180,11 @@ struct TapRecognitionTests {
             Text("top")
             HStack(spacing: 0) {
                 Text("..")
-                Text("ABCD")
-                    .frame(width: 2)
+                Text("AB")
                     .onTapGesture(coordinateSpace: .local) { location in
                         locationProbe.record("local", location)
                     }
+                Text("CD")
                     .onTapGesture(coordinateSpace: .global) { location in
                         locationProbe.record("global", location)
                     }
@@ -120,11 +194,12 @@ struct TapRecognitionTests {
         _ = runtime.block(from: view)
 
         dispatchClick(to: runtime, column: 4, row: 2)
+        dispatchClick(to: runtime, column: 6, row: 2)
 
         #expect(
             locationProbe.events == [
-                TapLocationEvent(name: "global", location: Point(column: 3, row: 1)),
                 TapLocationEvent(name: "local", location: Point(column: 1, row: 0)),
+                TapLocationEvent(name: "global", location: Point(column: 5, row: 1)),
             ]
         )
     }
@@ -211,7 +286,7 @@ struct TapRecognitionTests {
     }
 
     @Test
-    func `a tap sequence waits while a higher registered tap count remains reachable`() {
+    func `an innermost triple tap recognizes before outer lower-count handlers`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = CountedTapGestureView(tapProbe: tapProbe)
@@ -230,7 +305,7 @@ struct TapRecognitionTests {
     }
 
     @Test
-    func `after a timeout, a partial tap sequence performs the highest reached registered count`() {
+    func `an innermost triple tap falls back to the outer handler matching the timed-out count`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = CountedTapGestureView(tapProbe: tapProbe)
@@ -239,28 +314,35 @@ struct TapRecognitionTests {
         _ = runtime.block(from: view)
 
         dispatchClick(to: runtime, column: 1, row: 1, at: date)
-        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(0.1))
-
         #expect(tapProbe.events.isEmpty)
         #expect(
-            runtime.dispatchExpiredTapActions(at: date.addingTimeInterval(0.61)) == .handled
+            runtime.dispatchExpiredTapActions(at: date.addingTimeInterval(0.51)) == .handled
         )
-        #expect(tapProbe.events == ["two"])
+        #expect(tapProbe.events == ["one"])
+
+        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(1))
+        dispatchClick(to: runtime, column: 1, row: 1, at: date.addingTimeInterval(1.1))
+
+        #expect(tapProbe.events == ["one"])
+        #expect(
+            runtime.dispatchExpiredTapActions(at: date.addingTimeInterval(1.61)) == .handled
+        )
+        #expect(tapProbe.events == ["one", "two"])
     }
 
     @Test
-    func `after a timeout, a partial tap sequence invokes the highest reached handler with the last tap location`() {
+    func `a timed-out inner tap sequence reports its last location to the matching outer handler`() {
         let runtime = StateRuntime()
         let locationProbe = TapLocationProbe()
         let view = Text("ABCD")
-            .onTapGesture(count: 1, coordinateSpace: .local) { location in
-                locationProbe.record("one", location)
+            .onTapGesture(count: 3, coordinateSpace: .local) { location in
+                locationProbe.record("three", location)
             }
             .onTapGesture(count: 2, coordinateSpace: .local) { location in
                 locationProbe.record("two", location)
             }
-            .onTapGesture(count: 3, coordinateSpace: .local) { location in
-                locationProbe.record("three", location)
+            .onTapGesture(count: 1, coordinateSpace: .local) { location in
+                locationProbe.record("one", location)
             }
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
 

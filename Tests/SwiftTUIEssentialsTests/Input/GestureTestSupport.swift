@@ -241,14 +241,14 @@ struct CountedTapGestureView: View {
 
     var body: some View {
         Text("A")
-            .onTapGesture(count: 1) {
-                tapProbe.record("one")
+            .onTapGesture(count: 3) {
+                tapProbe.record("three")
             }
             .onTapGesture(count: 2) {
                 tapProbe.record("two")
             }
-            .onTapGesture(count: 3) {
-                tapProbe.record("three")
+            .onTapGesture(count: 1) {
+                tapProbe.record("one")
             }
     }
 }

@@ -733,9 +733,11 @@ extension View {
     ///
     /// The view registers its rendered terminal frame as a hit region. Pointer
     /// events that complete the requested tap count inside that frame run the
-    /// action. When the same hit region has handlers for larger tap counts,
-    /// SwiftTUI can defer a smaller-count action briefly while waiting for the
-    /// sequence to continue.
+    /// action. When multiple tap modifiers share the same interaction path,
+    /// the innermost modifier receives the first opportunity to recognize the
+    /// sequence. Recognition suppresses outer modifiers. If the innermost
+    /// modifier's requested count isn't reached before the sequence times out,
+    /// the nearest outer modifier matching the completed count runs instead.
     ///
     /// - Parameters:
     ///   - count: The number of consecutive taps required. Must be at least one.
@@ -760,6 +762,10 @@ extension View {
 
     /// Performs an action when this view recognizes a tap gesture, passing the
     /// tap location in the requested terminal-cell coordinate space.
+    ///
+    /// Tap modifiers at the same interaction path use innermost-first
+    /// precedence. Only the modifier that recognizes the sequence reports a
+    /// location; an outer modifier can run only after inner modifiers fail.
     ///
     /// - Parameters:
     ///   - count: The number of consecutive taps required. Must be at least one.

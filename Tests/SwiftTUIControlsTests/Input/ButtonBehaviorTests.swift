@@ -52,6 +52,24 @@ struct ButtonBehaviorTests {
     }
 
     @Test
+    func `a button tap suppresses an outer tap modifier at the same view path`() {
+        let runtime = StateRuntime()
+        let tapProbe = TapGestureProbe()
+        let view = Button("Run") {
+            tapProbe.record("button")
+        }
+        .onTapGesture {
+            tapProbe.record("outer")
+        }
+
+        _ = runtime.block(from: view)
+
+        dispatchClick(to: runtime, column: 1, row: 1)
+
+        #expect(tapProbe.events == ["button"])
+    }
+
+    @Test
     func `a button ignores clicks outside its hit region`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()

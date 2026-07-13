@@ -1168,13 +1168,16 @@ final class InputRuntime {
             resetTapSequence()
         }
 
-        guard let count = sequence.pendingCount else {
+        guard let handler = tapHandler(
+            at: sequence.path,
+            recognizing: sequence.count
+        ) else {
             return .ignored
         }
 
-        performTapActions(
+        performTapAction(
+            handler,
             at: sequence.path,
-            count: count,
             rootPoint: sequence.location,
             perform: perform
         )
@@ -1643,8 +1646,7 @@ final class InputRuntime {
         date: Date,
         perform: ([Int], () -> Void) -> Void
     ) -> KeyPress.Result {
-        let handlers = tapHandlersByPath[path] ?? []
-        guard let maximumCount = handlers.map(\.count).max() else {
+        guard let handler = tapHandlersByPath[path]?.last else {
             resetTapSequence()
             return .ignored
         }
@@ -1661,29 +1663,16 @@ final class InputRuntime {
             return .ignored
         }
 
-        if handlers.contains(where: { $0.count == sequence.count }) {
-            if sequence.count >= maximumCount {
-                performTapActions(
-                    at: path,
-                    count: sequence.count,
-                    rootPoint: location,
-                    perform: perform
-                )
-                resetTapSequence()
-            }
-            else {
-                tapSequence?.pendingCount = sequence.count
-            }
-            return .handled
+        if sequence.count == handler.count {
+            performTapAction(
+                handler,
+                at: path,
+                rootPoint: location,
+                perform: perform
+            )
+            resetTapSequence()
         }
-
-        if let pendingCount = handlers.map(\.count)
-            .filter({ $0 <= sequence.count })
-            .max() {
-            tapSequence?.pendingCount = pendingCount
-        }
-
-        if sequence.count >= maximumCount {
+        else if sequence.count > handler.count {
             resetTapSequence()
         }
 
@@ -1702,17 +1691,24 @@ final class InputRuntime {
         return perform(actionPath, handler.action) ? .handled : .ignored
     }
 
-    private func performTapActions(
+    private func tapHandler(
         at path: [Int],
-        count: Int,
+        recognizing count: Int
+    ) -> TapGestureHandler? {
+        tapHandlersByPath[path]?.last {
+            $0.count == count
+        }
+    }
+
+    private func performTapAction(
+        _ handler: TapGestureHandler,
+        at path: [Int],
         rootPoint: Point,
         perform: ([Int], () -> Void) -> Void
     ) {
-        for handler in tapHandlersByPath[path] ?? [] where handler.count == count {
-            let location = location(for: handler.action, path: path, rootPoint: rootPoint)
-            perform(handler.actionPath ?? path) {
-                handler.action.perform(at: location)
-            }
+        let location = location(for: handler.action, path: path, rootPoint: rootPoint)
+        perform(handler.actionPath ?? path) {
+            handler.action.perform(at: location)
         }
     }
 
@@ -1885,8 +1881,6 @@ private struct TapSequence {
     var location = Point.zero
 
     var deadline = Date.distantPast
-
-    var pendingCount: Int?
 
     func isExpired(at date: Date) -> Bool {
         date >= deadline
