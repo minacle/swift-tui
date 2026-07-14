@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-14
+
 ### Added
 
 - Added `DisclosureGroup` with internal or binding-controlled expansion,
@@ -86,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** Removed all six `View.backgroundStyle(_:)` overloads deprecated
   in 0.5.0. Use `View.background(_:)` instead.
+
+### Fixed
+
+- Fixed single-line `EditableText`, `TextField`, and `SecureField` scrolling so
+  content that exactly fills the available width keeps a visible trailing
+  caret cell after the final character.
 
 ## [0.9.0] - 2026-07-12
 
@@ -501,7 +509,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/minacle/swift-tui/releases/tag/v0.10.0
 [0.9.0]: https://github.com/minacle/swift-tui/releases/tag/v0.9.0
 [0.8.0]: https://github.com/minacle/swift-tui/releases/tag/v0.8.0
 [0.7.0]: https://github.com/minacle/swift-tui/releases/tag/v0.7.0
