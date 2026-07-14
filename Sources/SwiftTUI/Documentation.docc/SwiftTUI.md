@@ -70,6 +70,7 @@ Browse the [Runs API](../swifttuiruns/),
 ### Controls
 
 - ``Button``
+- ``DisclosureGroup``
 - ``TextField``
 - ``SecureField``
 - ``TextEditor``

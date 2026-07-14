@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `DisclosureGroup` with internal or binding-controlled expansion,
+  full-width terminal layout, filled triangle indicators, and
+  triangle-specific pointer toggling.
 - Added `ViewRenderer` and immutable `RenderedView` output for rendering one
   view synchronously as content-local plain text or SGR-styled ANSI without
   starting an application loop or terminal session.

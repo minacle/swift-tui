@@ -4,16 +4,18 @@ Add standard buttons and editable text controls to a SwiftTUI application.
 
 ## Overview
 
-`SwiftTUIControls` provides ``Button``, ``TextField``, ``SecureField``, and
-``TextEditor``. It re-exports `SwiftTUIEssentials`, so a target that imports
-this module can also declare an ``App``, compose views, manage state, and use
-the complete foundational API without importing the essentials module
-separately.
+`SwiftTUIControls` provides ``Button``, ``DisclosureGroup``, ``TextField``,
+``SecureField``, and ``TextEditor``. It re-exports `SwiftTUIEssentials`, so a
+target that imports this module can also declare an ``App``, compose views,
+manage state, and use the complete foundational API without importing the
+essentials module separately.
 
 Controls participate in SwiftTUI's focus and input systems. Buttons respond to
 Return and primary-pointer taps. Text fields and editors synchronize edits
 through ``Binding`` values, accept keyboard and pointer selection, render a
 text caret while focused, and scroll as needed to keep that caret visible.
+Disclosure groups reveal content when their leading triangle is tapped and can
+either retain their own expansion state or synchronize it through a binding.
 
 ```swift
 import SwiftTUIControls
@@ -63,6 +65,10 @@ because the underlying text APIs preserve terminal control characters.
 - ``Button``
 - ``ButtonSizing``
 - ``View/buttonSizing(_:)``
+
+### Disclosure
+
+- ``DisclosureGroup``
 
 ### Single-line text input
 
