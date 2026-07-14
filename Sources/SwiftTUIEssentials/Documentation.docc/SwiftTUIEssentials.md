@@ -1,20 +1,22 @@
 # ``SwiftTUIEssentials``
 
-Build complete terminal applications from SwiftTUI's foundational APIs.
+Build a terminal application from SwiftTUI's view, state, layout, rendering,
+and input primitives.
 
 ## Overview
 
-`SwiftTUIEssentials` provides the application lifecycle, view and state model,
-terminal-cell layout and rendering, keyboard and pointer input, focus,
-navigation, scrolling, text, and shape primitives. It also re-exports
-`SwiftTUIRuns`, whose attributed runs supply the text measurement and wrapping
+`SwiftTUIEssentials` is the foundational application module. It provides the
+``App`` lifecycle, declarative ``View`` model, persistent state, environment
+propagation, terminal-cell layout, rendering, focus, keyboard and pointer
+input, navigation, scrolling, text, and shape primitives. It also re-exports
+`SwiftTUIRuns`, whose attributed runs provide the measurement and wrapping
 model used by ``Text`` and ``EditableText``.
 
-Declare an ``App`` with a ``WindowGroup`` and compose its root view with
-containers such as ``VStack``, ``Grid``, and ``ScrollView``. The module is
-sufficient for a complete application when you want to build interactions from
-input modifiers and ``EditableText`` instead of depending on the standard
-controls in `SwiftTUIControls`.
+Declare an app with a ``WindowGroup`` and compose its root view from containers
+such as ``VStack``, ``Grid``, and ``ScrollView``. This module is sufficient for
+a complete application when you want to build interactions from input
+modifiers and ``EditableText``. Import `SwiftTUIControls` instead when you also
+want standard controls such as buttons, text fields, and text editors.
 
 ```swift
 import SwiftTUIEssentials
@@ -37,12 +39,12 @@ struct DashboardView: View {
                 HStack {
                     Text("API")
                     Spacer()
-                    Text("ready")
+                    Text("ready").foregroundStyle(.green)
                 }
                 HStack {
                     Text("Worker")
                     Spacer()
-                    Text("ready")
+                    Text("ready").foregroundStyle(.green)
                 }
             }
             .padding(1)
@@ -52,82 +54,173 @@ struct DashboardView: View {
 }
 ```
 
-Layout dimensions, coordinates, and spacing are measured in terminal columns
-and rows rather than points. Input and rendering remain terminal-dependent:
-terminals can differ in the keys, modifier flags, pointer events, colors, and
-Unicode cell widths they report or display. Sanitize untrusted strings before
-rendering them because text APIs preserve terminal control characters.
+SwiftTUI measures dimensions, positions, spacing, and pointer locations in
+terminal columns and rows rather than points or pixels. Terminal capabilities
+also affect the key phases, modifier flags, pointer events, colors, and Unicode
+cell widths that an application receives or displays.
+
+Text and clipboard APIs preserve their input. Sanitize untrusted strings before
+rendering them because embedded terminal control characters and escape
+sequences aren't escaped by the rendering pipeline.
 
 ## Topics
 
-### Application and view composition
+### Essentials
+
+- <doc:BuildingAnApplication>
+- <doc:ManagingStateAndEnvironment>
+- <doc:CreatingCustomLayouts>
+- <doc:DisplayingAndEditingText>
+- <doc:NavigatingAndScrolling>
+- <doc:InputRecognition>
+- <doc:RenderingPipeline>
+
+### Application and scene structure
 
 - ``App``
 - ``Scene``
+- ``SceneBuilder``
 - ``WindowGroup``
+
+### View composition and identity
+
 - ``View``
 - ``ViewBuilder``
+- ``Group``
 - ``ForEach``
+- ``AnyView``
+- ``EmptyView``
 
 ### State and environment
 
+- ``DynamicProperty``
 - ``State``
 - ``Binding``
 - ``Bindable``
-- ``Environment``
-- ``EnvironmentValues``
 - ``FocusState``
+- ``Environment``
+- ``EnvironmentBindable``
+- ``EnvironmentValues``
+- ``EnvironmentKey``
+- ``TerminateAction``
+- ``CopyAction``
+- ``PasteAction``
+- ``OpenURLAction``
+- ``ResolveKeyAction``
 
-### Layout and containers
+### Layout protocol and geometry
 
 - ``Layout``
 - ``AnyLayout``
+- ``LayoutProperties``
 - ``ProposedViewSize``
+- ``LayoutSubviews``
+- ``LayoutSubview``
+- ``ViewDimensions``
+- ``ViewSpacing``
+- ``Alignment``
+- ``HorizontalAlignment``
+- ``VerticalAlignment``
+- ``AlignmentID``
+- ``LayoutValueKey``
+- ``ContainerValueKey``
+- ``ContainerValues``
+
+### Layout containers
+
 - ``HStack``
 - ``VStack``
 - ``ZStack``
 - ``Grid``
-- ``ScrollView``
+- ``GridRow``
+- ``HStackLayout``
+- ``VStackLayout``
+- ``ZStackLayout``
+- ``GridLayout``
+- ``Spacer``
+- ``Divider``
 - ``ViewThatFits``
 - ``GeometryReader``
+- ``GeometryProxy``
+- ``EdgeInsets``
 
-### Rendering model
+### Scrolling
 
-- ``ViewRenderer``
-- ``RenderedView``
-- <doc:RenderingPipeline>
+- ``ScrollView``
+- ``ScrollViewReader``
+- ``ScrollViewProxy``
+- ``ScrollPosition``
+- ``ScrollPoint``
+- ``UnitPoint``
+- ``Axis``
+- ``Edge``
+- ``ScrollIndicatorVisibility``
+- ``ScrollIndicatorConfiguration``
+- ``HorizontalScrollIndicatorAttachmentKey``
+- ``VerticalScrollIndicatorAttachmentKey``
 
-### Text, shapes, and decoration
+### Text and selection
 
 - ``Text``
 - ``EditableText``
 - ``TextSelection``
+- ``TextSelectionNavigationBehavior``
+- ``TextAlignment``
+- ``ShapeStyle``
+- ``AnyShapeStyle``
+- ``TextSelectability``
+- ``EnabledTextSelectability``
+- ``DisabledTextSelectability``
+
+### Shapes, borders, and decoration
+
 - ``Shape``
+- ``ShapeView``
 - ``Rectangle``
+- ``RectangleHalfCellEdgeStyle``
+- ``FillShapeView``
+- ``FillStyle``
+- ``OffsetShape``
 - ``Box``
-- ``Divider``
+- ``RoundedBox``
+- ``HeavyBox``
+- ``DoubleBox``
+- ``HeavyDivider``
+- ``DoubleDivider``
 
-### Input and navigation
+### Input events, gestures, and shortcuts
 
-- <doc:InputRecognition>
 - ``InputEvent``
 - ``KeyEvent``
 - ``PointerEvent``
 - ``InputEventResult``
-- ``KeyPressEvent``
-- ``PointerPressEvent``
-- ``PointerMotionEvent``
-- ``PointerScrollEvent``
+- ``Gesture``
+- ``GestureState``
+- ``Shortcut``
+- ``ShortcutState``
+- ``KeyEquivalent``
 - ``KeyPress``
 - ``PointerPress``
-- ``Gesture``
-- ``TapGesture``
-- ``SpatialTapGesture``
-- ``LongPressGesture``
-- ``DragGesture``
-- ``GestureState``
-- ``GestureMask``
-- ``InputEventMask``
+- ``PointerMotion``
+- ``PointerScroll``
+- ``CoordinateSpace``
+- ``EventModifiers``
+
+### Navigation
+
 - ``NavigationStack``
 - ``NavigationLink``
 - ``NavigationPath``
+- ``PushAction``
+- ``PopAction``
+- ``DismissAction``
+
+### Rendering
+
+- ``ViewRenderer``
+- ``RenderedView``
+
+### Container-supplied views
+
+- ``ViewAttachmentKey``
+- ``ViewAttachments``
