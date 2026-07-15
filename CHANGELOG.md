@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `edgeInset` rendering performance by resolving flexible base content
+  at its final size and reusing repeated measurement work within each render
+  pass, including nested and opposite-edge compositions.
 - Fixed pointer hit testing so pressing one sibling no longer delivers
   `PointerPressEvent` or `onPointerPress` callbacks to descendants of another
   sibling outside their own hit regions.
