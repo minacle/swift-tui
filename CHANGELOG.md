@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-16
+
 ### Fixed
 
 - Fixed `edgeInset` rendering performance by resolving flexible base content
@@ -518,7 +520,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/minacle/swift-tui/releases/tag/v0.10.1
 [0.10.0]: https://github.com/minacle/swift-tui/releases/tag/v0.10.0
 [0.9.0]: https://github.com/minacle/swift-tui/releases/tag/v0.9.0
 [0.8.0]: https://github.com/minacle/swift-tui/releases/tag/v0.8.0
