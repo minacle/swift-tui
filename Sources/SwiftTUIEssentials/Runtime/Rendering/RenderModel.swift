@@ -3,7 +3,7 @@
 /// A `nil` dimension is unspecified and asks the child for its intrinsic size
 /// on that axis. A concrete value is a layout proposal rather than permission
 /// to allocate an unbounded render buffer.
-nonisolated struct RenderProposal: Equatable, Sendable {
+nonisolated struct RenderProposal: Equatable, Hashable, Sendable {
 
     var columns: Int?
 
@@ -265,6 +265,9 @@ enum LayoutMeasurementContext {
     @TaskLocal
     private static var taskIsMeasuring = false
 
+    @TaskLocal
+    private static var taskRenderPass: LayoutMeasurementRenderPass?
+
     static var isMeasuring: Bool {
         taskIsMeasuring
     }
@@ -273,6 +276,114 @@ enum LayoutMeasurementContext {
         $taskIsMeasuring.withValue(true) {
             return operation()
         }
+    }
+
+    /// Reuses the current pass-local measurement cache or creates one for a
+    /// top-level render resolution.
+    static func withRenderPass<Value>(_ operation: () -> Value) -> Value {
+        guard taskRenderPass == nil else {
+            return operation()
+        }
+
+        return $taskRenderPass.withValue(
+            LayoutMeasurementRenderPass(),
+            operation: operation
+        )
+    }
+
+    /// Reuses an element rendered for measurement with the same view identity,
+    /// proposal, alignment query, and stack axis in the current render pass.
+    static func cachedElement(
+        type: Any.Type,
+        path: [Int],
+        proposal: RenderProposal?,
+        alignmentKeys: Set<AlignmentKey>,
+        stackAxis: Axis?,
+        render: () -> RenderedElement?
+    ) -> RenderedElement? {
+        guard isMeasuring, let taskRenderPass else {
+            return render()
+        }
+
+        return taskRenderPass.element(
+            type: type,
+            path: path,
+            proposal: proposal,
+            alignmentKeys: alignmentKeys,
+            stackAxis: stackAxis,
+            render: render
+        )
+    }
+}
+
+/// Stores side-effect-free measurement renders for one synchronous resolution
+/// tree so nested layouts do not repeatedly evaluate the same view proposal.
+/// The task-local value is `Sendable` only to cross the task-local API; render
+/// resolution accesses its mutable storage synchronously from the owning task.
+private nonisolated final class LayoutMeasurementRenderPass: @unchecked Sendable {
+
+    private enum StackAxisKey: Hashable {
+
+        case none
+
+        case horizontal
+
+        case vertical
+
+        init(_ axis: Axis?) {
+            self = switch axis {
+            case .horizontal:
+                .horizontal
+            case .vertical:
+                .vertical
+            case nil:
+                .none
+            }
+        }
+    }
+
+    private struct Key: Hashable {
+
+        var type: ObjectIdentifier
+
+        var path: [Int]
+
+        var proposal: RenderProposal?
+
+        var alignmentKeys: Set<AlignmentKey>
+
+        var stackAxis: StackAxisKey
+    }
+
+    private struct Resolution {
+
+        var element: RenderedElement?
+    }
+
+    private var resolutions: [Key: Resolution] = [:]
+
+    func element(
+        type: Any.Type,
+        path: [Int],
+        proposal: RenderProposal?,
+        alignmentKeys: Set<AlignmentKey>,
+        stackAxis: Axis?,
+        render: () -> RenderedElement?
+    ) -> RenderedElement? {
+        let key = Key(
+            type: ObjectIdentifier(type),
+            path: path,
+            proposal: proposal,
+            alignmentKeys: alignmentKeys,
+            stackAxis: StackAxisKey(stackAxis)
+        )
+        if let resolution = resolutions[key] {
+            return resolution.element
+        }
+
+        let element = render()
+        resolutions[key] = Resolution(element: element)
+        return element
     }
 }
 

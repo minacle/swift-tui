@@ -39,6 +39,22 @@ enum ViewResolver {
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        LayoutMeasurementContext.withRenderPass {
+            resolveBlock(
+                from: view,
+                in: proposal,
+                path: path,
+                runtime: runtime
+            )
+        }
+    }
+
+    private static func resolveBlock<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
         switch directlyResolvedBlock(from: view, in: proposal, path: path, runtime: runtime) {
         case .resolved(let block):
             return block
@@ -114,6 +130,30 @@ enum ViewResolver {
     }
 
     static func element<Content: View>(
+        from view: Content,
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedElement? {
+        LayoutMeasurementContext.withRenderPass {
+            LayoutMeasurementContext.cachedElement(
+                type: Content.self,
+                path: path,
+                proposal: proposal,
+                alignmentKeys: ExplicitAlignmentQueryContext.keys,
+                stackAxis: StackAxisContext.axis
+            ) {
+                resolveElement(
+                    from: view,
+                    in: proposal,
+                    path: path,
+                    runtime: runtime
+                )
+            }
+        }
+    }
+
+    private static func resolveElement<Content: View>(
         from view: Content,
         in proposal: RenderProposal?,
         path: [Int],
