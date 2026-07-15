@@ -66,7 +66,10 @@ target. Shortcuts on that branch compete by tier, then by proximity to the
 focused target and source-modifier nesting. Without a focused target, only
 shortcuts attached directly at the rendered root remain eligible; existing
 low-level key handlers retain their focus requirements. Pointer presses use the
-deepest hit-tested target, while buttonless motion and scroll retarget on every
+deepest hit-tested target and offer the sample only to attachments on that path
+and its ancestors, plus deeper attachments whose own hit regions contain the
+pointer. Selecting a common ancestor doesn't make attachments in another
+descendant branch eligible. Buttonless motion and scroll retarget on every
 sample. A captured drag keeps button motion and the matching release on its
 original target even outside the rendered bounds; scroll input never follows
 pointer capture.

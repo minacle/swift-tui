@@ -828,7 +828,7 @@ final class RecognitionRuntime {
         for attachment in orderedAttachments
         where attachment.isActive
             && attachment.families.contains(.key)
-            && isDirectlyTargeted(attachment, targetPath: previousPath) {
+            && isKeyTargeted(attachment, targetPath: previousPath) {
             _ = perform(attachment) {
                 attachment.cancel(.focusLost)
                 return AttachmentDispatchOutcome()
@@ -898,9 +898,10 @@ final class RecognitionRuntime {
                 attachment.process(
                     sample,
                     date: date,
-                    isTargeted: isDirectlyTargeted(
+                    isTargeted: isTargeted(
                         attachment,
-                        targetPath: targetPath
+                        targetPath: targetPath,
+                        sample: sample
                     ) || (kind == .shortcut
                         && targetPath == nil
                         && attachment.path.isEmpty),
@@ -1118,7 +1119,11 @@ final class RecognitionRuntime {
         targetPath: [Int]?,
         sample: RecognitionSample
     ) -> Bool {
-        if isDirectlyTargeted(attachment, targetPath: targetPath) {
+        if isTargeted(
+            attachment,
+            targetPath: targetPath,
+            sample: sample
+        ) {
             return true
         }
         if attachment.kind == .shortcut,
@@ -1135,7 +1140,39 @@ final class RecognitionRuntime {
         return false
     }
 
-    private func isDirectlyTargeted(
+    private func isTargeted(
+        _ attachment: AnyRecognitionAttachment,
+        targetPath: [Int]?,
+        sample: RecognitionSample
+    ) -> Bool {
+        switch sample {
+        case .keyPress:
+            return isKeyTargeted(
+                attachment,
+                targetPath: targetPath
+            )
+        case .pointerPress(let press):
+            return isPointerTargeted(
+                attachment,
+                targetPath: targetPath,
+                point: press.location
+            )
+        case .pointerMotion(let motion):
+            return isPointerTargeted(
+                attachment,
+                targetPath: targetPath,
+                point: motion.location
+            )
+        case .pointerScroll(let scroll):
+            return isPointerTargeted(
+                attachment,
+                targetPath: targetPath,
+                point: scroll.location
+            )
+        }
+    }
+
+    private func isKeyTargeted(
         _ attachment: AnyRecognitionAttachment,
         targetPath: [Int]?
     ) -> Bool {
@@ -1144,6 +1181,30 @@ final class RecognitionRuntime {
         }
         return targetPath.starts(with: attachment.path)
             || attachment.path.starts(with: targetPath)
+    }
+
+    /// Limits direct pointer delivery to the hit-tested branch, its ancestors,
+    /// and descendant attachments whose own hit regions contain the pointer.
+    /// The frame check excludes sibling branches when a common ancestor is the
+    /// deepest selected target while preserving overlapping descendant input.
+    private func isPointerTargeted(
+        _ attachment: AnyRecognitionAttachment,
+        targetPath: [Int]?,
+        point: Point
+    ) -> Bool {
+        guard let targetPath else {
+            return false
+        }
+        if targetPath.starts(with: attachment.path) {
+            return true
+        }
+        guard attachment.path.starts(with: targetPath) else {
+            return false
+        }
+        return hitRegions.contains {
+            $0.path == attachment.path
+                && $0.frame.contains(column: point.column, row: point.row)
+        }
     }
 
     private func hitTarget(at point: Point) -> [Int]? {
