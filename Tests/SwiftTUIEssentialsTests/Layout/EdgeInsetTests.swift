@@ -127,6 +127,18 @@ struct EdgeInsetTests {
     }
 
     @Test
+    func `edgeInset expands a divider across the natural width of its base view`() {
+        let block = ViewResolver.block(
+            from: Text("ABC")
+                .edgeInset(.top) {
+                    Divider()
+                }
+        )
+
+        #expect(block?.lines == ["───", "ABC"])
+    }
+
+    @Test
     func `edgeInset treats multiple builder children as one inset region`() {
         let block = ViewResolver.block(
             from: FlexibleProbe("C")
@@ -170,6 +182,188 @@ struct EdgeInsetTests {
         #expect(block?.focusRegions.map(\.frame) == [expectedFrame])
         #expect(block?.identifiedRegions.map(\.frame) == [expectedFrame])
         #expect(block?.coordinateSpaceRegions.map(\.frame) == [expectedFrame])
+    }
+
+    @Test
+    func `a single edgeInset renders its base and inset once without measurement`() {
+        let baseCounter = RenderCounter()
+        let insetCounter = RenderCounter()
+
+        _ = ViewResolver.block(
+            from: CountingProbe(counter: baseCounter)
+                .edgeInset(.bottom) {
+                    CountingProbe(counter: insetCounter)
+                },
+            in: RenderProposal(columns: 80, rows: 24)
+        )
+
+        #expect(baseCounter.measurementCount == 0)
+        #expect(baseCounter.placementCount == 1)
+        #expect(insetCounter.measurementCount == 0)
+        #expect(insetCounter.placementCount == 1)
+    }
+
+    @Test
+    func `edgeInset nesting renders its flexible base once without measurement`() {
+        let depths = [0, 1, 2, 4, 8, 12]
+        let vertical = depths.map {
+            renderCounter(nestedInsets: $0, edge: .bottom)
+        }
+        let horizontal = depths.map {
+            renderCounter(nestedInsets: $0, edge: .trailing)
+        }
+
+        #expect(vertical.map(\.measurementCount) == [0, 0, 0, 0, 0, 0])
+        #expect(vertical.map(\.placementCount) == [1, 1, 1, 1, 1, 1])
+        #expect(horizontal.map(\.measurementCount) == [0, 0, 0, 0, 0, 0])
+        #expect(horizontal.map(\.placementCount) == [1, 1, 1, 1, 1, 1])
+    }
+
+    @Test
+    func `opposite edgeInset modifiers render their flexible base once without measurement`() {
+        let vertical = renderCounter(edges: [.top, .bottom])
+        let horizontal = renderCounter(edges: [.leading, .trailing])
+
+        #expect(vertical.measurementCount == 0)
+        #expect(vertical.placementCount == 1)
+        #expect(horizontal.measurementCount == 0)
+        #expect(horizontal.placementCount == 1)
+    }
+
+    @Test
+    func `an enclosing stack measures and places a nested edgeInset base once`() {
+        let vertical = renderCounterInStack(
+            nestedInsets: 12,
+            edge: .bottom,
+            axis: .vertical
+        )
+        let horizontal = renderCounterInStack(
+            nestedInsets: 12,
+            edge: .trailing,
+            axis: .horizontal
+        )
+
+        #expect(vertical.measurementCount == 1)
+        #expect(vertical.placementCount == 1)
+        #expect(horizontal.measurementCount == 1)
+        #expect(horizontal.placementCount == 1)
+    }
+
+    @Test
+    func `a subsequent edgeInset render places its flexible base once again without measurement`() {
+        let counter = renderCounter(
+            nestedInsets: 12,
+            edge: .bottom,
+            renderPasses: 2
+        )
+
+        #expect(counter.measurementCount == 0)
+        #expect(counter.placementCount == 2)
+    }
+
+    private func renderCounter(
+        nestedInsets count: Int,
+        edge: Edge,
+        renderPasses: Int = 1
+    ) -> RenderCounter {
+        renderCounter(
+            edges: Array(repeating: edge, count: count),
+            renderPasses: renderPasses
+        )
+    }
+
+    private func renderCounter(
+        edges: [Edge],
+        renderPasses: Int = 1
+    ) -> RenderCounter {
+        let counter = RenderCounter()
+        var view = AnyView(CountingProbe(counter: counter))
+        for (index, edge) in edges.enumerated() {
+            view = AnyView(
+                view.edgeInset(edge) {
+                    Text(String(index))
+                }
+            )
+        }
+
+        for _ in 0..<renderPasses {
+            _ = ViewResolver.block(
+                from: view,
+                in: RenderProposal(columns: 80, rows: 24)
+            )
+        }
+        return counter
+    }
+
+    private func renderCounterInStack(
+        nestedInsets count: Int,
+        edge: Edge,
+        axis: Axis
+    ) -> RenderCounter {
+        let counter = RenderCounter()
+        var view = AnyView(CountingProbe(counter: counter))
+        for index in 0..<count {
+            view = AnyView(
+                view.edgeInset(edge) {
+                    Text(String(index))
+                }
+            )
+        }
+
+        switch axis {
+        case .horizontal:
+            _ = ViewResolver.block(
+                from: HStack(spacing: 0) {
+                    view
+                },
+                in: RenderProposal(columns: 80, rows: 24)
+            )
+        case .vertical:
+            _ = ViewResolver.block(
+                from: VStack(spacing: 0) {
+                    view
+                },
+                in: RenderProposal(columns: 80, rows: 24)
+            )
+        }
+        return counter
+    }
+}
+
+private final class RenderCounter {
+
+    var measurementCount = 0
+
+    var placementCount = 0
+}
+
+private struct CountingProbe: View, LayoutModifierRenderable, LayoutTraitRenderable {
+
+    typealias Body = Never
+
+    let counter: RenderCounter
+
+    var layoutTraits: LayoutTraits {
+        LayoutTraits(flexibleAxes: [.horizontal, .vertical])
+    }
+
+    func renderedBlock(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> RenderedBlock? {
+        if LayoutMeasurementContext.isMeasuring {
+            counter.measurementCount += 1
+        }
+        else {
+            counter.placementCount += 1
+        }
+        return RenderedBlock(
+            lines: Array(
+                repeating: String(repeating: "C", count: proposal?.columns ?? 1),
+                count: proposal?.rows ?? 1
+            )
+        )
     }
 }
 
