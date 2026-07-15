@@ -233,3 +233,131 @@ git diff --check
 
 - Treat a successful build with zero matching tests as a failed focused check;
   verify that the intended test names appear in discovery output.
+
+## GitHub issues
+
+- Write GitHub Issue titles and bodies in Korean. Preserve the exact spelling
+  of API names, types, modules, terminal sequences, commands, paths, and quoted
+  diagnostics when translating the surrounding explanation.
+- Base every issue on the current checkout. Distinguish verified behavior from
+  a proposed explanation or implementation, and link to relevant issues,
+  discussions, documentation, or source locations when they are available.
+- Use a concise title that states the observable problem or desired outcome.
+  Prefix it with the owning module when that makes the scope clearer, such as
+  `Runs:`, `Essentials:`, `Controls:`, or `SwiftTUI:`. Do not prefix the title
+  with a category such as `[Bug]` or `[Feature]` unless the repository adopts
+  that convention separately.
+- Explain why the work matters to a library user or maintainer. Include the
+  current behavior, desired behavior, impact, and relevant scope boundaries.
+  For a bug, include the smallest reliable reproduction and relevant environment
+  information.
+- Do not use GitHub task-list syntax such as `- [ ]` or turn an issue into an
+  implementation checklist. Use ordinary lists only when they make evidence,
+  affected cases, constraints, or alternatives easier to compare.
+- Keep a possible implementation separate from the observable contract. Record
+  uncertain causes and design ideas as analysis or possible directions rather
+  than facts or requirements.
+- For a performance issue, report the measurement method, inputs, environment,
+  and observed counts or timings. Distinguish stable evidence such as call
+  counts or complexity growth from machine-dependent wall-clock measurements.
+- Do not invent labels, milestones, assignees, priorities, or release targets.
+  Add them only when the user requests them or repository evidence establishes
+  them.
+- Use the following body shape. Omit optional sections that do not apply instead
+  of filling them with placeholders such as `없음` or `해당 없음`:
+
+```markdown
+## 요약
+
+관찰한 문제나 달성하려는 결과와 사용자에게 미치는 영향을 간결하게 설명합니다.
+
+## 환경
+
+- 확인한 커밋, Swift 버전, 플랫폼 등 재현에 필요한 환경을 작성합니다.
+
+## 재현
+
+문제를 보여 주는 최소 코드, 명령 또는 절차와 관찰 결과를 작성합니다.
+
+## 기대 동작
+
+사용자나 라이브러리 관점에서 기대하는 동작을 작성합니다.
+
+## 실제 동작
+
+기대 동작과 다르게 관찰되는 결과를 구체적으로 작성합니다.
+
+## 영향
+
+사용자 동작, 정확성, 성능 또는 유지보수에 미치는 영향을 작성합니다.
+
+## 원인 분석
+
+확인한 실행 경로와 근거를 작성하고, 추정은 추정임을 명시합니다.
+
+## 기존 테스트 범위
+
+현재 통과하는 관련 테스트와 아직 검증하지 않는 동작을 작성합니다.
+
+## 가능한 수정 방향
+
+검토할 대안과 수정 후에도 보존해야 하는 기존 계약을 작성합니다.
+
+## 범위
+
+기능 제안이라면 포함할 동작과 의도적으로 제외할 내용을 작성합니다.
+
+## 참고
+
+- 관련 이슈, 문서, 소스 위치 또는 검토할 대안을 작성합니다.
+```
+
+## GitHub pull requests
+
+- Always write GitHub Pull Request titles in English, even when the body is in
+  Korean. Preserve the exact spelling of API names, types, modules, terminal
+  sequences, commands, and paths.
+- Use a concise imperative title that states the outcome of the change, such as
+  `Add GitHub pull request guidance` or `Fix pointer drag capture`. Do not prefix
+  the title with a category such as `[Feature]` or `[Fix]` unless the repository
+  adopts that convention separately.
+- Base every pull request description on the actual diff against its target
+  branch. Describe the completed change and its motivation without promising
+  unimplemented follow-up work or repeating the commit history.
+- Write the body in Korean unless the user requests another language. Keep
+  exact identifiers, commands, paths, quoted diagnostics, and GitHub closing
+  keywords in their original spelling.
+- Explain the externally observable behavior and important implementation
+  boundaries. Call out public API, documentation, compatibility, security, or
+  performance effects when they are relevant.
+- Report the validation that actually ran, including focused tests, the full
+  suite, symbol-graph inspection, DocC generation, or platform-specific checks
+  as applicable. Distinguish passing evidence from checks that were not run or
+  could not complete.
+- Link related issues when known. Use a closing keyword such as `Closes #123`
+  only when the pull request fully resolves that issue; do not invent issue
+  numbers, labels, reviewers, milestones, or release targets.
+- Use the following body shape. Omit optional sections that do not apply instead
+  of filling them with placeholders such as `없음` or `해당 없음`:
+
+```markdown
+## 요약
+
+이 변경이 필요한 이유와 달성한 결과를 간결하게 설명합니다.
+
+## 변경 사항
+
+- 사용자가 관찰할 수 있는 행동과 주요 구현 경계를 작성합니다.
+
+## 검증
+
+- 실제로 실행한 테스트, 문서 검증, 플랫폼 확인 명령과 결과를 작성합니다.
+
+## 영향 및 호환성
+
+공개 API, 기존 행동, 마이그레이션, 성능 또는 보안에 미치는 영향을 작성합니다.
+
+## 관련 이슈
+
+- Closes #123
+```
