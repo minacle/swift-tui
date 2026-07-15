@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed pointer hit testing so pressing one sibling no longer delivers
+  `PointerPressEvent` or `onPointerPress` callbacks to descendants of another
+  sibling outside their own hit regions.
+
 ## [0.10.0] - 2026-07-14
 
 ### Added

@@ -221,6 +221,37 @@ struct PointerPressTests {
     }
 
     @Test
+    func `pointer-down on a sibling excludes a descendant onPointerPress outside its hit region`() {
+        let runtime = StateRuntime()
+        let pointerProbe = PointerPressProbe()
+        let view = HStack(spacing: 0) {
+            Text("A")
+                .onPointerPress {
+                    pointerProbe.record("descendant")
+                    return .handled
+                }
+            Text("B")
+        }
+        .onPointerPress {
+            pointerProbe.record("ancestor")
+            return .ignored
+        }
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 1, row: 0),
+                    phase: .down
+                )
+            ) == .ignored
+        )
+        #expect(pointerProbe.names == ["ancestor"])
+    }
+
+    @Test
     func `handling pointer-up prevents a competing tap from completing`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()

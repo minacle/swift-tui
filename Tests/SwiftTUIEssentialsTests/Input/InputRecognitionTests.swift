@@ -235,6 +235,41 @@ struct InputRecognitionTests {
     }
 
     @Test
+    func `pointer-down on a sibling excludes a descendant PointerPressEvent outside its hit region`() {
+        let probe = RecognitionProbe()
+        let runtime = StateRuntime()
+        let view = HStack(spacing: 0) {
+            Text("A")
+                .inputEvent(
+                    PointerPressEvent().onRecognized { _ in
+                        probe.events.append("descendant")
+                        return .handled
+                    }
+                )
+            Text("B")
+        }
+        .inputEvent(
+            PointerPressEvent().onRecognized { _ in
+                probe.events.append("ancestor")
+                return .ignored
+            }
+        )
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 1, row: 0),
+                    phase: .down
+                )
+            ) == .ignored
+        )
+        #expect(probe.events == ["ancestor"])
+    }
+
+    @Test
     func `InputEventMask selects the current attachment or receiver registrations structurally`() {
         let currentProbe = RecognitionProbe()
         let currentRuntime = StateRuntime()
