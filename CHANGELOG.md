@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed composite focusable views so nested focus owners report independent
+  `isFocused` values and each editable or pointer receiver uses its own frame
+  for caret placement, pointer targeting, and local coordinates.
+
 ## [0.10.1] - 2026-07-16
 
 ### Fixed

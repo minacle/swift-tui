@@ -33,8 +33,7 @@ nonisolated struct KeyPressView<Content: View>: View, InputModifierRenderable, L
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerKeyPressHandler(handler, at: interactionPath)
+        runtime?.registerKeyPressHandler(handler, at: path)
         return ViewResolver.block(
             from: content,
             in: proposal,
@@ -48,8 +47,7 @@ nonisolated struct KeyPressView<Content: View>: View, InputModifierRenderable, L
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerKeyPressHandler(handler, at: interactionPath)
+        runtime?.registerKeyPressHandler(handler, at: path)
         return ViewResolver.element(
             from: content,
             in: proposal,
@@ -119,8 +117,7 @@ struct TapGestureView<Content: View>: View, InputModifierRenderable, LayoutTrait
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerTapGestureHandler(handler, at: interactionPath)
+        runtime?.registerTapGestureHandler(handler, at: path)
         guard var block = ViewResolver.block(
             from: content,
             in: proposal,
@@ -131,7 +128,7 @@ struct TapGestureView<Content: View>: View, InputModifierRenderable, LayoutTrait
         }
 
         block.hitRegions.append(
-            RenderedHitRegion(path: interactionPath, frame: block.bounds)
+            RenderedHitRegion(path: path, frame: block.bounds)
         )
         return block
     }
@@ -164,7 +161,7 @@ nonisolated struct PointerPressView<Content: View>: View, InputModifierRenderabl
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        runtime?.registerPointerPressHandler(handler, at: path)
+        let attachmentID = runtime?.registerPointerPressHandler(handler, at: path)
         guard var block = ViewResolver.block(
             from: content,
             in: proposal,
@@ -174,7 +171,13 @@ nonisolated struct PointerPressView<Content: View>: View, InputModifierRenderabl
             return nil
         }
 
-        block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+        block.hitRegions.append(
+            RenderedHitRegion(
+                path: path,
+                frame: block.bounds,
+                recognitionAttachmentIDs: attachmentID.map { [$0] } ?? []
+            )
+        )
         return block
     }
 

@@ -14,7 +14,7 @@ enum RecognitionAttachmentTier: Int, CaseIterable, Comparable {
     }
 }
 
-enum RecognitionAttachmentKind: Hashable {
+nonisolated enum RecognitionAttachmentKind: Hashable, Sendable {
 
     case inputEvent
 
@@ -23,7 +23,7 @@ enum RecognitionAttachmentKind: Hashable {
     case shortcut
 }
 
-struct RecognitionAttachmentID: Hashable {
+nonisolated struct RecognitionAttachmentID: Hashable, Sendable {
 
     var path: [Int]
 
@@ -472,7 +472,7 @@ final class RecognitionRuntime {
         actionPath: [Int],
         tier: RecognitionAttachmentTier,
         environment: EnvironmentValues
-    ) -> Bool {
+    ) -> RecognitionAttachmentID? {
         let definition = event._makeInputEvent()
         let id = nextID(path: path, kind: .inputEvent)
         pendingAttachments.append(
@@ -485,7 +485,7 @@ final class RecognitionRuntime {
                 definition: definition
             )
         )
-        return !definition.families.intersection(.pointer).isEmpty
+        return definition.families.intersection(.pointer).isEmpty ? nil : id
     }
 
     func register<G: Gesture>(
@@ -495,7 +495,7 @@ final class RecognitionRuntime {
         tier: RecognitionAttachmentTier,
         environment: EnvironmentValues,
         isSimultaneous: Bool = false
-    ) {
+    ) -> RecognitionAttachmentID {
         let definition = gesture._makeGesture()
         let id = nextID(path: path, kind: .gesture)
         pendingAttachments.append(
@@ -509,6 +509,7 @@ final class RecognitionRuntime {
                 definition: definition
             )
         )
+        return id
     }
 
     func register<S: Shortcut>(
@@ -772,7 +773,7 @@ final class RecognitionRuntime {
                 let outcome = perform(attachment) {
                     attachment.advance(
                         to: date,
-                        convert: coordinateConverter(for: attachment.path),
+                        convert: coordinateConverter(for: attachment),
                         invalidate: invalidate
                     )
                 }
@@ -856,7 +857,7 @@ final class RecognitionRuntime {
                     sample,
                     date: date,
                     isTargeted: true,
-                    convert: coordinateConverter(for: attachment.path),
+                    convert: coordinateConverter(for: attachment),
                     invalidate: invalidate
                 )
             }
@@ -905,7 +906,7 @@ final class RecognitionRuntime {
                     ) || (kind == .shortcut
                         && targetPath == nil
                         && attachment.path.isEmpty),
-                    convert: coordinateConverter(for: attachment.path),
+                    convert: coordinateConverter(for: attachment),
                     invalidate: invalidate
                 )
             }
@@ -1192,14 +1193,29 @@ final class RecognitionRuntime {
         targetPath: [Int]?,
         point: Point
     ) -> Bool {
+        if capturedAttachmentID == attachment.id {
+            return true
+        }
         guard let targetPath else {
             return false
+        }
+        let attachmentRegions = hitRegions.filter {
+            $0.recognitionAttachmentIDs.contains(attachment.id)
+        }
+        let isInsideAttachment = attachmentRegions.contains {
+            $0.frame.contains(column: point.column, row: point.row)
+        }
+        if targetPath == attachment.path, !attachmentRegions.isEmpty {
+            return isInsideAttachment
         }
         if targetPath.starts(with: attachment.path) {
             return true
         }
         guard attachment.path.starts(with: targetPath) else {
             return false
+        }
+        if !attachmentRegions.isEmpty {
+            return isInsideAttachment
         }
         return hitRegions.contains {
             $0.path == attachment.path
@@ -1223,23 +1239,33 @@ final class RecognitionRuntime {
     }
 
     private func coordinateConverter(
-        for path: [Int]
+        for attachment: AnyRecognitionAttachment
     ) -> (Point, CoordinateSpace) -> Point? {
-        { [hitRegions, focusRegions, scrollRegions, coordinateSpaceRegions] point, coordinateSpace in
+        let attachmentID = attachment.id
+        let path = attachment.path
+        return { [hitRegions, focusRegions, scrollRegions, coordinateSpaceRegions] point, coordinateSpace in
             switch coordinateSpace.storage {
             case .global:
                 return point
             case .local:
-                let frames = hitRegions
-                    .filter({ $0.path == path })
+                let attachmentFrames = hitRegions
+                    .filter({
+                        $0.recognitionAttachmentIDs.contains(attachmentID)
+                    })
                     .map(\.frame)
-                    + focusRegions
+                if let frame = attachmentFrames.min(by: { $0.area < $1.area }) {
+                    return Point(
+                        column: point.column - frame.x,
+                        row: point.row - frame.y
+                    )
+                }
+                let fallbackFrames = focusRegions
                     .filter({ $0.path == path })
                     .map { $0.positionFrame ?? $0.frame }
                     + scrollRegions
                     .filter({ $0.path == path })
                     .map(\.frame)
-                guard let frame = frames.min(by: { $0.area < $1.area }) else {
+                guard let frame = fallbackFrames.min(by: { $0.area < $1.area }) else {
                     return Point(column: point.column, row: point.row)
                 }
                 return Point(
@@ -1389,17 +1415,16 @@ struct InputEventAttachmentView<Content: View, Event: InputEvent>: View,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
         let canRegister = RecognitionRenderContext.values.inputEventsEnabled
             && mask.contains(.inputEvent)
-        let requiresHitRegion = canRegister
+        let attachmentID = canRegister
             ? runtime?.registerInputEvent(
                 event,
-                at: interactionPath,
+                at: path,
                 actionPath: actionPath,
                 tier: tier
-            ) == true
-            : false
+            )
+            : nil
         guard var block = RecognitionRenderContext.withInputEvents(
             enabled: mask.contains(.subviews),
             perform: {
@@ -1413,9 +1438,13 @@ struct InputEventAttachmentView<Content: View, Event: InputEvent>: View,
         ) else {
             return nil
         }
-        if requiresHitRegion {
+        if let attachmentID {
             block.hitRegions.append(
-                RenderedHitRegion(path: interactionPath, frame: block.bounds)
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: [attachmentID]
+                )
             )
         }
         return block
@@ -1471,17 +1500,19 @@ struct GestureAttachmentView<Content: View, AttachedGesture: Gesture>: View,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
         let canRegister = RecognitionRenderContext.values.gesturesEnabled
             && mask.contains(.gesture)
-        if canRegister {
+        let attachmentID: RecognitionAttachmentID? = if canRegister {
             runtime?.registerGesture(
                 gesture,
-                at: interactionPath,
+                at: path,
                 actionPath: actionPath,
                 tier: tier,
                 isSimultaneous: isSimultaneous
             )
+        }
+        else {
+            nil
         }
         guard var block = RecognitionRenderContext.withGestures(
             enabled: mask.contains(.subviews),
@@ -1498,7 +1529,11 @@ struct GestureAttachmentView<Content: View, AttachedGesture: Gesture>: View,
         }
         if canRegister {
             block.hitRegions.append(
-                RenderedHitRegion(path: interactionPath, frame: block.bounds)
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: attachmentID.map { [$0] } ?? []
+                )
             )
         }
         return block
@@ -1554,13 +1589,12 @@ struct ShortcutAttachmentView<Content: View, AttachedShortcut: Shortcut>: View,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
         let canRegister = RecognitionRenderContext.values.shortcutsEnabled
             && mask.contains(.shortcut)
         if canRegister {
             runtime?.registerShortcut(
                 shortcut,
-                at: interactionPath,
+                at: path,
                 actionPath: actionPath,
                 tier: tier,
                 isSimultaneous: isSimultaneous

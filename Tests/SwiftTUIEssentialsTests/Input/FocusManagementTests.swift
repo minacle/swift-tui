@@ -70,6 +70,31 @@ struct FocusManagementTests {
     }
 
     @Test
+    func `moving focus to a nested focused child clears the outer isFocused value`() {
+        let runtime = StateRuntime()
+        let outerProbe = FocusBindingProbe<Bool>()
+        let childProbe = FocusBindingProbe<Bool>()
+        let view = NestedFocusOwnerEnvironmentMarkerView(
+            outerProbe: outerProbe,
+            childProbe: childProbe
+        )
+
+        let initialBlock = renderFocusUntilStable(runtime, view: view)
+        #expect(
+            initialBlock?.lines
+                == ["focused  ", "unfocused"]
+        )
+
+        childProbe.binding?.wrappedValue = true
+        #expect(
+            renderFocusUntilStable(runtime, view: view)?.lines
+                == ["unfocused", "focused  "]
+        )
+        #expect(outerProbe.binding?.wrappedValue == false)
+        #expect(childProbe.binding?.wrappedValue == true)
+    }
+
+    @Test
     func `a button label observes isFocused after the button receives pointer focus`() {
         let runtime = StateRuntime()
         let view = FocusableEnvironmentButton()
@@ -403,4 +428,66 @@ struct FocusManagementTests {
         )
         #expect(tapProbe.events == ["tap"])
     }
+}
+
+private struct NestedFocusOwnerEnvironmentMarkerView: View {
+
+    @FocusState private var isOuterFocused = true
+
+    @FocusState private var isChildFocused: Bool
+
+    let outerProbe: FocusBindingProbe<Bool>
+
+    let childProbe: FocusBindingProbe<Bool>
+
+    var body: some View {
+        CapturedNestedFocusOwnerEnvironmentMarkers(
+            outerFocus: $isOuterFocused,
+            childFocus: $isChildFocused,
+            outerProbe: outerProbe,
+            childProbe: childProbe
+        )
+    }
+}
+
+private struct CapturedNestedFocusOwnerEnvironmentMarkers: View {
+
+    let outerFocus: FocusState<Bool>.Binding
+
+    let childFocus: FocusState<Bool>.Binding
+
+    init(
+        outerFocus: FocusState<Bool>.Binding,
+        childFocus: FocusState<Bool>.Binding,
+        outerProbe: FocusBindingProbe<Bool>,
+        childProbe: FocusBindingProbe<Bool>
+    ) {
+        self.outerFocus = outerFocus
+        self.childFocus = childFocus
+        outerProbe.capture(outerFocus)
+        childProbe.capture(childFocus)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            IsFocusedEnvironmentMarkerText()
+            IsFocusedEnvironmentMarkerText()
+                .focused(childFocus)
+        }
+        .focused(outerFocus)
+    }
+}
+
+private func renderFocusUntilStable<Content: View>(
+    _ runtime: StateRuntime,
+    view: Content
+) -> RenderedBlock? {
+    var block: RenderedBlock?
+    for _ in 0..<8 {
+        block = runtime.block(from: view)
+        if !runtime.consumeInvalidation() {
+            break
+        }
+    }
+    return block
 }

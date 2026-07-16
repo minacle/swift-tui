@@ -377,4 +377,93 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(block?.caret == RenderedCaret(row: 0, column: 2))
     }
 
+    @Test
+    func `an indented multiline EditableText uses its receiver geometry without reacting to the outer header`() {
+        let runtime = StateRuntime()
+        let selectionProbe = BindingProbe<TextSelection?>()
+        let view = FocusableCompositeMultilineEditableText(
+            selectionProbe: selectionProbe
+        )
+        let proposal = RenderProposal(columns: 12, rows: 3)
+
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        dispatchClick(to: runtime, column: 8, row: 3)
+        #expect(
+            selectionCharacterOffsets(
+                selectionProbe.binding?.wrappedValue,
+                in: "ab\ncd"
+            ) == 4..<4
+        )
+
+        dispatchClick(to: runtime, column: 2, row: 1)
+        #expect(
+            selectionCharacterOffsets(
+                selectionProbe.binding?.wrappedValue,
+                in: "ab\ncd"
+            ) == 4..<4
+        )
+    }
+
+}
+
+private struct FocusableCompositeMultilineEditableText: View {
+
+    @State private var text = "ab\ncd"
+
+    @State private var selection: TextSelection?
+
+    @FocusState private var isEditorFocused = true
+
+    let selectionProbe: BindingProbe<TextSelection?>
+
+    var body: some View {
+        CapturedFocusableCompositeMultilineEditableText(
+            text: $text,
+            selection: $selection,
+            isEditorFocused: $isEditorFocused,
+            selectionProbe: selectionProbe
+        )
+    }
+}
+
+private struct CapturedFocusableCompositeMultilineEditableText: View {
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>
+
+    let isEditorFocused: FocusState<Bool>.Binding
+
+    init(
+        text: Binding<String>,
+        selection: Binding<TextSelection?>,
+        isEditorFocused: FocusState<Bool>.Binding,
+        selectionProbe: BindingProbe<TextSelection?>
+    ) {
+        self.text = text
+        self.selection = selection
+        self.isEditorFocused = isEditorFocused
+        selectionProbe.capture(selection)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Header")
+                .simultaneousInputEvent(
+                    PointerPressEvent(.left)
+                        .onRecognized { _ in .ignored }
+                )
+            HStack(alignment: .top, spacing: 0) {
+                Text("> ")
+                EditableText(
+                    text: text,
+                    selection: selection,
+                    lineMode: .multiline
+                )
+                .focused(isEditorFocused)
+            }
+            .padding(.leading, 4)
+        }
+        .focusable()
+    }
 }

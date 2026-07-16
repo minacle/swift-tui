@@ -76,9 +76,15 @@ pointer capture.
 
 Coordinates are zero-based terminal columns and rows. Primitive pointer events
 convert a location to their requested ``CoordinateSpace`` immediately before a
-callback. A missing named space is a programming error when direct recognition
-begins; if a named space disappears during an active recognition sequence,
-SwiftTUI cancels that sequence instead of invoking its completion callback.
+callback. Each pointer attachment keeps the structural receiver on which it was
+declared and its own rendered hit frame, even when several receivers share an
+enclosing focus owner. Hit testing therefore selects only attachments whose
+receiver frames contain the pointer. The ``CoordinateSpace/local`` origin is
+the selected attachment's rendered frame rather than the enclosing focus
+region or another attachment on the same focusable view. A missing named space
+is a programming error when direct recognition begins; if a named space
+disappears during an active recognition sequence, SwiftTUI cancels that
+sequence instead of invoking its completion callback.
 
 ### Shortcut recognition
 

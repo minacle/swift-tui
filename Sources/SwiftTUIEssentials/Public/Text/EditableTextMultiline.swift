@@ -14,7 +14,7 @@ extension EditableText {
             at: path,
             initialText: text.wrappedValue
         )
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
+        let focusPath = EnvironmentRenderContext.current.focusPath ?? path
         let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
             && runtime?.isSuppressingInteractiveRenderRegistrations != true
         if updatesInteractiveState {
@@ -29,11 +29,11 @@ extension EditableText {
             editorState?.updateLayoutWidth(proposal?.columns)
         }
         if EnvironmentRenderContext.current.focusPath == nil {
-            runtime?.registerFocusable(true, at: interactionPath)
+            runtime?.registerFocusable(true, at: focusPath)
         }
         runtime?.registerKeyPressHandler(
             KeyPressHandler(
-                actionPath: interactionPath,
+                actionPath: focusPath,
                 matches: EditableTextMultilineInput.matches,
                 action: {
                     handle(
@@ -45,11 +45,11 @@ extension EditableText {
                     )
                 }
             ),
-            at: interactionPath
+            at: path
         )
-        runtime?.registerPointerDownPositionHandler(
+        let pointerAttachmentIDs = runtime?.registerPointerDownPositionHandler(
             PointerDownPositionHandler(
-                actionPath: interactionPath,
+                actionPath: focusPath,
                 requiresFocus: true,
                 shouldDeferBegin: { point in
                     guard let editorState else {
@@ -90,8 +90,9 @@ extension EditableText {
                     editorState.publishSelection(to: selection)
                 }
             ),
-            at: interactionPath
-        )
+            at: path,
+            requiringFocusAt: focusPath
+        ) ?? []
 
         let currentText = displayedText(for: editorState?.text ?? text.wrappedValue)
         let layout = EditableTextMultilineLayout(
@@ -103,11 +104,11 @@ extension EditableText {
             state: editorState,
             layout: layout,
             runtime: runtime,
-            path: interactionPath
+            path: focusPath
         )
         if updatesInteractiveState {
             editorState?.publishSelectionOnFocus(
-                runtime?.isFocused(at: interactionPath) == true,
+                runtime?.isFocused(at: focusPath) == true,
                 to: selection
             )
             editorState?.updateScrollPoint(
@@ -148,9 +149,18 @@ extension EditableText {
             position: ScrollPosition(point: editorState?.scrollPoint ?? ScrollPoint()),
             proposal: RenderProposal(columns: proposal?.columns, rows: proposal?.rows)
         ).block
+        if !pointerAttachmentIDs.isEmpty {
+            block.hitRegions.append(
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: pointerAttachmentIDs
+                )
+            )
+        }
         block.focusRegions.append(
             RenderedFocusRegion(
-                path: interactionPath,
+                path: focusPath,
                 frame: block.bounds,
                 positionFrame: block.bounds
             )

@@ -61,7 +61,7 @@ enum EditableTextSingleLineRenderer {
             at: path,
             initialText: text.wrappedValue
         )
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
+        let focusPath = EnvironmentRenderContext.current.focusPath ?? path
         let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
             && runtime?.isSuppressingInteractiveRenderRegistrations != true
         if updatesInteractiveState {
@@ -75,11 +75,11 @@ enum EditableTextSingleLineRenderer {
             fieldState?.clamp()
         }
         if EnvironmentRenderContext.current.focusPath == nil {
-            runtime?.registerFocusable(true, at: interactionPath)
+            runtime?.registerFocusable(true, at: focusPath)
         }
         runtime?.registerKeyPressHandler(
             KeyPressHandler(
-                actionPath: interactionPath,
+                actionPath: focusPath,
                 matches: {
                     EditableTextSingleLineInput.matches($0)
                 },
@@ -92,11 +92,11 @@ enum EditableTextSingleLineRenderer {
                     )
                 }
             ),
-            at: interactionPath
+            at: path
         )
-        runtime?.registerPointerDownPositionHandler(
+        let pointerAttachmentIDs = runtime?.registerPointerDownPositionHandler(
             PointerDownPositionHandler(
-                actionPath: interactionPath,
+                actionPath: focusPath,
                 requiresFocus: true,
                 shouldDeferBegin: { point in
                     guard let fieldState else {
@@ -131,13 +131,14 @@ enum EditableTextSingleLineRenderer {
                     fieldState.publishSelection(to: selection)
                 }
             ),
-            at: interactionPath
-        )
+            at: path,
+            requiringFocusAt: focusPath
+        ) ?? []
 
         let currentText = fieldState?.text ?? text.wrappedValue
         let layoutText = displayMode.layoutText(for: currentText)
         let singleLineLayout = EditableTextSingleLineLayout(layoutText)
-        let isFocused = runtime?.isFocused(at: interactionPath) == true
+        let isFocused = runtime?.isFocused(at: focusPath) == true
         if updatesInteractiveState {
             fieldState?.publishSelectionOnFocus(isFocused, to: selection)
         }
@@ -196,9 +197,18 @@ enum EditableTextSingleLineRenderer {
             position: ScrollPosition(x: scrollColumn),
             proposal: RenderProposal(columns: proposal?.columns, rows: 1)
         ).block
+        if !pointerAttachmentIDs.isEmpty {
+            block.hitRegions.append(
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: pointerAttachmentIDs
+                )
+            )
+        }
         block.focusRegions.append(
             RenderedFocusRegion(
-                path: interactionPath,
+                path: focusPath,
                 frame: block.bounds,
                 positionFrame: block.bounds
             )
