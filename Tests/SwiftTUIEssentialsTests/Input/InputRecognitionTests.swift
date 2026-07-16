@@ -270,6 +270,60 @@ struct InputRecognitionTests {
     }
 
     @Test
+    func `pointer attachments sharing a focus owner use their own hit regions and local origins`() {
+        let probe = RecognitionProbe()
+        let runtime = StateRuntime()
+        let view = VStack(alignment: .leading, spacing: 0) {
+            Text("AA")
+                .inputEvent(
+                    PointerPressEvent(.left, coordinateSpace: .local)
+                        .onRecognized { press in
+                            probe.events.append(
+                                "first-\(press.location.column)-\(press.location.row)"
+                            )
+                            return .ignored
+                        }
+                )
+            Text("BBB")
+                .inputEvent(
+                    PointerPressEvent(.left, coordinateSpace: .local)
+                        .onRecognized { press in
+                            probe.events.append(
+                                "second-\(press.location.column)-\(press.location.row)"
+                            )
+                            return .ignored
+                        }
+                )
+                .padding(.leading, 4)
+        }
+        .focusable()
+
+        #expect(runtime.block(from: view)?.lines == ["AA     ", "    BBB"])
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 5, row: 1),
+                    phase: .down
+                )
+            ) == .ignored
+        )
+        #expect(probe.events == ["second-1-0"])
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 1, row: 0),
+                    phase: .down
+                )
+            ) == .ignored
+        )
+        #expect(probe.events == ["second-1-0", "first-1-0"])
+    }
+
+    @Test
     func `InputEventMask selects the current attachment or receiver registrations structurally`() {
         let currentProbe = RecognitionProbe()
         let currentRuntime = StateRuntime()

@@ -93,6 +93,13 @@ rendered focus region, and keyboard or pointer focus changes publish back into
 the binding. Descendants can read `EnvironmentValues.isFocused` to choose their
 own appearance because focus modifiers don't draw a focus indicator.
 
+Focus ownership follows the nearest focus modifier in the resolved hierarchy.
+Consecutive focus modifiers at one view identity share that candidate, while a
+focus modifier on a descendant creates a distinct nested candidate and becomes
+the focus owner for its subtree. When the descendant gains focus, its
+`EnvironmentValues.isFocused` value is `true` and the enclosing candidate's
+value is `false` after the focus update rerenders.
+
 Outside a rendered or captured action context, focus state also uses fallback
 storage and can't move application focus. If multiple visible regions use the
 same optional focus value, the first rendered candidate receives a

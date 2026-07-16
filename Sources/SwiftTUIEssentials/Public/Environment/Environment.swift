@@ -369,7 +369,9 @@ extension EnvironmentValues {
     /// focus.
     ///
     /// SwiftTUI maintains this read-only value while resolving a focused view.
-    /// It defaults to `false` outside that scope.
+    /// A nested focus modifier replaces an enclosing focus owner for its
+    /// subtree, so only the candidate that owns focus reports `true`. The value
+    /// defaults to `false` outside a focused scope.
     public internal(set) nonisolated var isFocused: Bool {
         get {
             self[IsFocusedKey.self]

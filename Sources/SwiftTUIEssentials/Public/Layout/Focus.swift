@@ -18,11 +18,10 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerFocusable(isFocusable, at: interactionPath)
+        runtime?.registerFocusable(isFocusable, at: path)
         guard var block = render(
-            isFocused: isFocusable && runtime?.isFocused(at: interactionPath) == true,
-            focusPath: interactionPath,
+            isFocused: isFocusable && runtime?.isFocused(at: path) == true,
+            focusPath: path,
             operation: {
                 ViewResolver.block(
                     from: content,
@@ -36,7 +35,7 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
         }
 
         if isFocusable {
-            block.setFocusFrame(block.bounds, at: interactionPath)
+            block.setFocusFrame(block.bounds, at: path)
         }
 
         return block
@@ -47,11 +46,10 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerFocusable(isFocusable, at: interactionPath)
+        runtime?.registerFocusable(isFocusable, at: path)
         guard let element = render(
-            isFocused: isFocusable && runtime?.isFocused(at: interactionPath) == true,
-            focusPath: interactionPath,
+            isFocused: isFocusable && runtime?.isFocused(at: path) == true,
+            focusPath: path,
             operation: {
                 ViewResolver.element(
                     from: content,
@@ -68,7 +66,7 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
             return element
         }
 
-        block.setFocusFrame(block.bounds, at: interactionPath)
+        block.setFocusFrame(block.bounds, at: path)
         return .block(block)
     }
 
@@ -79,7 +77,7 @@ struct FocusableView<Content: View>: View, FocusModifierRenderable, LayoutTraitR
     ) -> Value {
         var environment = EnvironmentRenderContext.current
         environment.isFocused = isFocused
-        if environment.focusPath == nil, let focusPath {
+        if let focusPath {
             environment.focusPath = focusPath
         }
         return EnvironmentRenderContext.withValues(environment, perform: operation)
@@ -106,12 +104,11 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerFocusable(true, at: interactionPath)
-        runtime?.registerFocusAttachment(attachment, at: interactionPath)
+        runtime?.registerFocusable(true, at: path)
+        runtime?.registerFocusAttachment(attachment, at: path)
         guard var block = render(
-            isFocused: runtime?.isFocused(at: interactionPath) == true,
-            focusPath: interactionPath,
+            isFocused: runtime?.isFocused(at: path) == true,
+            focusPath: path,
             operation: {
                 ViewResolver.block(
                     from: content,
@@ -124,7 +121,7 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
             return nil
         }
 
-        block.setFocusFrame(block.bounds, at: interactionPath)
+        block.setFocusFrame(block.bounds, at: path)
         return block
     }
 
@@ -133,12 +130,11 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerFocusable(true, at: interactionPath)
-        runtime?.registerFocusAttachment(attachment, at: interactionPath)
+        runtime?.registerFocusable(true, at: path)
+        runtime?.registerFocusAttachment(attachment, at: path)
         guard let element = render(
-            isFocused: runtime?.isFocused(at: interactionPath) == true,
-            focusPath: interactionPath,
+            isFocused: runtime?.isFocused(at: path) == true,
+            focusPath: path,
             operation: {
                 ViewResolver.element(
                     from: content,
@@ -155,7 +151,7 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
             return element
         }
 
-        block.setFocusFrame(block.bounds, at: interactionPath)
+        block.setFocusFrame(block.bounds, at: path)
         return .block(block)
     }
 
@@ -166,7 +162,7 @@ struct FocusedView<Content: View>: View, FocusModifierRenderable, LayoutTraitRen
     ) -> Value {
         var environment = EnvironmentRenderContext.current
         environment.isFocused = isFocused
-        if environment.focusPath == nil, let focusPath {
+        if let focusPath {
             environment.focusPath = focusPath
         }
         return EnvironmentRenderContext.withValues(environment, perform: operation)
@@ -229,6 +225,10 @@ extension View {
     /// the rendered cells; descendants can read `EnvironmentValues.isFocused`
     /// to choose their own focused appearance.
     ///
+    /// Consecutive focus modifiers resolved at this view identity share one
+    /// candidate. A focus modifier on a descendant creates a separate nested
+    /// candidate and becomes the nearest focus owner for that subtree.
+    ///
     /// Passing `false` explicitly removes the view from focus eligibility and
     /// rejects focus requests associated with the same interaction path. A
     /// disabled or hidden view is likewise not focusable.
@@ -248,6 +248,9 @@ extension View {
     /// request. Keyboard or pointer focus changes update the binding. The
     /// modifier also supplies the resulting state through
     /// `EnvironmentValues.isFocused` to the modified subtree.
+    /// Consecutive focus modifiers at one view identity share a candidate, but
+    /// a descendant focus modifier owns focus independently and replaces this
+    /// modifier as the nearest focus owner within its subtree.
     ///
     /// - Parameter condition: The binding that is `true` exactly while this
     ///   view owns focus.
@@ -264,6 +267,9 @@ extension View {
     /// the binding, and when the binding's focused candidate loses focus it is
     /// cleared. The focused state is also available to descendants through
     /// `EnvironmentValues.isFocused`.
+    /// Consecutive focus modifiers at one view identity share a candidate, but
+    /// a descendant focus modifier owns focus independently and replaces this
+    /// modifier as the nearest focus owner within its subtree.
     ///
     /// - Parameters:
     ///   - binding: The optional focus-state binding shared by a group of focus

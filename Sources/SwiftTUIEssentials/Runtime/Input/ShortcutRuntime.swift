@@ -46,8 +46,7 @@ struct TapShortcutView<Content: View>: View, InputModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerTapShortcutHandler(handler, at: interactionPath)
+        runtime?.registerTapShortcutHandler(handler, at: path)
         return ViewResolver.block(
             from: content,
             in: proposal,
@@ -61,8 +60,7 @@ struct TapShortcutView<Content: View>: View, InputModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerTapShortcutHandler(handler, at: interactionPath)
+        runtime?.registerTapShortcutHandler(handler, at: path)
         return ViewResolver.element(
             from: content,
             in: proposal,
@@ -90,8 +88,7 @@ struct LongPressShortcutView<Content: View>: View, InputModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerLongPressShortcutHandler(handler, at: interactionPath)
+        runtime?.registerLongPressShortcutHandler(handler, at: path)
         return ViewResolver.block(
             from: content,
             in: proposal,
@@ -105,8 +102,7 @@ struct LongPressShortcutView<Content: View>: View, InputModifierRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedElement? {
-        let interactionPath = EnvironmentRenderContext.current.focusPath ?? path
-        runtime?.registerLongPressShortcutHandler(handler, at: interactionPath)
+        runtime?.registerLongPressShortcutHandler(handler, at: path)
         return ViewResolver.element(
             from: content,
             in: proposal,

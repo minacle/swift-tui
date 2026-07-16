@@ -491,11 +491,11 @@ final class StateRuntime {
         at path: [Int],
         actionPath: [Int]?,
         tier: RecognitionAttachmentTier
-    ) -> Bool {
+    ) -> RecognitionAttachmentID? {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled,
               RecognitionRenderContext.values.inputEventsEnabled else {
-            return false
+            return nil
         }
 
         return recognition.register(
@@ -513,14 +513,14 @@ final class StateRuntime {
         actionPath: [Int]?,
         tier: RecognitionAttachmentTier,
         isSimultaneous: Bool = false
-    ) {
+    ) -> RecognitionAttachmentID? {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled,
               RecognitionRenderContext.values.gesturesEnabled else {
-            return
+            return nil
         }
 
-        recognition.register(
+        return recognition.register(
             gesture,
             at: path,
             actionPath: actionPath ?? path,
@@ -631,14 +631,17 @@ final class StateRuntime {
         )
     }
 
-    func registerPointerPressHandler(_ handler: PointerPressHandler, at path: [Int]) {
+    func registerPointerPressHandler(
+        _ handler: PointerPressHandler,
+        at path: [Int]
+    ) -> RecognitionAttachmentID? {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled,
               RecognitionRenderContext.values.inputEventsEnabled else {
-            return
+            return nil
         }
 
-        _ = recognition.register(
+        return recognition.register(
             ViewDefinedPointerPressEvent(handler: handler),
             at: path,
             actionPath: handler.actionPath ?? path,
@@ -680,21 +683,23 @@ final class StateRuntime {
 
     func registerPointerDownPositionHandler(
         _ handler: PointerDownPositionHandler,
-        at path: [Int]
-    ) {
+        at path: [Int],
+        requiringFocusAt focusPath: [Int]? = nil
+    ) -> [RecognitionAttachmentID] {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled,
               RecognitionRenderContext.values.inputEventsEnabled else {
-            return
+            return []
         }
 
         let handler = environmentRestoringPointerDownPositionHandler(handler)
         let sequence = PointerPositionSequenceState()
-        _ = recognition.register(
+        let requiredFocusPath = focusPath ?? path
+        let eagerID = recognition.register(
             PointerPositionInputEvent(
                 handler: handler,
                 isEligible: { [weak self] in
-                    !handler.requiresFocus || self?.focus.activePath == path
+                    !handler.requiresFocus || self?.focus.activePath == requiredFocusPath
                 },
                 sequence: sequence,
                 stage: .eager
@@ -704,7 +709,7 @@ final class StateRuntime {
             tier: .viewDefined,
             environment: EnvironmentRenderContext.current
         )
-        _ = recognition.register(
+        let lazyID = recognition.register(
             PointerPositionInputEvent(
                 handler: handler,
                 isEligible: { [weak self] in
@@ -718,17 +723,21 @@ final class StateRuntime {
             tier: .viewDefined,
             environment: EnvironmentRenderContext.current
         )
+        return [eagerID, lazyID].compactMap { $0 }
     }
 
-    func registerLinkHandler(_ handler: LinkHandler, at path: [Int]) {
+    func registerLinkHandler(
+        _ handler: LinkHandler,
+        at path: [Int]
+    ) -> RecognitionAttachmentID? {
         guard !isSuppressingInteractiveRenderRegistrations,
               EnvironmentRenderContext.current.isEnabled,
               RecognitionRenderContext.values.inputEventsEnabled else {
-            return
+            return nil
         }
 
         let handler = environmentRestoringLinkHandler(handler)
-        _ = recognition.register(
+        return recognition.register(
             LinkActivationInputEvent(handler: handler),
             at: path,
             actionPath: handler.actionPath ?? path,
@@ -2721,6 +2730,8 @@ private final class FocusRuntime {
 
     private var updatedActivePathDuringRender = false
 
+    private var activePathAtRenderStart: [Int]?
+
     private(set) var activePath: [Int]?
 
     func beginRender(requests: [FocusRequestRecord]) {
@@ -2730,6 +2741,7 @@ private final class FocusRuntime {
         attachmentsByPath = [:]
         allAttachments = []
         updatedActivePathDuringRender = false
+        activePathAtRenderStart = activePath
         requestsForCurrentRender = requests.sorted {
             $0.generation > $1.generation
         }
@@ -2765,14 +2777,13 @@ private final class FocusRuntime {
             return Candidate(path: path, attachments: attachmentsByPath[path] ?? [])
         }
 
-        let previousActivePath = activePath
         let activeCandidate = activeCandidate(
             from: candidates,
             extraRequests: extraRequests
         )
         activePath = activeCandidate?.path
         let attachmentsChanged = syncAttachments(for: activeCandidate)
-        return activePath != previousActivePath || attachmentsChanged
+        return activePath != activePathAtRenderStart || attachmentsChanged
     }
 
     private func activeCandidate(
@@ -2870,8 +2881,6 @@ private final class FocusRuntime {
         for request in requestsForCurrentRender
             where attachments.contains(where: { attachment in
                 attachment.matches(request.request)
-                    || (request.sourcePath.map { path.starts(with: $0) } == true
-                        && attachment.matchesValue(request.request.value))
             }) {
             activePath = path
             updatedActivePathDuringRender = true

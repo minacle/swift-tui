@@ -753,4 +753,183 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(block?.lines == ["BXC"])
         #expect(block?.caret == RenderedCaret(column: 2))
     }
+
+    @Test
+    func `an indented single-line EditableText maps a click from its own receiver origin`() {
+        let runtime = StateRuntime()
+        let selectionProbe = BindingProbe<TextSelection?>()
+        let view = FocusableCompositeSingleLineEditableText(
+            selectionProbe: selectionProbe
+        )
+        let proposal = RenderProposal(columns: 20)
+
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 8, row: 1),
+                    phase: .down
+                )
+            ) == .ignored
+        )
+        #expect(
+            selectionCharacterOffsets(
+                selectionProbe.binding?.wrappedValue,
+                in: "0123456789"
+            ) == 2..<2
+        )
+    }
+
+    @Test
+    func `clicking the outer header leaves the single-line EditableText selection unchanged`() {
+        let runtime = StateRuntime()
+        let selectionProbe = BindingProbe<TextSelection?>()
+        let view = FocusableCompositeSingleLineEditableText(
+            selectionProbe: selectionProbe
+        )
+        let proposal = RenderProposal(columns: 20)
+
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        dispatchClick(to: runtime, column: 9, row: 2)
+        #expect(
+            selectionCharacterOffsets(
+                selectionProbe.binding?.wrappedValue,
+                in: "0123456789"
+            ) == 2..<2
+        )
+
+        dispatchClick(to: runtime, column: 2, row: 1)
+        #expect(
+            selectionCharacterOffsets(
+                selectionProbe.binding?.wrappedValue,
+                in: "0123456789"
+            ) == 2..<2
+        )
+    }
+
+    @Test
+    func `Left after the nested editor appears keeps the outer header unfocused`() {
+        let runtime = StateRuntime()
+        let selectionProbe = BindingProbe<TextSelection?>()
+        let view = FocusableCompositeSingleLineEditableText(
+            selectionProbe: selectionProbe,
+            startsEditing: false
+        )
+        let proposal = RenderProposal(columns: 20)
+
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        dispatchClick(to: runtime, column: 2, row: 1)
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: .return, characters: "\r")
+            ) == .ignored
+        )
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        #expect(runtime.block(from: view, in: proposal)?.trimmedLines.first == "Header unfocused")
+
+        #expect(
+            runtime.dispatch(
+                KeyPress(key: .leftArrow, characters: "\u{F702}")
+            ) == .handled
+        )
+        #expect(renderUntilStable(runtime, view: view, in: proposal) <= 4)
+        #expect(runtime.block(from: view, in: proposal)?.trimmedLines.first == "Header unfocused")
+    }
+}
+
+private struct FocusableCompositeSingleLineEditableText: View {
+
+    @State private var isEditing: Bool
+
+    @State private var text = "0123456789"
+
+    @State private var selection: TextSelection?
+
+    @FocusState private var isEditorFocused = true
+
+    let selectionProbe: BindingProbe<TextSelection?>
+
+    init(
+        selectionProbe: BindingProbe<TextSelection?>,
+        startsEditing: Bool = true
+    ) {
+        self._isEditing = State(initialValue: startsEditing)
+        self._isEditorFocused = FocusState(wrappedValue: startsEditing)
+        self.selectionProbe = selectionProbe
+    }
+
+    var body: some View {
+        CapturedFocusableCompositeSingleLineEditableText(
+            isEditing: $isEditing,
+            text: $text,
+            selection: $selection,
+            isEditorFocused: $isEditorFocused,
+            selectionProbe: selectionProbe
+        )
+    }
+}
+
+private struct CapturedFocusableCompositeSingleLineEditableText: View {
+
+    let isEditing: Binding<Bool>
+
+    let text: Binding<String>
+
+    let selection: Binding<TextSelection?>
+
+    let isEditorFocused: FocusState<Bool>.Binding
+
+    init(
+        isEditing: Binding<Bool>,
+        text: Binding<String>,
+        selection: Binding<TextSelection?>,
+        isEditorFocused: FocusState<Bool>.Binding,
+        selectionProbe: BindingProbe<TextSelection?>
+    ) {
+        self.isEditing = isEditing
+        self.text = text
+        self.selection = selection
+        self.isEditorFocused = isEditorFocused
+        selectionProbe.capture(selection)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            CompositeSingleLineHeader()
+                .simultaneousInputEvent(
+                    PointerPressEvent(.left)
+                        .onRecognized { _ in .ignored }
+                )
+            HStack(spacing: 0) {
+                Text("> ")
+                if isEditing.wrappedValue {
+                    EditableText(text: text, selection: selection)
+                        .focused(isEditorFocused)
+                }
+            }
+            .padding(.leading, 4)
+        }
+        .focusable()
+        .simultaneousInputEvent(
+            KeyPressEvent(.return, phases: .down)
+                .onRecognized { _ in
+                    isEditing.wrappedValue = true
+                    return .ignored
+                }
+                .deferred(priority: .eager)
+        )
+        .onChange(of: isEditing.wrappedValue) {
+            isEditorFocused.wrappedValue = $1
+        }
+    }
+}
+
+private struct CompositeSingleLineHeader: View {
+
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        Text("Header \(isFocused ? "focused" : "unfocused")")
+    }
 }

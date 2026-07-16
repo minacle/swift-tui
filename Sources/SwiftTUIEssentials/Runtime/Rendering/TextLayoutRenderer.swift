@@ -236,8 +236,7 @@ enum TextLayoutRenderer {
             )
         )
         if allowsSelection, !block.bounds.isEmpty {
-            block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
-            runtime?.registerPointerDownPositionHandler(
+            let attachmentIDs = runtime?.registerPointerDownPositionHandler(
                 PointerDownPositionHandler(
                     actionPath: path,
                     requiresFocus: false,
@@ -259,6 +258,13 @@ enum TextLayoutRenderer {
                     }
                 ),
                 at: path
+            ) ?? []
+            block.hitRegions.append(
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: attachmentIDs
+                )
             )
         }
         registerLinks(in: runtime, path: path, runs: layout.runs, block: &block)
@@ -279,6 +285,15 @@ enum TextLayoutRenderer {
 
             let linkPath = path + [linkIndex]
             linkIndex += 1
+            let attachmentID = runtime?.registerLinkHandler(
+                LinkHandler(
+                    actionPath: linkPath,
+                    action: {
+                        EnvironmentRenderContext.current.openURL.result(for: url).accepted
+                    }
+                ),
+                at: linkPath
+            )
             block.hitRegions.append(
                 RenderedHitRegion(
                     path: linkPath,
@@ -287,17 +302,9 @@ enum TextLayoutRenderer {
                         y: run.row,
                         width: run.width,
                         height: 1
-                    )
+                    ),
+                    recognitionAttachmentIDs: attachmentID.map { [$0] } ?? []
                 )
-            )
-            runtime?.registerLinkHandler(
-                LinkHandler(
-                    actionPath: linkPath,
-                    action: {
-                        EnvironmentRenderContext.current.openURL.result(for: url).accepted
-                    }
-                ),
-                at: linkPath
             )
         }
     }

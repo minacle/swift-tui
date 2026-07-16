@@ -234,13 +234,23 @@ nonisolated struct RenderedHitRegion: Equatable, Sendable {
 
     var frame: RenderedRect
 
+    var recognitionAttachmentIDs: [RecognitionAttachmentID] = []
+
     func offsetBy(x: Int, y: Int) -> RenderedHitRegion {
-        RenderedHitRegion(path: path, frame: frame.offsetBy(x: x, y: y))
+        RenderedHitRegion(
+            path: path,
+            frame: frame.offsetBy(x: x, y: y),
+            recognitionAttachmentIDs: recognitionAttachmentIDs
+        )
     }
 
     func clipped(to bounds: RenderedRect) -> RenderedHitRegion? {
         frame.clipped(to: bounds).map {
-            RenderedHitRegion(path: path, frame: $0)
+            RenderedHitRegion(
+                path: path,
+                frame: $0,
+                recognitionAttachmentIDs: recognitionAttachmentIDs
+            )
         }
     }
 }

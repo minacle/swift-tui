@@ -1355,10 +1355,16 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
             return nil
         }
 
-        registerActivation(in: runtime, path: path)
+        let pointerAttachmentID = registerActivation(in: runtime, path: path)
         if isActive(in: runtime) {
             block.focusRegions.append(RenderedFocusRegion(path: path, frame: block.bounds))
-            block.hitRegions.append(RenderedHitRegion(path: path, frame: block.bounds))
+            block.hitRegions.append(
+                RenderedHitRegion(
+                    path: path,
+                    frame: block.bounds,
+                    recognitionAttachmentIDs: pointerAttachmentID.map { [$0] } ?? []
+                )
+            )
         }
         return block
     }
@@ -1373,11 +1379,14 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
         }
     }
 
-    private func registerActivation(in runtime: StateRuntime?, path: [Int]) {
+    private func registerActivation(
+        in runtime: StateRuntime?,
+        path: [Int]
+    ) -> RecognitionAttachmentID? {
         guard let runtime,
               isActive(in: runtime),
               let stackPath = NavigationStackContext.current?.path else {
-            return
+            return nil
         }
 
         let environment = EnvironmentRenderContext.current
@@ -1397,7 +1406,7 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
             actionPath: path,
             tier: .viewDefined
         )
-        _ = runtime.registerInputEvent(
+        return runtime.registerInputEvent(
             PointerPressEvent(.left)
                 .sequenced(before: PointerPressEvent(.left, phases: .up))
                 .onRecognized { _ in
