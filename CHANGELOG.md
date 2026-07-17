@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed terminal input waits so view tasks start without user input and state
-  changes made after suspension wake the application runner for redraw.
+- Fixed terminal input waits so view tasks start without user input, state
+  changes made after suspension wake the application runner for redraw, and
+  repeated key input cannot defer a redraw or termination until a later
+  terminal byte arrives.
 
 ## [0.10.2] - 2026-07-17
 

@@ -32,6 +32,8 @@ private enum AppRunnerTestScenario: String {
 
     case longPress = "long-press"
 
+    case repeatedInput = "repeated-input"
+
     case resize
 
     case terminalRestoration = "terminal-restoration"
@@ -50,6 +52,8 @@ private struct AppRunnerTestView: View {
             CancellableTaskView()
         case .longPress:
             LongPressView()
+        case .repeatedInput:
+            RepeatedInputView()
         case .resize:
             ResizeView()
         }
@@ -133,6 +137,38 @@ private struct CancellableTaskView: View {
     }
 }
 
+private struct RepeatedInputView: View {
+
+    @Environment(\.terminate)
+    private var terminate
+
+    @FocusState
+    private var isFocused = false
+
+    @State
+    private var count = 0
+
+    var body: some View {
+        let renderedCount = count
+        recordRepeatedInput("render:\(renderedCount):focused:\(isFocused)")
+        return Text("count:\(count)")
+            .frame(width: 10, height: 1, alignment: .topLeading)
+            .focusable()
+            .focused($isFocused)
+            .task {
+                isFocused = true
+            }
+            .onKeyPress("a") {
+                count += 1
+                recordRepeatedInput("handled:\(count)")
+                if count == 3 {
+                    terminate()
+                }
+                return .handled
+            }
+    }
+}
+
 private struct LongPressView: View {
 
     @Environment(\.terminate)
@@ -149,6 +185,10 @@ private struct LongPressView: View {
                 terminate()
             }
     }
+}
+
+private func recordRepeatedInput(_ message: String) {
+    FileHandle.standardError.write(Data("[repeated-input]\(message)\n".utf8))
 }
 
 private struct ResizeView: View {

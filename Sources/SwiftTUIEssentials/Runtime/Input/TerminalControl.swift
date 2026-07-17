@@ -846,15 +846,7 @@ nonisolated final class TerminalInputWorker: Sendable {
     func requestInput(
         deliver: @escaping @Sendable (TerminalInput) -> Void
     ) {
-        let shouldStart = readState.withLock {
-            guard !$0.isReading, !$0.isStopped else {
-                return false
-            }
-
-            $0.isReading = true
-            return true
-        }
-        guard shouldStart else {
+        guard beginRead() else {
             return
         }
 
@@ -864,11 +856,7 @@ nonisolated final class TerminalInputWorker: Sendable {
             let input = io.withLock {
                 $0.readInput()
             }
-            let shouldDeliver = readState.withLock {
-                $0.isReading = false
-                return !$0.isStopped
-            }
-            guard shouldDeliver else {
+            guard finishRead() else {
                 return
             }
 
@@ -876,10 +864,21 @@ nonisolated final class TerminalInputWorker: Sendable {
         }
     }
 
-    func readInput(timeout: TimeInterval) -> TerminalInput {
-        queue.sync {
+    /// Reads buffered input without waiting behind an active asynchronous read.
+    ///
+    /// If another read owns the worker or the worker has stopped, this method
+    /// returns `.none` instead of entering the serial queue.
+    func readPendingInput() -> TerminalInput {
+        guard beginRead() else {
+            return .none
+        }
+        defer {
+            _ = finishRead()
+        }
+
+        return queue.sync {
             io.withLock {
-                $0.readInput(timeout: timeout)
+                $0.readInput(timeout: 0)
             }
         }
     }
@@ -915,6 +914,24 @@ nonisolated final class TerminalInputWorker: Sendable {
             wakeup.signal()
         }
         queue.sync {}
+    }
+
+    private func beginRead() -> Bool {
+        readState.withLock {
+            guard !$0.isReading, !$0.isStopped else {
+                return false
+            }
+
+            $0.isReading = true
+            return true
+        }
+    }
+
+    private func finishRead() -> Bool {
+        readState.withLock {
+            $0.isReading = false
+            return !$0.isStopped
+        }
     }
 
     private func interruptRead() {
@@ -987,7 +1004,7 @@ final class TerminalSession {
     }
 
     func readPendingInput() -> TerminalInput {
-        inputWorker.readInput(timeout: 0)
+        inputWorker.readPendingInput()
     }
 
     func currentTerminalSize() -> TerminalViewportSize {

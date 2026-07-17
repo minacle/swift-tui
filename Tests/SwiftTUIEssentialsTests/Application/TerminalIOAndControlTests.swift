@@ -153,6 +153,43 @@ struct TerminalIOAndControlTests {
     }
 
     @Test
+    func `a pending input probe returns immediately while the worker waits for a new byte`() throws {
+        let input = try FileDescriptor.pipe()
+        let output = try FileDescriptor.pipe()
+        defer {
+            try? input.readEnd.close()
+            try? input.writeEnd.close()
+            try? output.readEnd.close()
+            try? output.writeEnd.close()
+        }
+        let worker = try TerminalInputWorker(
+            inputDescriptor: input.readEnd,
+            outputDescriptor: output.writeEnd
+        )
+        defer { worker.stop() }
+        worker.requestInput { _ in }
+
+        Thread.sleep(forTimeInterval: 0.01)
+        let result = Mutex<[TerminalInput]>([])
+        let completed = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            result.withLock {
+                $0.append(worker.readPendingInput())
+            }
+            completed.signal()
+        }
+
+        let completedWithoutInput = completed.wait(timeout: .now() + 1) == .success
+        if !completedWithoutInput {
+            try input.writeEnd.writeAll([97])
+            #expect(completed.wait(timeout: .now() + 1) == .success)
+        }
+
+        #expect(completedWithoutInput)
+        #expect(result.withLock { $0 == [.none] })
+    }
+
+    @Test
     func `a clipboard query interrupts the idle reader and preserves unrelated pending input`() throws {
         let input = try FileDescriptor.pipe()
         let output = try FileDescriptor.pipe()
@@ -187,7 +224,7 @@ struct TerminalIOAndControlTests {
         #expect(worker.paste() == "clipboard")
         #expect(responded.wait(timeout: .now() + 1) == .success)
         #expect(
-            worker.readInput(timeout: 0)
+            worker.readPendingInput()
                 == .keyPress(KeyPress(key: "a", characters: "a"))
         )
     }

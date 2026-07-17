@@ -50,6 +50,34 @@ struct AppRunnerTests {
     }
 
     @Test
+    func `repeated key input redraws and terminates without waiting for another byte`() throws {
+        try withPseudoTerminal { master, slave in
+            let process = try startTestHost(scenario: "repeated-input", terminal: slave)
+            defer { stop(process) }
+            let output = TerminalOutputReader(descriptor: master)
+
+            #expect(
+                output.waitFor("[repeated-input]render:0:focused:true", process: process)
+            )
+            for count in 1 ... 3 {
+                try master.writeAll([97])
+                #expect(
+                    output.waitFor("[repeated-input]handled:\(count)", process: process)
+                )
+            }
+
+            #expect(
+                output.waitFor("[repeated-input]render:3:focused:true", process: process)
+            )
+            #expect(waitForExit(process))
+            output.drain()
+            #expect(
+                output.text.occurrences(of: TerminalControl.exitAlternateScreenSequence) == 1
+            )
+        }
+    }
+
+    @Test
     func `a long-press deadline expires without further terminal input`() throws {
         try withPseudoTerminal { master, slave in
             let process = try startTestHost(scenario: "long-press", terminal: slave)
