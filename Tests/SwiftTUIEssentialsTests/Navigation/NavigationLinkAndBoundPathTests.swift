@@ -174,7 +174,7 @@ struct NavigationLinkAndBoundPathTests {
     }
 
     @Test
-    func `a value push action from a child destination appends its enum value to the root bound path`() {
+    func `a value push action from a child destination appends its enum value and consumes Return`() {
         var path: [NavigationPushDestination] = []
         let runtime = StateRuntime()
         let view = NavigationPushChildRootDestinationView(
@@ -192,14 +192,14 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(path == [.detail])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }
 
     @Test
-    func `the value push action updates a NavigationStack path stored in an observable object`() {
+    func `the value push action updates an observable NavigationStack path and consumes Return`() {
         let runtime = StateRuntime()
         let view = NavigationPushObservableObjectPathView()
 
@@ -207,13 +207,13 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }
 
     @Test
-    func `a NavigationStack retains an initialized observable path model when pushing a value`() {
+    func `a NavigationStack retains its initialized path model when a Button consumes Return to push`() {
         let runtime = StateRuntime()
         let view = NavigationPushInitializedObservableObjectPathRootView()
 
@@ -221,7 +221,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }

@@ -196,19 +196,31 @@ struct SecureTextEntryTests {
     }
 
     @Test
-    func `Return submits the secure field's current value without inserting a newline`() {
+    func `Return submits the secure field's current value once and handles the key without inserting a newline`() {
         let runtime = StateRuntime()
         let view = SecureFieldSubmitView()
 
-        #expect(runtime.block(from: view)?.lines == ["Password", "  none  "])
+        #expect(runtime.block(from: view)?.lines == ["Password", " none:0 "])
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "s", characters: "s")) == .handled)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
-        #expect(runtime.block(from: view)?.lines == ["• ", "s "])
+        #expect(runtime.block(from: view)?.lines == ["•  ", "s:1"])
         #expect(runtime.block(from: view)?.caret == RenderedCaret(column: 1))
+    }
+
+    @Test
+    func `Return remains unhandled in a focused SecureField without an onSubmit action`() {
+        let runtime = StateRuntime()
+        let view = FocusedSecureFieldWithoutSubmitView()
+
+        _ = runtime.block(from: view)
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
     }
 
     @Test
@@ -225,5 +237,15 @@ struct SecureTextEntryTests {
         #expect(block?.focusRegions.map(\.frame) == [
             RenderedRect(x: 0, y: 0, width: 20, height: 1),
         ])
+    }
+}
+
+private struct FocusedSecureFieldWithoutSubmitView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    var body: some View {
+        SecureField("Password", text: .constant(""))
+            .focused($isFocused)
     }
 }

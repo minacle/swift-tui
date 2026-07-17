@@ -24,7 +24,7 @@ struct ButtonBehaviorTests {
     }
 
     @Test
-    func `a button performs its action when pointer-up occurs within the region where pointer-down began`() {
+    func `a button performs its action and consumes pointer-up when the press begins and ends inside its region`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -46,13 +46,13 @@ struct ButtonBehaviorTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date
-            ) == .ignored
+            ) == .handled
         )
         #expect(tapProbe.events == ["run"])
     }
 
     @Test
-    func `button activation and an outer tap both recognize the pointer sequence`() {
+    func `button pointer activation consumes pointer-up before an outer tap recognizes`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = Button("Run") {
@@ -64,13 +64,13 @@ struct ButtonBehaviorTests {
 
         _ = runtime.block(from: view)
 
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
 
-        #expect(tapProbe.events == ["button", "outer"])
+        #expect(tapProbe.events == ["button"])
     }
 
     @Test
-    func `button activation and an outer long press both recognize the pointer sequence`() {
+    func `button pointer activation consumes pointer-up after an outer long press recognizes`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -102,7 +102,7 @@ struct ButtonBehaviorTests {
             runtime.dispatch(
                 PointerPress(button: .left, location: Point(column: 0, row: 0), phase: .up),
                 at: date.addingTimeInterval(0.1)
-            ) == .ignored
+            ) == .handled
         )
         #expect(tapProbe.events == ["pressing", "long", "button", "ended"])
     }
@@ -123,7 +123,7 @@ struct ButtonBehaviorTests {
     }
 
     @Test
-    func `a focused button performs its action for Return and ignores unrelated keys`() {
+    func `a focused button performs its action and consumes Return while ignoring unrelated keys`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = FocusedButtonView(tapProbe: tapProbe)
@@ -133,12 +133,12 @@ struct ButtonBehaviorTests {
         _ = runtime.block(from: view)
 
         #expect(runtime.dispatch(KeyPress(key: "x", characters: "x")) == .ignored)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(tapProbe.events == ["go"])
     }
 
     @Test
-    func `button Return activation continues to key resolution after its action`() {
+    func `button Return activation consumes the key before resolution`() {
         let runtime = StateRuntime()
         let tapProbe = TapGestureProbe()
         let view = ResolvedButtonView(tapProbe: tapProbe)
@@ -150,7 +150,7 @@ struct ButtonBehaviorTests {
         #expect(
             runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled
         )
-        #expect(tapProbe.events == ["button", "resolve"])
+        #expect(tapProbe.events == ["button"])
     }
 
     @Test
@@ -193,7 +193,7 @@ struct ButtonBehaviorTests {
 
         #expect(runtime.block(from: view)?.text == "0")
 
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "1")
@@ -207,11 +207,11 @@ struct ButtonBehaviorTests {
             .environment(\.testMarker, "button")
 
         _ = runtime.block(from: view)
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
 
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
 
         #expect(tapProbe.events == ["button", "button"])
     }
@@ -262,10 +262,38 @@ struct ButtonBehaviorTests {
 
         #expect(runtime.block(from: view, in: RenderProposal(columns: 5))?.lines == ["A    "])
 
-        dispatchClick(to: runtime, column: 5, row: 1)
+        dispatchButtonClick(to: runtime, column: 5, row: 1)
 
         #expect(tapProbe.events == ["tap"])
     }
+}
+
+private func dispatchButtonClick(
+    to runtime: StateRuntime,
+    column: Int,
+    row: Int,
+    at date: Date = Date(timeIntervalSinceReferenceDate: 1_000)
+) {
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .down
+            ),
+            at: date
+        ) == .ignored
+    )
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .up
+            ),
+            at: date
+        ) == .handled
+    )
 }
 
 private struct FocusedButtonView: View {

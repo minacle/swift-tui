@@ -79,7 +79,7 @@ struct ProgrammaticScrollingTests {
         let view = ReaderScrollToBottomView()
 
         #expect(runtime.block(from: view)?.lines == ["go", "A ", "B "])
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
 
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.lines == ["go", "C ", "D "])
@@ -91,14 +91,14 @@ struct ProgrammaticScrollingTests {
         let bottom = ReaderAnchorScrollView(anchor: .bottom)
 
         #expect(runtime.block(from: bottom)?.lines == ["go", "A ", "B "])
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: bottom)?.lines == ["go", "B ", "C "])
 
         let topRuntime = StateRuntime()
         let top = ReaderAnchorScrollView(anchor: .top)
         #expect(topRuntime.block(from: top)?.lines == ["go", "A ", "B "])
-        dispatchClick(to: topRuntime, column: 1, row: 1)
+        dispatchButtonClick(to: topRuntime, column: 1, row: 1)
         #expect(topRuntime.consumeInvalidation())
         #expect(topRuntime.block(from: top)?.lines == ["go", "C ", "D "])
     }
@@ -115,7 +115,7 @@ struct ProgrammaticScrollingTests {
         )
 
         #expect(runtime.block(from: view)?.lines == ["go", "A ", "B "])
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
 
         #expect(position.point == ScrollPoint(y: 1))
         #expect(runtime.consumeInvalidation())
@@ -128,7 +128,7 @@ struct ProgrammaticScrollingTests {
         let horizontal = ReaderHorizontalScrollView()
 
         #expect(horizontalRuntime.block(from: horizontal)?.lines == ["go", "AB"])
-        dispatchClick(to: horizontalRuntime, column: 1, row: 1)
+        dispatchButtonClick(to: horizontalRuntime, column: 1, row: 1)
         #expect(horizontalRuntime.consumeInvalidation())
         #expect(horizontalRuntime.block(from: horizontal)?.lines == ["go", "BC"])
 
@@ -136,7 +136,7 @@ struct ProgrammaticScrollingTests {
         let twoAxis = ReaderTwoAxisScrollView()
 
         #expect(twoAxisRuntime.block(from: twoAxis)?.lines == ["go", "AB", "DE"])
-        dispatchClick(to: twoAxisRuntime, column: 1, row: 1)
+        dispatchButtonClick(to: twoAxisRuntime, column: 1, row: 1)
         #expect(twoAxisRuntime.consumeInvalidation())
         #expect(twoAxisRuntime.block(from: twoAxis)?.lines == ["go", "EF", "HI"])
     }
@@ -147,14 +147,14 @@ struct ProgrammaticScrollingTests {
         let missing = ReaderMissingIDView()
 
         #expect(missingRuntime.block(from: missing)?.lines == ["go", "A ", "B "])
-        dispatchClick(to: missingRuntime, column: 1, row: 1)
+        dispatchButtonClick(to: missingRuntime, column: 1, row: 1)
         _ = missingRuntime.consumeInvalidation()
         #expect(missingRuntime.block(from: missing)?.lines == ["go", "A ", "B "])
 
         let scopedRuntime = StateRuntime()
         let scoped = ReaderOutOfScopeView()
         #expect(scopedRuntime.block(from: scoped)?.lines == ["go", "X ", "A ", "B "])
-        dispatchClick(to: scopedRuntime, column: 1, row: 1)
+        dispatchButtonClick(to: scopedRuntime, column: 1, row: 1)
         _ = scopedRuntime.consumeInvalidation()
         #expect(scopedRuntime.block(from: scoped)?.lines == ["go", "X ", "A ", "B "])
     }
