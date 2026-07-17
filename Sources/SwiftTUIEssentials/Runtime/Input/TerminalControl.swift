@@ -1,4 +1,7 @@
 import Foundation
+import CoreFoundation
+import Dispatch
+import Synchronization
 import Terminal
 import Termios
 
@@ -35,7 +38,80 @@ enum TerminalInput: Equatable, Sendable {
     case none
 }
 
-enum TerminalControl {
+/// Schedules a source that ends the current main-run-loop service pass.
+///
+/// Signaling is safe from the terminal worker. The block remains pending if it
+/// is scheduled just before the runner enters the run loop, so no wakeup is
+/// lost at the boundary between requesting input and waiting for an event.
+nonisolated enum MainRunLoopWakeup {
+
+    static func signal() {
+        let mainRunLoop = CFRunLoopGetMain()
+        CFRunLoopPerformBlock(
+            mainRunLoop,
+            RunLoop.Mode.default.rawValue as NSString
+        ) {
+            CFRunLoopStop(mainRunLoop)
+        }
+        CFRunLoopWakeUp(mainRunLoop)
+    }
+}
+
+/// Wakes an idle terminal read without consuming bytes from terminal input.
+///
+/// The pipe contains at most one byte. Writers coalesce repeated wake requests,
+/// and the input worker consumes the byte before it completes the interrupted
+/// read. Closing the pipe is safe only after the worker has stopped.
+nonisolated final class TerminalInputWakeup: Sendable {
+
+    let readDescriptor: FileDescriptor
+
+    private let writeDescriptor: FileDescriptor
+
+    private let isPending = Mutex(false)
+
+    init() throws {
+        let descriptors = try FileDescriptor.pipe()
+        readDescriptor = descriptors.readEnd
+        writeDescriptor = descriptors.writeEnd
+    }
+
+    deinit {
+        try? readDescriptor.close()
+        try? writeDescriptor.close()
+    }
+
+    func signal() {
+        let shouldWrite = isPending.withLock {
+            guard !$0 else {
+                return false
+            }
+
+            $0 = true
+            return true
+        }
+        guard shouldWrite else {
+            return
+        }
+
+        do {
+            try writeDescriptor.writeAll([1])
+        }
+        catch {
+            isPending.withLock { $0 = false }
+        }
+    }
+
+    func consume() {
+        var byte: UInt8 = 0
+        _ = try? withUnsafeMutableBytes(of: &byte) {
+            try unsafe readDescriptor.read(into: $0)
+        }
+        isPending.withLock { $0 = false }
+    }
+}
+
+nonisolated enum TerminalControl {
 
     static let quitByte: UInt8 = 3
 
@@ -132,8 +208,10 @@ enum TerminalControl {
         Terminal.SGR.backgroundColor(color)
     }
 
-    static func currentTerminalSize() -> TerminalViewportSize {
-        guard let size = try? Terminal.size(for: .standardOutput),
+    static func currentTerminalSize(
+        for descriptor: FileDescriptor = .standardOutput
+    ) -> TerminalViewportSize {
+        guard let size = try? Terminal.size(for: descriptor),
               size.columns > 0,
               size.rows > 0 else {
             return TerminalViewportSize(columns: 80, rows: 24)
@@ -143,7 +221,9 @@ enum TerminalControl {
     }
 
     static func readInput(timeout: TimeInterval? = nil) -> TerminalInput {
-        readInput(timeout: timeout, readByte: readByte(timeout:))
+        readInput(timeout: timeout) {
+            readByte(timeout: $0)
+        }
     }
 
     static func readInput(
@@ -235,29 +315,73 @@ enum TerminalControl {
         return .none
     }
 
-    static func write(_ output: String) {
-        FileHandle.standardOutput.write(Data(output.utf8))
+    static func write(
+        _ output: String,
+        to descriptor: FileDescriptor = .standardOutput
+    ) {
+        _ = try? descriptor.writeAll(output.utf8)
     }
 
-    static func readByte(timeout: TimeInterval?) -> UInt8? {
-        guard waitForInput(timeout: timeout) else {
+    static func readByte(
+        from descriptor: FileDescriptor = .standardInput,
+        timeout: TimeInterval?,
+        interruptedBy wakeup: TerminalInputWakeup? = nil
+    ) -> UInt8? {
+        guard waitForInput(
+            on: descriptor,
+            timeout: timeout,
+            interruptedBy: wakeup
+        ) else {
             return nil
         }
 
-        return FileHandle.standardInput.readData(ofLength: 1).first
+        var byte: UInt8 = 0
+        let count = try? withUnsafeMutableBytes(of: &byte) {
+            try unsafe descriptor.read(into: $0)
+        }
+        return count == 1 ? byte : nil
     }
 
-    private static func waitForInput(timeout: TimeInterval?) -> Bool {
-        var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
+    private static func waitForInput(
+        on descriptor: FileDescriptor,
+        timeout: TimeInterval?,
+        interruptedBy wakeup: TerminalInputWakeup?
+    ) -> Bool {
+        var descriptors = [
+            pollfd(
+                fd: descriptor.rawValue,
+                events: Int16(POLLIN),
+                revents: 0
+            )
+        ]
+        if let wakeup {
+            descriptors.append(
+                pollfd(
+                    fd: wakeup.readDescriptor.rawValue,
+                    events: Int16(POLLIN),
+                    revents: 0
+                )
+            )
+        }
+
         let milliseconds = timeout.map {
             max(Int32(($0 * 1_000).rounded(.up)), 0)
         } ?? -1
-        let result = unsafe poll(&descriptor, 1, milliseconds)
+        let result = unsafe poll(&descriptors, nfds_t(descriptors.count), milliseconds)
         if result < 0, errno == EINTR {
             return false
         }
 
-        return result > 0
+        guard result > 0 else {
+            return false
+        }
+
+        let hasInput = descriptors[0].revents & Int16(POLLIN) != 0
+        if descriptors.count > 1,
+           descriptors[1].revents & Int16(POLLIN) != 0 {
+            wakeup?.consume()
+        }
+        return hasInput
     }
 
     private static func readUTF8ContinuationBytes(
@@ -544,13 +668,15 @@ enum TerminalControl {
     }
 }
 
-final class TerminalIO {
+nonisolated final class TerminalIO {
 
     private static let clipboardResponsePrefix = Array("\u{001B}]52;c;".utf8)
 
     private static let clipboardResponseByteTimeout: TimeInterval = 0.1
 
     private let readTerminalByte: (TimeInterval?) -> UInt8?
+
+    private let readInterruptibleTerminalByte: (TimeInterval?) -> UInt8?
 
     private let writeOutput: (String) -> Void
 
@@ -560,14 +686,26 @@ final class TerminalIO {
 
     init(
         readByte: @escaping (TimeInterval?) -> UInt8?,
+        readInterruptibleByte: ((TimeInterval?) -> UInt8?)? = nil,
         write: @escaping (String) -> Void
     ) {
         self.readTerminalByte = readByte
+        self.readInterruptibleTerminalByte = readInterruptibleByte ?? readByte
         self.writeOutput = write
     }
 
     func readInput(timeout: TimeInterval? = nil) -> TerminalInput {
-        TerminalControl.readInput(timeout: timeout, readByte: readBufferedByte(timeout:))
+        var isFirstRead = true
+        return TerminalControl.readInput(timeout: timeout) {
+            [self]
+            timeout in
+
+            let readByte = isFirstRead
+                ? readInterruptibleTerminalByte
+                : readTerminalByte
+            isFirstRead = false
+            return readBufferedByte(timeout: timeout, readByte: readByte)
+        }
     }
 
     func copy(_ text: String) {
@@ -624,7 +762,10 @@ final class TerminalIO {
         return String(data: data, encoding: .utf8)
     }
 
-    private func readBufferedByte(timeout: TimeInterval?) -> UInt8? {
+    private func readBufferedByte(
+        timeout: TimeInterval?,
+        readByte: (TimeInterval?) -> UInt8?
+    ) -> UInt8? {
         if pendingInputOffset < pendingInputBytes.count {
             let byte = pendingInputBytes[pendingInputOffset]
             pendingInputOffset += 1
@@ -635,7 +776,7 @@ final class TerminalIO {
             return byte
         }
 
-        return readTerminalByte(timeout)
+        return readByte(timeout)
     }
 
     private func enqueueInput(_ byte: UInt8) {
@@ -647,40 +788,239 @@ final class TerminalIO {
     }
 }
 
+/// Serializes terminal input parsing away from the main actor.
+///
+/// The queue is the only execution context that accesses `io`. The mutex makes
+/// that ownership visible to Swift's sendability checker, while `readState`
+/// lets the main actor observe whether it must wake a blocking first-byte read
+/// without waiting for the I/O mutex itself.
+nonisolated final class TerminalInputWorker: Sendable {
+
+    private struct ReadState {
+
+        var isReading = false
+
+        var isStopped = false
+    }
+
+    private let queue = DispatchQueue(label: "SwiftTUI.TerminalInput")
+
+    private let io: Mutex<TerminalIO>
+
+    private let readState = Mutex(ReadState())
+
+    private let wakeup: TerminalInputWakeup
+
+    init(
+        inputDescriptor: FileDescriptor,
+        outputDescriptor: FileDescriptor
+    ) throws {
+        let wakeup = try TerminalInputWakeup()
+        self.wakeup = wakeup
+        self.io = Mutex(
+            TerminalIO(
+                readByte: {
+                    TerminalControl.readByte(
+                        from: inputDescriptor,
+                        timeout: $0
+                    )
+                },
+                readInterruptibleByte: {
+                    TerminalControl.readByte(
+                        from: inputDescriptor,
+                        timeout: $0,
+                        interruptedBy: wakeup
+                    )
+                },
+                write: {
+                    TerminalControl.write($0, to: outputDescriptor)
+                }
+            )
+        )
+    }
+
+    deinit {
+        stop()
+    }
+
+    func requestInput(
+        deliver: @escaping @Sendable (TerminalInput) -> Void
+    ) {
+        guard beginRead() else {
+            return
+        }
+
+        queue.async {
+            [self] in
+
+            let input = io.withLock {
+                $0.readInput()
+            }
+            guard finishRead() else {
+                return
+            }
+
+            deliver(input)
+        }
+    }
+
+    /// Reads buffered input without waiting behind an active asynchronous read.
+    ///
+    /// If another read owns the worker or the worker has stopped, this method
+    /// returns `.none` instead of entering the serial queue.
+    func readPendingInput() -> TerminalInput {
+        guard beginRead() else {
+            return .none
+        }
+        defer {
+            _ = finishRead()
+        }
+
+        return queue.sync {
+            io.withLock {
+                $0.readInput(timeout: 0)
+            }
+        }
+    }
+
+    func paste() -> String? {
+        interruptRead()
+        return queue.sync {
+            io.withLock {
+                $0.paste()
+            }
+        }
+    }
+
+    func copy(_ text: String) {
+        interruptRead()
+        queue.sync {
+            io.withLock {
+                $0.copy(text)
+            }
+        }
+    }
+
+    func stop() {
+        let shouldInterrupt = readState.withLock {
+            guard !$0.isStopped else {
+                return false
+            }
+
+            $0.isStopped = true
+            return $0.isReading
+        }
+        if shouldInterrupt {
+            wakeup.signal()
+        }
+        queue.sync {}
+    }
+
+    private func beginRead() -> Bool {
+        readState.withLock {
+            guard !$0.isReading, !$0.isStopped else {
+                return false
+            }
+
+            $0.isReading = true
+            return true
+        }
+    }
+
+    private func finishRead() -> Bool {
+        readState.withLock {
+            $0.isReading = false
+            return !$0.isStopped
+        }
+    }
+
+    private func interruptRead() {
+        let isReading = readState.withLock {
+            $0.isReading && !$0.isStopped
+        }
+        if isReading {
+            wakeup.signal()
+        }
+    }
+}
+
 final class TerminalSession {
 
     private let original: Termios
 
     private let raw: Termios
 
-    private let io: TerminalIO
+    private let inputDescriptor: FileDescriptor
+
+    private let outputDescriptor: FileDescriptor
+
+    private let inputWorker: TerminalInputWorker
+
+    private let pendingInputs = Mutex<[TerminalInput]>([])
 
     private var previousWindowChangeHandler: (@convention(c) (Int32) -> Void)?
 
+    private var windowChangeSource: (any DispatchSourceSignal)?
+
     private var isActive = false
 
-    init() throws {
-        let original = try Termios(readingFrom: .standardInput)
+    init(
+        inputDescriptor: FileDescriptor = .standardInput,
+        outputDescriptor: FileDescriptor = .standardOutput
+    ) throws {
+        let original = try Termios(readingFrom: inputDescriptor)
         var raw = original
         raw.makeRaw()
         self.original = original
         self.raw = raw
-        self.io = TerminalIO(
-            readByte: TerminalControl.readByte(timeout:),
-            write: TerminalControl.write(_:)
+        self.inputDescriptor = inputDescriptor
+        self.outputDescriptor = outputDescriptor
+        self.inputWorker = try TerminalInputWorker(
+            inputDescriptor: inputDescriptor,
+            outputDescriptor: outputDescriptor
         )
     }
 
-    func readInput(timeout: TimeInterval? = nil) -> TerminalInput {
-        io.readInput(timeout: timeout)
+    func requestInput() {
+        inputWorker.requestInput {
+            [weak self]
+            input in
+
+            self?.pendingInputs.withLock {
+                $0.append(input)
+            }
+            MainRunLoopWakeup.signal()
+        }
+    }
+
+    func takeInput() -> TerminalInput? {
+        pendingInputs.withLock {
+            guard !$0.isEmpty else {
+                return nil
+            }
+
+            return $0.removeFirst()
+        }
+    }
+
+    func readPendingInput() -> TerminalInput {
+        inputWorker.readPendingInput()
+    }
+
+    func currentTerminalSize() -> TerminalViewportSize {
+        TerminalControl.currentTerminalSize(for: outputDescriptor)
+    }
+
+    func write(_ output: String) {
+        TerminalControl.write(output, to: outputDescriptor)
     }
 
     func copy(_ text: String) {
-        io.copy(text)
+        inputWorker.copy(text)
     }
 
     func paste() -> String? {
-        io.paste()
+        inputWorker.paste()
     }
 
     func start() throws {
@@ -688,13 +1028,29 @@ final class TerminalSession {
             return
         }
 
-        try raw.apply(to: .standardInput, when: .now)
-        previousWindowChangeHandler = signal(SIGWINCH, handleTerminalWindowChangeSignal)
-        TerminalControl.write(TerminalControl.enterAlternateScreenSequence)
-        TerminalControl.write(TerminalControl.enablePointerTrackingSequence)
-        TerminalControl.write(TerminalControl.enableFocusReportingSequence)
-        TerminalControl.write(TerminalControl.hideCaretSequence)
+        try raw.apply(to: inputDescriptor, when: .now)
+        previousWindowChangeHandler = signal(SIGWINCH, SIG_IGN)
+        let windowChangeSource = DispatchSource.makeSignalSource(
+            signal: SIGWINCH,
+            queue: .main
+        )
+        windowChangeSource.setEventHandler {
+            MainRunLoopWakeup.signal()
+        }
+        windowChangeSource.resume()
+        self.windowChangeSource = windowChangeSource
+        write(TerminalControl.enterAlternateScreenSequence)
+        write(TerminalControl.enablePointerTrackingSequence)
+        write(TerminalControl.enableFocusReportingSequence)
+        write(TerminalControl.hideCaretSequence)
         isActive = true
+    }
+
+    func stopReading() {
+        inputWorker.stop()
+        pendingInputs.withLock {
+            $0 = []
+        }
     }
 
     func stop() {
@@ -702,18 +1058,18 @@ final class TerminalSession {
             return
         }
 
-        try? original.apply(to: .standardInput, when: .now)
+        stopReading()
+        try? original.apply(to: inputDescriptor, when: .now)
+        windowChangeSource?.cancel()
+        windowChangeSource = nil
         if let previousWindowChangeHandler {
             _ = signal(SIGWINCH, previousWindowChangeHandler)
             self.previousWindowChangeHandler = nil
         }
-        TerminalControl.write(TerminalControl.showCaretSequence)
-        TerminalControl.write(TerminalControl.disableFocusReportingSequence)
-        TerminalControl.write(TerminalControl.disablePointerTrackingSequence)
-        TerminalControl.write(TerminalControl.exitAlternateScreenSequence)
+        write(TerminalControl.showCaretSequence)
+        write(TerminalControl.disableFocusReportingSequence)
+        write(TerminalControl.disablePointerTrackingSequence)
+        write(TerminalControl.exitAlternateScreenSequence)
         isActive = false
     }
-}
-
-private nonisolated func handleTerminalWindowChangeSignal(_: Int32) {
 }

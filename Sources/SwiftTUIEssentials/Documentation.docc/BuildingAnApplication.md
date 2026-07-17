@@ -68,10 +68,13 @@ across render passes and invokes its callback after a change. Removing the view
 forgets the prior value without calling the change action.
 
 Use `task(priority:_:)` for asynchronous work scoped to a rendered identity.
-SwiftTUI requests cancellation when that identity disappears. An `id`-based
-task also cancels and restarts when its equatable ID changes. Cancellation is
-cooperative: an operation that ignores it can continue running and retain its
-captures after the view disappears.
+The application runner starts the task even when no terminal input arrives, and
+a state change before or after suspension wakes the runner to redraw. SwiftTUI
+requests cancellation when that identity disappears. An `id`-based task also
+cancels and restarts when its equatable ID changes; terminal input remains
+dispatchable while either task is suspended. Cancellation is cooperative: an
+operation that ignores it can continue running and retain its captures after
+the view disappears.
 
 ### Handle process services through the environment
 

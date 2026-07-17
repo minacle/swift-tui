@@ -36,8 +36,11 @@ extension App {
     /// This method is normally invoked by Swift's `@main` entry point. It
     /// configures the terminal session, repeatedly renders the root scene into
     /// the current viewport, dispatches keyboard and pointer input, and prints a
-    /// startup error if the terminal session cannot be created. Startup errors
-    /// are reported to terminal output rather than propagated to the caller.
+    /// startup error if the terminal session cannot be created. While terminal
+    /// input is idle, the loop continues to service view tasks, state
+    /// invalidation, recognition deadlines, and viewport-change signals on the
+    /// main run loop. Startup errors are reported to terminal output rather than
+    /// propagated to the caller.
     public static func main() {
         do {
             try AppRunner(app: Self()).run()

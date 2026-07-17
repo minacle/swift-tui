@@ -100,6 +100,12 @@ let package = Package(
             ],
             swiftSettings: swiftSettings,
         ),
+        .executableTarget(
+            name: "SwiftTUIAppRunnerTestHost",
+            dependencies: ["SwiftTUI"],
+            path: "Tests/SwiftTUIAppRunnerTestHost",
+            swiftSettings: swiftSettings,
+        ),
         .testTarget(
             name: "SwiftTUIRunsTests",
             dependencies: ["SwiftTUIRuns"],

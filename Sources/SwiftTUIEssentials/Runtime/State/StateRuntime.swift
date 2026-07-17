@@ -6,6 +6,8 @@ final class StateRuntime {
 
     private let now: () -> Date
 
+    private let onInvalidation: () -> Void
+
     private var cells: [StateKey: Any] = [:]
 
     private var renderKeysByStorageID: [ObjectIdentifier: StateKey] = [:]
@@ -72,8 +74,12 @@ final class StateRuntime {
 
     private var pendingRemovedStateSubtrees: [[Int]] = []
 
-    init(now: @escaping () -> Date = Date.init) {
+    init(
+        now: @escaping () -> Date = Date.init,
+        onInvalidation: @escaping () -> Void = {}
+    ) {
         self.now = now
+        self.onInvalidation = onInvalidation
     }
 
     var isSuppressingRenderRegistrations: Bool {
@@ -117,7 +123,7 @@ final class StateRuntime {
                 viewDefinedShortcuts.cancelAll { path, operation in
                     withView(at: path, perform: operation)
                 }
-                invalidated = true
+                invalidate()
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
             change.finishRender(perform: performChangeHandler)
@@ -159,7 +165,7 @@ final class StateRuntime {
             operation()
         } onChange: {
             MainActor.assumeIsolated {
-                self.invalidated = true
+                self.invalidate()
             }
         }
     }
@@ -197,7 +203,7 @@ final class StateRuntime {
                 viewDefinedShortcuts.cancelAll { path, operation in
                     withView(at: path, perform: operation)
                 }
-                invalidated = true
+                invalidate()
             }
             lifecycle.finishRender(perform: performLifecycleHandler)
             change.finishRender(perform: performChangeHandler)
@@ -235,6 +241,16 @@ final class StateRuntime {
         }
 
         return invalidated
+    }
+
+    /// Marks the rendered frame stale and wakes an application runner that is
+    /// servicing the main run loop while terminal input remains idle.
+    private func invalidate() {
+        let shouldNotify = !invalidated
+        invalidated = true
+        if shouldNotify {
+            onInvalidation()
+        }
     }
 
     func layoutMeasurementStore(at path: [Int]) -> LayoutMeasurementStore {
@@ -295,7 +311,7 @@ final class StateRuntime {
         let cell = StateCell(value: initialValue()) {
             [weak self] in
 
-            self?.invalidated = true
+            self?.invalidate()
         }
         cells[key] = cell
         return cell
@@ -314,7 +330,7 @@ final class StateRuntime {
             invalidate: {
                 [weak self] in
 
-                self?.invalidated = true
+                self?.invalidate()
             },
             nextGeneration: {
                 [weak self] in
@@ -448,7 +464,7 @@ final class StateRuntime {
                     viewDefinedShortcuts.cancelAll { path, operation in
                         withView(at: path, perform: operation)
                     }
-                    invalidated = true
+                    invalidate()
                 }
                 return .ignored
             }
@@ -831,7 +847,7 @@ final class StateRuntime {
             return false
         }
 
-        invalidated = true
+        invalidate()
         return true
     }
 
@@ -840,7 +856,7 @@ final class StateRuntime {
         at path: [Int]
     ) {
         navigation.pushDirectDestination(destination, at: path)
-        invalidated = true
+        invalidate()
     }
 
     func topDirectNavigationDestination(at path: [Int]) -> NavigationDirectDestination? {
@@ -859,7 +875,7 @@ final class StateRuntime {
         for removedPath in removedPaths {
             removeStateSubtree(at: removedPath)
         }
-        invalidated = true
+        invalidate()
         return true
     }
 
@@ -871,7 +887,7 @@ final class StateRuntime {
         for removedPath in removedPaths {
             removeStateSubtree(at: removedPath)
         }
-        invalidated = true
+        invalidate()
         return true
     }
 
@@ -918,7 +934,7 @@ final class StateRuntime {
             isIndicatorInteracting: previous?.isIndicatorInteracting ?? false
         )
         if requestsFlash {
-            invalidated = true
+            invalidate()
         }
 
         if EnvironmentRenderContext.current.isEnabled,
@@ -981,7 +997,7 @@ final class StateRuntime {
         state.flashDeadline = now().addingTimeInterval(0.5)
         scrollViewStates[path] = state
         state.binding?.wrappedValue = ScrollPosition(point: next)
-        invalidated = true
+        invalidate()
     }
 
     func setScrollIndicatorInteraction(_ active: Bool, at path: [Int]) {
@@ -995,7 +1011,7 @@ final class StateRuntime {
             state.flashDeadline = now().addingTimeInterval(0.5)
         }
         scrollViewStates[path] = state
-        invalidated = true
+        invalidate()
     }
 
     func isFocused(at path: [Int]) -> Bool {
@@ -1013,7 +1029,7 @@ final class StateRuntime {
         let state = EditableTextSingleLineState(initialText: initialText) {
             [weak self] in
 
-            self?.invalidated = true
+            self?.invalidate()
         }
         editableTextSingleLineStates[path] = state
         return state
@@ -1030,7 +1046,7 @@ final class StateRuntime {
         let state = EditableTextMultilineState(initialText: initialText) {
             [weak self] in
 
-            self?.invalidated = true
+            self?.invalidate()
         }
         editableTextMultilineStates[path] = state
         return state
@@ -1044,7 +1060,7 @@ final class StateRuntime {
         let state = TextSelectionState(offset: initialOffset) {
             [weak self] in
 
-            self?.invalidated = true
+            self?.invalidate()
         }
         textSelectionStates[path] = state
         return state
@@ -1145,7 +1161,7 @@ final class StateRuntime {
                     withView(at: path, perform: operation)
                 }
             },
-            invalidate: { [weak self] in self?.invalidated = true }
+            invalidate: { [weak self] in self?.invalidate() }
         ) == .handled {
             return .handled
         }
@@ -1203,7 +1219,7 @@ final class StateRuntime {
                 )
                 return input.hasRecognizedTap || input.hasRecognizedLongPress
             },
-            invalidate: { [weak self] in self?.invalidated = true }
+            invalidate: { [weak self] in self?.invalidate() }
         )
         if result == .handled {
             input.cancelDefaultGestureRecognition { path, operation in
@@ -1243,7 +1259,7 @@ final class StateRuntime {
                 )
                 return input.hasRecognizedLongPress
             },
-            invalidate: { [weak self] in self?.invalidated = true }
+            invalidate: { [weak self] in self?.invalidate() }
         )
         if result == .handled {
             input.cancelDefaultGestureRecognition { path, operation in
@@ -1276,7 +1292,7 @@ final class StateRuntime {
             .pointerScroll(pointerScroll),
             at: date,
             perform: performRecognitionAttachment,
-            invalidate: { [weak self] in self?.invalidated = true }
+            invalidate: { [weak self] in self?.invalidate() }
         ) == .handled {
             input.cancelDefaultGestureRecognition { path, operation in
                 withView(at: path, perform: operation)
@@ -1391,7 +1407,7 @@ final class StateRuntime {
                     withView(at: path, perform: operation)
                 }
             },
-            invalidate: { [weak self] in self?.invalidated = true }
+            invalidate: { [weak self] in self?.invalidate() }
         )
     }
 
@@ -1408,7 +1424,7 @@ final class StateRuntime {
             expired = true
         }
         if expired {
-            invalidated = true
+            invalidate()
         }
     }
 
@@ -1833,7 +1849,7 @@ final class StateRuntime {
             state.flashDeadline = now().addingTimeInterval(0.5)
             scrollViewStates[path] = state
             state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
-            invalidated = true
+            invalidate()
             return
         }
     }
@@ -1929,7 +1945,7 @@ final class StateRuntime {
         state.flashDeadline = now().addingTimeInterval(0.5)
         scrollViewStates[path] = state
         state.binding?.wrappedValue = ScrollPosition(point: nextPoint)
-        invalidated = true
+        invalidate()
         return .handled
     }
 
