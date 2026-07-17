@@ -202,10 +202,12 @@ extension View {
     /// rendered hierarchy.
     ///
     /// SwiftTUI starts one unstructured task after the view's identity appears.
-    /// Stable re-renders don't restart a completed or running task. When the
-    /// identity disappears, SwiftTUI requests cancellation and removes its task
-    /// record without waiting for cleanup. Cancellation is cooperative: work
-    /// that doesn't observe cancellation can continue and retain captured
+    /// The task starts even when the application is waiting for terminal input,
+    /// and state changes made before or after suspension wake the runner for a
+    /// redraw. Stable re-renders don't restart a completed or running task. When
+    /// the identity disappears, SwiftTUI requests cancellation and removes its
+    /// task record without waiting for cleanup. Cancellation is cooperative:
+    /// work that doesn't observe cancellation can continue and retain captured
     /// values after the view disappears.
     ///
     /// - Parameters:
@@ -240,9 +242,11 @@ extension View {
     ///
     /// SwiftTUI creates one unstructured task with the supplied executor
     /// preference after the identity appears. An actor-isolated action still
-    /// runs on its actor. When the identity disappears, SwiftTUI requests
-    /// cancellation and removes its record without awaiting cleanup;
-    /// uncooperative work can continue and retain captured values.
+    /// runs on its actor. The task starts while terminal input is idle, and
+    /// state changes made after suspension wake the application runner for a
+    /// redraw. When the identity disappears, SwiftTUI requests cancellation and
+    /// removes its record without awaiting cleanup; uncooperative work can
+    /// continue and retain captured values.
     ///
     /// - Parameters:
     ///   - name: Currently ignored. The runtime doesn't retain a task name or
@@ -278,9 +282,11 @@ extension View {
     /// SwiftTUI compares `value` with the identifier registered for the same
     /// rendered identity. When it changes, SwiftTUI requests cancellation of
     /// the previous task and immediately starts a new unstructured task without
-    /// waiting for the old task to finish. Cancellation is cooperative, so the
-    /// old operation can continue and overlap the replacement if it ignores the
-    /// request. Disappearance has the same cancellation boundary.
+    /// waiting for the old task to finish. Input remains dispatchable while a
+    /// task is suspended, and state changes made by either task wake the runner
+    /// for redraw. Cancellation is cooperative, so the old operation can
+    /// continue and overlap the replacement if it ignores the request.
+    /// Disappearance has the same cancellation boundary.
     ///
     /// - Parameters:
     ///   - value: The equatable identifier. Equal values preserve the existing
@@ -319,8 +325,10 @@ extension View {
     /// preference. It doesn't await the old task, so an operation that ignores
     /// cancellation can overlap the replacement and retain its captures. An
     /// actor-isolated action still runs on its actor rather than being forced
-    /// onto the preferred executor. Disappearance requests cancellation under
-    /// the same cooperative boundary.
+    /// onto the preferred executor. Terminal input remains dispatchable while
+    /// either task is suspended, and their state changes wake the runner for
+    /// redraw. Disappearance requests cancellation under the same cooperative
+    /// boundary.
     ///
     /// - Parameters:
     ///   - value: The equatable identifier. Equal values preserve the existing

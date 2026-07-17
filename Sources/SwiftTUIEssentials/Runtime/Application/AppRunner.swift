@@ -9,12 +9,38 @@ struct AppRunner<Application: App> {
             return
         }
 
-        let runtime = StateRuntime()
-        let termination = TerminationController()
+        try run(root, session: TerminalSession())
+    }
 
-        let session = try TerminalSession()
+    func run(session: TerminalSession) throws {
+        guard let root = SceneResolver.rootScene(from: app.body) else {
+            return
+        }
+
+        try run(root, session: session)
+    }
+
+    private func run(
+        _ root: any RootScene,
+        session: TerminalSession
+    ) throws {
+        let runtime = StateRuntime(onInvalidation: {
+            MainRunLoopWakeup.signal()
+        })
+        let termination = TerminationController {
+            MainRunLoopWakeup.signal()
+        }
+        let runLoopKeepAlive = Timer(
+            fire: .distantFuture,
+            interval: 0,
+            repeats: false
+        ) { _ in }
+        RunLoop.main.add(runLoopKeepAlive, forMode: .default)
+
         try session.start()
         defer {
+            runLoopKeepAlive.invalidate()
+            session.stopReading()
             runtime.endInputSession()
             session.stop()
         }
@@ -29,28 +55,25 @@ struct AppRunner<Application: App> {
         )
 
         while true {
-            if viewportTracker.needsRedraw(for: TerminalControl.currentTerminalSize()) {
-                viewportTracker.update(
-                    renderedViewport: render(
-                        root,
-                        using: runtime,
-                        termination: termination,
-                        session: session
-                    )
-                )
+            if termination.isRequested {
+                return
             }
 
-            if dispatch(
-                session.readInput(timeout: inputTimeout(using: runtime)),
-                using: runtime
-            ) {
-                dispatchPendingInput(using: runtime, session: session)
+            session.requestInput()
+            waitForEvent(until: nextDeadline(using: runtime))
+
+            if let input = session.takeInput(),
+               dispatch(input, using: runtime) {
+                dispatchPendingInput(
+                    using: runtime,
+                    session: session
+                )
             }
 
             runtime.dispatchExpiredRecognitionActions()
             runtime.dispatchExpiredScrollIndicatorFlashes()
 
-            let currentViewport = TerminalControl.currentTerminalSize()
+            let currentViewport = session.currentTerminalSize()
             if runtime.consumeInvalidation()
                 || viewportTracker.needsRedraw(for: currentViewport) {
                 viewportTracker.update(
@@ -99,7 +122,7 @@ struct AppRunner<Application: App> {
     }
 
     private func dispatchPendingInput(using runtime: StateRuntime, session: TerminalSession) {
-        while dispatch(session.readInput(timeout: 0), using: runtime) {}
+        while dispatch(session.readPendingInput(), using: runtime) {}
     }
 
     private func render(
@@ -110,7 +133,7 @@ struct AppRunner<Application: App> {
         previousRender: RenderedTerminalViewport? = nil
     ) -> RenderedTerminalViewport {
         while true {
-            let viewport = TerminalControl.currentTerminalSize()
+            let viewport = session.currentTerminalSize()
             guard let block = root.renderedBlock(
                 in: RenderProposal(viewport),
                 using: runtime,
@@ -128,7 +151,8 @@ struct AppRunner<Application: App> {
             render(
                 block,
                 in: viewport,
-                previousRender: previousRender
+                previousRender: previousRender,
+                session: session
             )
             return RenderedTerminalViewport(viewport: viewport, block: block)
         }
@@ -137,9 +161,10 @@ struct AppRunner<Application: App> {
     private func render(
         _ block: RenderedBlock,
         in viewport: TerminalViewportSize,
-        previousRender: RenderedTerminalViewport?
+        previousRender: RenderedTerminalViewport?,
+        session: TerminalSession
     ) {
-        TerminalControl.write(TerminalScreenRenderer.redraw(
+        session.write(TerminalScreenRenderer.redraw(
             from: previousRender?.block,
             previousViewport: previousRender?.viewport,
             to: block,
@@ -147,15 +172,23 @@ struct AppRunner<Application: App> {
         ))
     }
 
-    private func inputTimeout(using runtime: StateRuntime) -> TimeInterval? {
+    private func nextDeadline(using runtime: StateRuntime) -> Date? {
         [
             runtime.nextTapDeadline,
             runtime.nextLongPressDeadline,
             runtime.nextRecognitionDeadline,
             runtime.nextScrollIndicatorFlashDeadline,
-        ].compactMap(\.self).min().map {
-            max($0.timeIntervalSinceNow, 0)
-        }
+        ].compactMap(\.self).min()
+    }
+
+    /// Services one main-run-loop source or waits until the next runtime
+    /// deadline so MainActor task continuations can run while terminal input
+    /// remains blocked on the dedicated I/O worker.
+    private func waitForEvent(until deadline: Date?) {
+        _ = RunLoop.main.run(
+            mode: .default,
+            before: deadline ?? .distantFuture
+        )
     }
 }
 
@@ -223,9 +256,20 @@ final class TerminationController {
 
     private(set) var isRequested = false
 
+    private let onRequest: () -> Void
+
+    init(onRequest: @escaping () -> Void = {}) {
+        self.onRequest = onRequest
+    }
+
     lazy var action = TerminateAction {
         [weak self] in
 
-        self?.isRequested = true
+        guard let self, !isRequested else {
+            return
+        }
+
+        isRequested = true
+        onRequest()
     }
 }

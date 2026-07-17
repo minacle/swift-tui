@@ -61,10 +61,12 @@ print(output.ansiText, terminator: "")
 ## Drive rendering until the frame is stable
 
 `AppRunner` owns the terminal session and the application loop. It renders the
-root scene initially, then reads keyboard and pointer input, dispatches expired
-gesture and scroll-indicator deadlines, and checks the terminal viewport.
-Changes observed through ``State`` or Observation mark the runtime as
-invalidated.
+root scene initially, then requests terminal input from a serial I/O worker
+while servicing the main run loop. A main-run-loop pass ends for delivered
+input, a view-task or Observation invalidation, the next gesture or
+scroll-indicator deadline, or a terminal viewport signal. The runner then
+dispatches pending input, expired actions, and any required redraw without
+using finite-interval polling.
 
 A render pass may itself register lifecycle work, reconcile focus, or
 synchronize control state. After producing a block, the runner publishes the
