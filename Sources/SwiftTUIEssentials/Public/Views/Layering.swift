@@ -54,6 +54,9 @@ struct BackgroundStyleView<Content: View>: View,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
+        let backgroundStyle = style.resolvingAccentColor(
+            to: EnvironmentRenderContext.current.tint
+        )
         guard let contentBlock = ViewResolver.block(
             from: content,
             in: proposal,
@@ -62,8 +65,11 @@ struct BackgroundStyleView<Content: View>: View,
         ) else {
             return nil
         }
+        guard let backgroundStyle else {
+            return contentBlock
+        }
 
-        return contentBlock.fillingBackground(style)
+        return contentBlock.fillingBackground(backgroundStyle)
     }
 }
 

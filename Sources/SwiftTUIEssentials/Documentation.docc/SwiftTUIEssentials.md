@@ -168,6 +168,7 @@ sequences aren't escaped by the rendering pipeline.
 - ``TextAlignment``
 - ``ShapeStyle``
 - ``AnyShapeStyle``
+- ``AccentColor``
 - ``TextSelectability``
 - ``EnabledTextSelectability``
 - ``DisabledTextSelectability``

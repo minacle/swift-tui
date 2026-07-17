@@ -501,8 +501,13 @@ enum TextSelectionRenderer {
                 if let tint {
                     characterStyle.backgroundStyle = tint
                 }
-                if let foregroundStyle {
-                    characterStyle.foregroundStyle = foregroundStyle._swiftTUIAnyColor
+                if
+                    let foregroundStyle,
+                    let resolvedForegroundStyle = foregroundStyle
+                        ._swiftTUIAnyColor
+                        .resolvingAccentColor(to: tint)
+                {
+                    characterStyle.foregroundStyle = resolvedForegroundStyle
                 }
             }
             if pendingStyle != characterStyle {
