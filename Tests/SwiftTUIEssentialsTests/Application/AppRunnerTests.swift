@@ -159,9 +159,16 @@ private final class TerminalOutputReader {
 }
 
 private func testHostURL() -> URL {
-    Bundle(for: AppRunnerTestsBundleToken.self).bundleURL
-        .deletingLastPathComponent()
-        .appendingPathComponent("SwiftTUIAppRunnerTestHost")
+    let bundleURL = Bundle(for: AppRunnerTestsBundleToken.self).bundleURL
+    let candidates = [
+        bundleURL.deletingLastPathComponent(),
+        bundleURL,
+    ].map { directory in
+        directory.appendingPathComponent("SwiftTUIAppRunnerTestHost")
+    }
+    return candidates.first { candidate in
+        FileManager.default.isExecutableFile(atPath: candidate.path)
+    } ?? candidates[0]
 }
 
 private func startTestHost(
@@ -250,7 +257,7 @@ private func resizePseudoTerminal(
         ws_xpixel: 0,
         ws_ypixel: 0
     )
-    guard unsafe ioctl(descriptor.rawValue, TIOCSWINSZ, &size) == 0 else {
+    guard unsafe ioctl(descriptor.rawValue, UInt(TIOCSWINSZ), &size) == 0 else {
         throw Errno(rawValue: errno)
     }
 }
