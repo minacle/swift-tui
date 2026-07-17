@@ -19,14 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes made after suspension wake the application runner for redraw, and
   repeated key input cannot defer a redraw or termination until a later
   terminal byte arrives.
-- **Breaking:** Fixed `Button` activation and submission from `TextField` or
-  `SecureField` with an installed `onSubmit` action to handle the triggering
-  input sample after invoking the callback, preventing duplicate later callbacks
-  ([#11](https://github.com/minacle/swift-tui/issues/11)). Immediate key
-  handlers that precede eager deferred submission still run, while fields
-  without an `onSubmit` action continue to leave Return available to later key
-  handling. Apps relying on the affected 0.10.x propagation behavior need to
-  adjust.
+- **Breaking:** Fixed successful `Button` and `NavigationLink` activation,
+  `ScrollView` wheel movement, and submission from `TextField` or `SecureField`
+  with an installed `onSubmit` action to handle the triggering input sample,
+  preventing duplicate later callbacks
+  ([#11](https://github.com/minacle/swift-tui/issues/11)). Pointer-down focus and
+  pending pointer activation remain non-consuming; inapplicable scrolls, failed
+  navigation, and fields without an `onSubmit` action continue to leave input
+  available to later handling. Apps relying on the affected 0.10.x propagation
+  behavior need to adjust.
 
 ## [0.10.2] - 2026-07-17
 

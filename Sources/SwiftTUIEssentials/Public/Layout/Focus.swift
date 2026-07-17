@@ -225,6 +225,10 @@ extension View {
     /// the rendered cells; descendants can read `EnvironmentValues.isFocused`
     /// to choose their own focused appearance.
     ///
+    /// Pointer focus is requested on pointer-down without handling that sample,
+    /// allowing activation and gesture recognition from the same press to
+    /// continue through pointer-up.
+    ///
     /// Consecutive focus modifiers resolved at this view identity share one
     /// candidate. A focus modifier on a descendant creates a separate nested
     /// candidate and becomes the nearest focus owner for that subtree.

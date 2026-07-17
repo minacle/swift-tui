@@ -95,7 +95,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -113,7 +113,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -136,7 +136,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         _ = runtime.block(from: view)
 
@@ -160,7 +160,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         _ = runtime.block(from: view)
 

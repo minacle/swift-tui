@@ -8,7 +8,7 @@ import SwiftTUIControls
 struct NavigationLinkAndBoundPathTests {
 
     @Test
-    func `a focused direct NavigationLink opens with Return or tap and closes with Escape`() {
+    func `a focused direct NavigationLink consumes Return or pointer-up when it opens and closes with Escape`() {
         let runtime = StateRuntime()
         let view = FocusedDirectNavigationLinkView()
 
@@ -16,7 +16,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -24,7 +24,7 @@ struct NavigationLinkAndBoundPathTests {
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Open")
 
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchNavigationLinkClick(to: runtime, column: 1, row: 1)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
     }
@@ -44,7 +44,7 @@ struct NavigationLinkAndBoundPathTests {
     }
 
     @Test
-    func `a value NavigationLink appends its value to the bound path and renders its destination`() {
+    func `a value NavigationLink consumes Return while appending its value and rendering its destination`() {
         var path: [Int] = []
         let runtime = StateRuntime()
         let view = FocusedValueNavigationLinkView(
@@ -62,7 +62,7 @@ struct NavigationLinkAndBoundPathTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(path == [1])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Value 1")
@@ -146,6 +146,86 @@ struct NavigationLinkAndBoundPathTests {
             ) == .ignored
         )
         #expect(runtime.block(from: view)?.text == "Missing")
+    }
+
+    @Test
+    func `NavigationLink pointer activation consumes pointer-up after an outer long press`() {
+        var path: [Int] = []
+        let runtime = StateRuntime()
+        let probe = TapGestureProbe()
+        let view = GestureNavigationLinkView(
+            path: Binding(
+                get: { path },
+                set: { path = $0 }
+            ),
+            probe: probe
+        )
+        let date = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 0, row: 0),
+                    phase: .down
+                ),
+                at: date
+            ) == .ignored
+        )
+        #expect(probe.events == ["long"])
+        #expect(path.isEmpty)
+
+        #expect(
+            runtime.dispatch(
+                PointerPress(
+                    button: .left,
+                    location: Point(column: 0, row: 0),
+                    phase: .up
+                ),
+                at: date.addingTimeInterval(0.1)
+            ) == .handled
+        )
+        #expect(probe.events == ["long"])
+        #expect(path == [1])
+    }
+
+    @Test
+    func `NavigationLink pointer activation consumes pointer-up before an outer tap`() {
+        var path: [Int] = []
+        let runtime = StateRuntime()
+        let probe = TapGestureProbe()
+        let view = TapNavigationLinkView(
+            path: Binding(
+                get: { path },
+                set: { path = $0 }
+            ),
+            probe: probe
+        )
+
+        _ = runtime.block(from: view)
+        dispatchNavigationLinkClick(to: runtime, column: 1, row: 1)
+
+        #expect(probe.events.isEmpty)
+        #expect(path == [1])
+    }
+
+    @Test
+    func `NavigationLink Return activation consumes the key before resolution`() {
+        let runtime = StateRuntime()
+        let probe = TapGestureProbe()
+        let view = ResolvedNavigationLinkView(probe: probe)
+
+        #expect(runtime.block(from: view)?.text == "Open")
+        _ = runtime.consumeInvalidation()
+        _ = runtime.block(from: view)
+
+        #expect(
+            runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled
+        )
+        #expect(probe.events.isEmpty)
+        #expect(runtime.block(from: view)?.text == "Detail")
     }
 
     @Test
@@ -254,4 +334,90 @@ struct NavigationLinkAndBoundPathTests {
         #expect(runtime.block(from: view)?.text == "Root")
     }
 
+}
+
+private func dispatchNavigationLinkClick(
+    to runtime: StateRuntime,
+    column: Int,
+    row: Int,
+    at date: Date = Date(timeIntervalSinceReferenceDate: 1_000)
+) {
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .down
+            ),
+            at: date
+        ) == .ignored
+    )
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .up
+            ),
+            at: date
+        ) == .handled
+    )
+}
+
+private struct GestureNavigationLinkView: View {
+
+    let path: Binding<[Int]>
+
+    let probe: TapGestureProbe
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationLink("Open", value: 1)
+                .onLongPressGesture(minimumDuration: 0) {
+                    probe.record("long")
+                }
+                .navigationDestination(for: Int.self) { _ in
+                    Text("Detail")
+                }
+        }
+    }
+}
+
+private struct TapNavigationLinkView: View {
+
+    let path: Binding<[Int]>
+
+    let probe: TapGestureProbe
+
+    var body: some View {
+        NavigationStack(path: path) {
+            NavigationLink("Open", value: 1)
+                .onTapGesture {
+                    probe.record("tap")
+                }
+                .navigationDestination(for: Int.self) { _ in
+                    Text("Detail")
+                }
+        }
+    }
+}
+
+private struct ResolvedNavigationLinkView: View {
+
+    @FocusState var isFocused: Bool = true
+
+    let probe: TapGestureProbe
+
+    var body: some View {
+        NavigationStack {
+            NavigationLink("Open") {
+                Text("Detail")
+            }
+            .focused($isFocused)
+            .environment(\.resolveKey[.return]) { _ in
+                probe.record("resolve")
+                return .handled
+            }
+        }
+    }
 }

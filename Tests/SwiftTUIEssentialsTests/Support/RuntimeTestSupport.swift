@@ -136,7 +136,7 @@ func dispatchWheel(
     column: Int,
     row: Int,
     modifiers: EventModifiers = [],
-    expecting result: InputEventResult = .ignored
+    expecting result: InputEventResult = .handled
 ) {
     #expect(
         runtime.dispatch(
