@@ -14,7 +14,7 @@ to learn, but they do not imply source compatibility or identical behavior.
 
 ## Project Status
 
-This README documents SwiftTUI 0.10.2.
+This README documents SwiftTUI 0.11.0.
 
 SwiftTUI is still a pre-1.0 package. It follows Semantic Versioning, but minor
 releases can contain source-breaking changes while the public API is being
@@ -35,7 +35,7 @@ Add SwiftTUI to the package dependencies in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/minacle/swift-tui", from: "0.10.2"),
+    .package(url: "https://github.com/minacle/swift-tui", from: "0.11.0"),
 ]
 ```
 
