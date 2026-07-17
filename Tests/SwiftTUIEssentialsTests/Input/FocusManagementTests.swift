@@ -101,7 +101,7 @@ struct FocusManagementTests {
 
         #expect(runtime.block(from: view)?.text == "unfocused")
 
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "focused")
     }

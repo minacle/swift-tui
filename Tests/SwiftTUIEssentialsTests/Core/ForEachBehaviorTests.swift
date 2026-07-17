@@ -122,10 +122,10 @@ struct ForEachBehaviorTests {
         ]
 
         _ = runtime.block(from: ForEachButtonView(items: firstOrder, tapProbe: tapProbe))
-        dispatchClick(to: runtime, column: 1, row: 2)
+        dispatchButtonClick(to: runtime, column: 1, row: 2)
 
         _ = runtime.block(from: ForEachButtonView(items: secondOrder, tapProbe: tapProbe))
-        dispatchClick(to: runtime, column: 1, row: 2)
+        dispatchButtonClick(to: runtime, column: 1, row: 2)
 
         #expect(tapProbe.events == ["b", "a"])
     }

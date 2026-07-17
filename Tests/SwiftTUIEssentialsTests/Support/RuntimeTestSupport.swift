@@ -42,6 +42,34 @@ func dispatchClick(
     )
 }
 
+func dispatchButtonClick(
+    to runtime: StateRuntime,
+    column: Int,
+    row: Int,
+    at date: Date = Date(timeIntervalSinceReferenceDate: 1_000)
+) {
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .down
+            ),
+            at: date
+        ) == .ignored
+    )
+    #expect(
+        runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: column - 1, row: row - 1),
+                phase: .up
+            ),
+            at: date
+        ) == .handled
+    )
+}
+
 func dispatchSelectionDrag(
     to runtime: StateRuntime,
     fromColumn: Int,
@@ -108,7 +136,7 @@ func dispatchWheel(
     column: Int,
     row: Int,
     modifiers: EventModifiers = [],
-    expecting result: InputEventResult = .ignored
+    expecting result: InputEventResult = .handled
 ) {
     #expect(
         runtime.dispatch(

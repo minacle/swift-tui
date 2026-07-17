@@ -466,6 +466,9 @@ final class StateRuntime {
                     }
                     invalidate()
                 }
+                // Pointer focus prepares the interaction that began on this
+                // sample. Leave pointer-down available so activation and
+                // gestures can still complete on later samples.
                 return .ignored
             }
             .deferred(priority: .eager)
@@ -951,8 +954,7 @@ final class StateRuntime {
                     guard let self, scrollOwner(for: scroll) == path else {
                         return .ignored
                     }
-                    _ = dispatchScroll(scroll, at: path)
-                    return .ignored
+                    return dispatchScroll(scroll, at: path)
                 }
                 .deferred(priority: .eager)
             _ = recognition.register(

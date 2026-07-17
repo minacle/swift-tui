@@ -466,6 +466,8 @@ struct TextFieldSubmitView: View {
 
     @State var submitted = "none"
 
+    @State var submissionCount = 0
+
     @FocusState var isFocused = true
 
     var body: some View {
@@ -474,8 +476,9 @@ struct TextFieldSubmitView: View {
                 .focused($isFocused)
                 .onSubmit {
                     submitted = text
+                    submissionCount += 1
                 }
-            Text(submitted)
+            Text("\(submitted):\(submissionCount)")
         }
     }
 }
@@ -486,6 +489,8 @@ struct SecureFieldSubmitView: View {
 
     @State var submitted = "none"
 
+    @State var submissionCount = 0
+
     @FocusState var isFocused = true
 
     var body: some View {
@@ -494,8 +499,9 @@ struct SecureFieldSubmitView: View {
                 .focused($isFocused)
                 .onSubmit {
                     submitted = text
+                    submissionCount += 1
                 }
-            Text(submitted)
+            Text("\(submitted):\(submissionCount)")
         }
     }
 }

@@ -11,8 +11,12 @@ public import SwiftTUIEssentials
 /// The field is focusable unless disabled. Pointer presses request focus;
 /// clicking positions the caret and dragging creates a replacement selection.
 /// The caret is rendered only while focused and is hidden while a range is
-/// selected. Return is consumed without inserting a newline and invokes the
-/// nearest ``View/onSubmit(_:)`` action when one is installed.
+/// selected. Return doesn't insert a newline and invokes the nearest
+/// ``View/onSubmit(_:)`` action when one is installed. Submission is an eager
+/// deferred input event, so immediate key handlers run first. After invoking
+/// the action, the field handles the sample before later input events,
+/// global-key fallback, or key resolution. A field without a submission action
+/// leaves Return unhandled.
 ///
 /// Single-line describes layout and Return-key behavior; the field doesn't
 /// remove newline characters already supplied through the binding.
@@ -164,7 +168,10 @@ extension TextField where Label == Text {
 /// placeholder remains readable while the value is empty. Single-line
 /// describes layout and Return-key behavior; the field doesn't remove newline
 /// characters already supplied through the binding. Selection navigation and
-/// highlighting follow the same environment values as `TextField`.
+/// highlighting follow the same environment values as `TextField`. Return
+/// submission also follows `TextField`: an installed ``View/onSubmit(_:)``
+/// action runs after immediate key handling and then handles Return, while the
+/// key remains unhandled when no action is installed.
 ///
 /// > Important: Masking changes only the field's rendered characters. It still
 /// > reveals the value's `Character` count, and the bound `String` contains the
@@ -301,8 +308,12 @@ private struct TextFieldBody<Label: View>: View {
     private var submitEvent: some InputEvent<KeyPress> {
         KeyPressEvent(.return)
             .onRecognized { _ in
-                submitAction?()
-                return .ignored
+                guard let submitAction else {
+                    return .ignored
+                }
+
+                submitAction()
+                return .handled
             }
             .deferred(priority: .eager)
     }
@@ -334,8 +345,11 @@ extension View {
     /// Performs an action when the user submits a text field within this view.
     ///
     /// A focused ``TextField`` or ``SecureField`` invokes the action
-    /// synchronously for Return key-down and repeat events. The field consumes
-    /// Return without inserting a newline. If modifiers are nested, the
+    /// synchronously for Return key-down and repeat events. Submission is an
+    /// eager deferred input event, so matching immediate key handlers run first.
+    /// The field doesn't insert a newline and handles the sample after invoking
+    /// the action, preventing later input events, global-key fallback, and key
+    /// resolution from receiving the same Return. If modifiers are nested, the
     /// innermost action replaces outer actions rather than combining with them.
     /// ``TextEditor`` consumes Return to insert a newline and never invokes this
     /// action.

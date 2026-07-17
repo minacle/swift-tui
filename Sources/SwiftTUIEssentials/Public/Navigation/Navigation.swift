@@ -306,6 +306,11 @@ public struct NavigationStack<Data, Root: View>: View {
 /// to Return key-down or repeat events and to a completed single primary-button
 /// tap. It is inactive outside a ``NavigationStack``, while disabled, or when
 /// its optional value is `nil`.
+///
+/// A successful activation handles the Return sample or the completing
+/// pointer-up, stopping later input handlers, gestures, and key resolution for
+/// that sample. Pointer-down remains available while the tap is pending, and a
+/// link that cannot push a destination leaves the activation sample unhandled.
 public struct NavigationLink<Label: View, Destination: View>: View {
 
     /// The body type for this directly rendered primitive view.
@@ -1394,12 +1399,11 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
         _ = runtime.registerInputEvent(
             KeyPressEvent(.return)
                 .onRecognized { _ in
-                    _ = activate(
+                    activate(
                         in: runtime,
                         stackPath: stackPath,
                         environment: environment
                     )
-                    return .ignored
                 }
                 .deferred(priority: .eager),
             at: path,
@@ -1410,12 +1414,11 @@ extension NavigationLink: NavigationRenderable, LayoutTraitRenderable {
             PointerPressEvent(.left)
                 .sequenced(before: PointerPressEvent(.left, phases: .up))
                 .onRecognized { _ in
-                    _ = activate(
+                    activate(
                         in: runtime,
                         stackPath: stackPath,
                         environment: environment
                     )
-                    return .ignored
                 }
                 .deferred(priority: .eager),
             at: path,

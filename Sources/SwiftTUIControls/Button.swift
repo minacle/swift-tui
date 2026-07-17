@@ -56,6 +56,13 @@ public nonisolated struct ButtonSizing: Equatable, Hashable, Sendable {
 /// and ends in the button's rendered hit region. A disabled button rejects
 /// focus and both activation paths.
 ///
+/// After invoking the action, the button handles the triggering Return sample
+/// or the pointer-up sample that completes an activation. Later consumable
+/// input events and gestures don't receive that sample, and Return doesn't
+/// reach global-key fallback or key resolution. The button doesn't handle the
+/// initial pointer-down, so an outer gesture that recognizes before the
+/// completing pointer-up isn't undone.
+///
 /// Each activation invokes the action synchronously in the environment
 /// captured when the button was rendered. By default, the button disables
 /// selection of noneditable text in its label. A nearer descendant modifier
@@ -132,7 +139,7 @@ private struct ButtonBody<Label: View>: View {
                 KeyPressEvent(.return)
                     .onRecognized { _ in
                         action()
-                        return .ignored
+                        return .handled
                     }
                     .deferred(priority: .eager)
             )
@@ -143,7 +150,7 @@ private struct ButtonBody<Label: View>: View {
                     )
                     .onRecognized { _ in
                         action()
-                        return .ignored
+                        return .handled
                     }
                     .deferred(priority: .eager)
             )

@@ -95,7 +95,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -113,7 +113,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Detail")
 
@@ -136,7 +136,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         _ = runtime.block(from: view)
 
@@ -144,14 +144,14 @@ struct DestinationPresentationTests {
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Activate")
 
-        dispatchClick(to: runtime, column: 1, row: 1)
+        dispatchButtonClick(to: runtime, column: 1, row: 1)
         #expect(probe.events == ["activated"])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Activated")
     }
 
     @Test
-    func `a focused Button in a destination presented from a direct destination remains activatable with Return`() {
+    func `a focused Button in a destination presented from a direct destination activates and consumes Return`() {
         let runtime = StateRuntime()
         let probe = KeyPressProbe()
         let view = NavigationPresentedBoolStateDirectDestinationInputView(probe: probe)
@@ -160,7 +160,7 @@ struct DestinationPresentationTests {
         _ = runtime.consumeInvalidation()
         _ = runtime.block(from: view)
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(runtime.consumeInvalidation())
         _ = runtime.block(from: view)
 
@@ -168,7 +168,7 @@ struct DestinationPresentationTests {
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Activate")
 
-        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .ignored)
+        #expect(runtime.dispatch(KeyPress(key: .return, characters: "\r")) == .handled)
         #expect(probe.events == ["activated"])
         #expect(runtime.consumeInvalidation())
         #expect(runtime.block(from: view)?.text == "Activated")

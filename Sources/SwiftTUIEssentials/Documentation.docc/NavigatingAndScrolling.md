@@ -67,14 +67,20 @@ action indefinitely.
 Navigation links are inactive outside a stack, beneath a disabled ancestor, or
 when their optional value is `nil`. The link's label defines its focusable and
 pointer-active region; the stack doesn't add a separate platform navigation
-bar or transition animation.
+bar or transition animation. A successful link activation handles Return or
+the completing pointer-up, so later handlers, gestures, and key resolution do
+not run for that sample. Pointer-down remains available while a tap is pending;
+an inactive link or failed value lookup leaves the input unhandled.
 
 ### Control a scroll offset
 
 Vertical scrolling is enabled by default. A scroll view accepts pointer-wheel
 input over its visible frame without requiring keyboard focus. Use
 `scrollDisabled(_:)` to suppress user scrolling while keeping binding- and
-proxy-driven changes available.
+proxy-driven changes available. A wheel sample that moves content is handled.
+Nested scroll views prefer the innermost view that can move in the requested
+direction; at an edge, the unhandled sample can move an eligible outer scroll
+view or continue to a later input handler.
 
 `scrollPosition(_:)` supplies a ``ScrollPosition`` binding. A concrete point or
 edge is resolved against the current content and viewport, clamped to enabled

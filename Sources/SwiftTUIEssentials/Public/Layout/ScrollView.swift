@@ -497,6 +497,10 @@ private struct ScrollIndicatorsFlashTriggerView<Content: View, Value: Equatable>
 /// Enabled scroll views register their visible frame for pointer-wheel input;
 /// they do not need keyboard focus to scroll. Use ``View/scrollDisabled(_:)``
 /// to suppress user input without suppressing bound or proxy-driven positions.
+/// A wheel sample that changes the offset is handled, stopping later input
+/// handlers for that sample. At an edge, a scroll view leaves an inapplicable
+/// sample unhandled so an eligible outer scroll view or later handler can use
+/// it; among overlapping scroll views, the innermost eligible view moves.
 public nonisolated struct ScrollView<Content: View>: View {
 
     /// The body type for this primitive view.
