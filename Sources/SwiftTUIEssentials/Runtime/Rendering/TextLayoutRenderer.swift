@@ -426,8 +426,13 @@ private enum TextRunLayoutMapper {
                     if let tint {
                         style.backgroundStyle = tint
                     }
-                    if let selectionForegroundStyle {
-                        style.foregroundStyle = selectionForegroundStyle._swiftTUIAnyColor
+                    if
+                        let selectionForegroundStyle,
+                        let resolvedForegroundStyle = selectionForegroundStyle
+                            ._swiftTUIAnyColor
+                            .resolvingAccentColor(to: tint)
+                    {
+                        style.foregroundStyle = resolvedForegroundStyle
                     }
                 }
                 if rowAlignment == nil {
@@ -490,6 +495,7 @@ private enum TextRunLayoutMapper {
             if annotation?.link != nil, style.foregroundStyle == nil, let tint {
                 style.foregroundStyle = tint
             }
+            style = style.resolvingAccentColor(to: tint)
 
             return StyledCharacter(
                 character: character,

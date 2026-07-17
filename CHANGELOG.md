@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `AccentColor.accentColor` as a semantic terminal color that follows the
+  nearest `tint` in view foregrounds, backgrounds, shape fills, and text
+  selection styles, with blue as its context-free SGR fallback.
+
 ## [0.10.2] - 2026-07-17
 
 ### Fixed

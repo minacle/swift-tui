@@ -290,6 +290,31 @@ struct LayeredViewTests {
     }
 
     @Test
+    func `accentColor backgrounds resolve the nearest tint and disappear when tint is cleared`() {
+        let tinted = ViewResolver.block(
+            from: Text("A")
+                .padding(.trailing, 1)
+                .background(.accentColor)
+                .tint(.green)
+        )
+        let cleared = ViewResolver.block(
+            from: Text("A")
+                .padding(.trailing, 1)
+                .background(.accentColor)
+                .tint(Optional<Color16>.none)
+        )
+
+        #expect(tinted?.runs == [
+            RenderedRun(
+                text: "A ",
+                style: TextStyle(backgroundStyle: AnyColor(Color16.green))
+            ),
+        ])
+        #expect(cleared?.runs == [RenderedRun(text: "A")])
+        #expect(cleared?.lines == ["A "])
+    }
+
+    @Test
     func `an overlay renders in front of its base view without changing the base size`() {
         let block = ViewResolver.block(
             from: Text("A")

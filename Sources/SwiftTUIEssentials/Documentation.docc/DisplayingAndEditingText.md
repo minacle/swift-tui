@@ -49,6 +49,16 @@ terminal content with `Run` and ``RunGroup``. Run attributes merge with the
 foreground, background, bold, dim, italic, underline, and strikethrough style
 inherited at the view layer.
 
+Use ``AccentColor/accentColor`` through leading-dot syntax to style content
+with the tint inherited where the style modifier appears. The default tint is
+blue, and clearing the tint causes the semantic color to apply no color.
+
+```swift
+Text("Ready")
+    .foregroundStyle(.accentColor)
+    .tint(.green)
+```
+
 Use `lineLimit(_:)` to limit rendered rows and `truncationMode(_:)` to choose
 where the last visible line removes content. The truncation marker is up to
 three ASCII period characters. `multilineTextAlignment(_:)` aligns lines
@@ -99,6 +109,7 @@ See <doc:InputRecognition> for the input path used by editing and
 - ``TextAlignment``
 - ``ShapeStyle``
 - ``AnyShapeStyle``
+- ``AccentColor``
 - ``DefaultColor``
 
 ### Edit and select

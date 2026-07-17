@@ -186,6 +186,44 @@ struct TextSelectionTests {
     }
 
     @Test
+    func `selected static text resolves an accentColor foreground through AnyShapeStyle`() {
+        let runtime = StateRuntime()
+        let view = Text("ab")
+            .foregroundStyle(.yellow)
+            .textSelection(.enabled)
+            .textSelectionForegroundStyle(
+                Optional(AnyShapeStyle(AccentColor.accentColor))
+            )
+            .tint(.green)
+
+        _ = runtime.block(from: view)
+        _ = runtime.dispatch(
+            PointerPress(
+                button: .left,
+                location: Point(column: 0, row: 0),
+                phase: .down
+            )
+        )
+        _ = runtime.dispatch(
+            PointerMotion(
+                button: .left,
+                location: Point(column: 2, row: 0),
+                modifiers: []
+            )
+        )
+
+        #expect(runtime.block(from: view)?.runs == [
+            RenderedRun(
+                text: "ab",
+                style: TextStyle(
+                    foregroundStyle: AnyColor(Color16.green),
+                    backgroundStyle: AnyColor(Color16.green)
+                )
+            ),
+        ])
+    }
+
+    @Test
     func `selected text emits foreground and background SGR sequences while screen rendering hides the terminal cursor`() {
         let runtime = StateRuntime()
         let view = Text("A")

@@ -8,6 +8,37 @@ import Testing
 struct EditableTextSingleLineSelectionAndCaretNavigationTests {
 
     @Test
+    func `selected single-line EditableText resolves an accentColor foreground through AnyShapeStyle`() {
+        let text = "abcd"
+        let upperBound = text.index(text.startIndex, offsetBy: 2)
+        let textProbe = BindingProbe<String>()
+        let selectionProbe = BindingProbe<TextSelection?>()
+        let view = SelectionSingleLineEditableTextView(
+            text: text,
+            selection: TextSelection(range: text.startIndex..<upperBound),
+            textProbe: textProbe,
+            selectionProbe: selectionProbe
+        )
+        .textSelectionForegroundStyle(
+            Optional(AnyShapeStyle(AccentColor.accentColor))
+        )
+        .tint(.green)
+        let runtime = StateRuntime()
+
+        #expect(renderUntilStable(runtime, view: view) <= 4)
+        #expect(runtime.block(from: view)?.runs == [
+            RenderedRun(
+                text: "ab",
+                style: TextStyle(
+                    foregroundStyle: AnyColor(Color16.green),
+                    backgroundStyle: AnyColor(Color16.green)
+                )
+            ),
+            RenderedRun(text: "cd", column: 2),
+        ])
+    }
+
+    @Test
     func `an external Unicode selection is replaced and republished as a caret in updated text`() {
         let text = "A👨‍👩‍👧‍👦한"
         let emojiStart = text.index(after: text.startIndex)

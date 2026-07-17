@@ -791,7 +791,9 @@ extension View {
     /// - Returns: A view whose descendants inherit the given base foreground.
     public func foregroundStyle(_ style: AnyColor) -> some View {
         transformEnvironment(\.textStyle) {
-            $0.foregroundStyle = style
+            $0.foregroundStyle = style.resolvingAccentColor(
+                to: EnvironmentRenderContext.current.tint
+            )
         }
     }
 

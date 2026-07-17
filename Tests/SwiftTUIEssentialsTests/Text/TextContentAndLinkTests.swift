@@ -45,6 +45,24 @@ struct TextContentAndLinkTests {
     }
 
     @Test
+    func `Run foreground colors resolve accentColor after text style merging`() {
+        let text = Text(
+            RunGroup {
+                Run("A")
+                    .foregroundColor(AccentColor.accentColor)
+            }
+        )
+        .tint(.green)
+
+        #expect(ViewResolver.block(from: text)?.runs == [
+            RenderedRun(
+                text: "A",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.green))
+            ),
+        ])
+    }
+
+    @Test
     func `Text keeps styles aligned after a grapheme crosses Run boundaries`() {
         let text = Text(
             RunGroup {

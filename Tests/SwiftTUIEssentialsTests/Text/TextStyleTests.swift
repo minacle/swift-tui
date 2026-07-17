@@ -8,6 +8,55 @@ import SwiftTUIControls
 struct TextStyleTests {
 
     @Test
+    func `AccentColor accentColor satisfies Color and ShapeStyle and uses blue SGR outside a tint environment`() {
+        let accent = AccentColor.accentColor
+
+        func acceptsColor<C: Color>(_: C) {}
+        func acceptsShapeStyle<S: ShapeStyle>(_: S) {}
+
+        acceptsColor(accent)
+        acceptsShapeStyle(accent)
+        #expect(accent.foreground == Color16.blue.foreground)
+        #expect(accent.background == Color16.blue.background)
+    }
+
+    @Test
+    func `accentColor resolves the default and nearest tint for foreground styling`() {
+        let block = ViewResolver.block(
+            from: VStack(spacing: 0) {
+                Text("A")
+                    .foregroundStyle(.accentColor)
+                Text("B")
+                    .foregroundStyle(.accentColor)
+                    .tint(.green)
+            }
+        )
+
+        #expect(block?.runs == [
+            RenderedRun(
+                text: "A",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.blue))
+            ),
+            RenderedRun(
+                text: "B",
+                row: 1,
+                style: TextStyle(foregroundStyle: AnyColor(Color16.green))
+            ),
+        ])
+    }
+
+    @Test
+    func `clearing tint removes an accentColor foreground`() {
+        let block = ViewResolver.block(
+            from: Text("A")
+                .foregroundStyle(.accentColor)
+                .tint(Optional<Color16>.none)
+        )
+
+        #expect(block?.runs == [RenderedRun(text: "A")])
+    }
+
+    @Test
     func `AnyColor factories preserve each concrete color in type-erased form`() {
         let defaultColor: AnyColor = .default
 

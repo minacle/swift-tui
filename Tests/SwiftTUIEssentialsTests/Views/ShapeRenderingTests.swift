@@ -33,6 +33,33 @@ struct ShapeRenderingTests {
     }
 
     @Test
+    func `accentColor shape fills resolve the nearest tint and preserve bounds when tint is cleared`() {
+        let tinted = ViewResolver.block(
+            from: Rectangle()
+                .fill(.accentColor)
+                .frame(width: 2, height: 1)
+                .tint(.green)
+        )
+        let cleared = ViewResolver.block(
+            from: Rectangle()
+                .fill(.accentColor)
+                .frame(width: 2, height: 1)
+                .tint(Optional<Color16>.none)
+        )
+
+        #expect(tinted?.runs == [
+            RenderedRun(
+                text: "██",
+                style: TextStyle(foregroundStyle: AnyColor(Color16.green))
+            ),
+        ])
+        #expect(cleared?.runs.isEmpty == true)
+        #expect(cleared?.width == 2)
+        #expect(cleared?.height == 1)
+        #expect(cleared?.lines == ["  "])
+    }
+
+    @Test
     func `a filled rectangle emits a foreground-color SGR sequence around its full-block cells`() {
         let output = TerminalScreenRenderer.screen(
             for: ViewResolver.block(

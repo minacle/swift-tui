@@ -565,10 +565,14 @@ enum ShapeRenderer {
             return nil
         }
         let bounds = RenderedRect(width: width, height: height)
+        let environment = EnvironmentRenderContext.current
+        let resolvedStyle = (style ?? environment.textStyle.foregroundStyle).flatMap {
+            $0.resolvingAccentColor(to: environment.tint)
+        }
         let fillBlock = fillBlock(
             shape: shape,
             bounds: bounds,
-            style: style ?? EnvironmentRenderContext.current.textStyle.foregroundStyle
+            style: resolvedStyle
         )
 
         return RenderedBlock.composited(
