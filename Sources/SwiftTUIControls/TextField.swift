@@ -18,6 +18,10 @@ public import SwiftTUIEssentials
 /// global-key fallback, or key resolution. A field without a submission action
 /// leaves Return unhandled.
 ///
+/// The field's internal horizontal viewport does not accept pointer-wheel
+/// input. Caret and selection changes still reveal their active endpoint, while
+/// a containing scroll view can handle an otherwise applicable wheel sample.
+///
 /// Single-line describes layout and Return-key behavior; the field doesn't
 /// remove newline characters already supplied through the binding.
 ///
@@ -172,6 +176,8 @@ extension TextField where Label == Text {
 /// submission also follows `TextField`: an installed ``View/onSubmit(_:)``
 /// action runs after immediate key handling and then handles Return, while the
 /// key remains unhandled when no action is installed.
+/// The internal horizontal viewport ignores pointer-wheel input and reveals
+/// movement only in response to editing or selection navigation.
 ///
 /// > Important: Masking changes only the field's rendered characters. It still
 /// > reveals the value's `Character` count, and the bound `String` contains the
@@ -279,20 +285,40 @@ private struct TextFieldBody<Label: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if let selection {
-            EditableText(text: text, selection: selection, mask: mask)
+        ScrollView(.horizontal) {
+            if let selection {
+                EditableText(
+                    text: text,
+                    selection: selection,
+                    inputPolicy: inputPolicy,
+                    mask: mask
+                )
                 .placeholder {
                     placeholder
                 }
                 .simultaneousInputEvent(submitEvent)
-        }
-        else {
-            EditableText(text: text, mask: mask)
+            }
+            else {
+                EditableText(
+                    text: text,
+                    inputPolicy: inputPolicy,
+                    mask: mask
+                )
                 .placeholder {
                     placeholder
                 }
                 .simultaneousInputEvent(submitEvent)
+            }
         }
+        .scrollDisabled(true)
+        .frame(height: 1)
+    }
+
+    private var inputPolicy: EditableText.InputPolicy {
+        EditableText.InputPolicy(
+            allowsNewlineInsertion: false,
+            allowsVerticalNavigation: false
+        )
     }
 
     @ViewBuilder

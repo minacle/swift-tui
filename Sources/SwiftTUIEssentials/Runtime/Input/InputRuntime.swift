@@ -2198,8 +2198,11 @@ final class InputRuntime {
 
         return (
             region.path,
-            region.frame,
-            Point(column: column - region.frame.x, row: row - region.frame.y)
+            region.positionFrame ?? region.frame,
+            Point(
+                column: column - (region.positionFrame ?? region.frame).x,
+                row: row - (region.positionFrame ?? region.frame).y
+            )
         )
     }
 

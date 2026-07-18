@@ -396,6 +396,11 @@ enum StackRenderer {
             height: height,
             paddedRows: paddedRows,
             caret: horizontalCaret(from: items, height: height, alignment: alignment),
+            textInputAnchor: horizontalTextInputAnchor(
+                from: items,
+                height: height,
+                alignment: alignment
+            ),
             hitRegions: horizontalHitRegions(from: items, height: height, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             scrollRegions: horizontalScrollRegions(from: items, height: height, alignment: alignment)
@@ -488,6 +493,11 @@ enum StackRenderer {
             height: height,
             paddedRows: paddedRows,
             caret: verticalCaret(from: items, width: width, alignment: alignment),
+            textInputAnchor: verticalTextInputAnchor(
+                from: items,
+                width: width,
+                alignment: alignment
+            ),
             hitRegions: verticalHitRegions(from: items, width: width, alignment: alignment)
                 .compactMap { $0.clipped(to: bounds) },
             scrollRegions: verticalScrollRegions(from: items, width: width, alignment: alignment)
@@ -1030,6 +1040,34 @@ enum StackRenderer {
         return nil
     }
 
+    private static func horizontalTextInputAnchor(
+        from items: [HorizontalItem],
+        height: Int,
+        alignment: VerticalAlignment
+    ) -> RenderedTextInputAnchor? {
+        let anchors = items.compactMap { item -> RenderedTextInputAnchor? in
+            guard let block = item.block,
+                  let anchor = block.textInputAnchor else {
+                return nil
+            }
+
+            return RenderedTextInputAnchor(
+                focusPath: anchor.focusPath,
+                generation: anchor.generation,
+                isFocused: anchor.isFocused,
+                hasFocusViewport: anchor.hasFocusViewport,
+                row: verticalOffset(
+                    for: block,
+                    in: items,
+                    containerHeight: height,
+                    alignment: alignment
+                ) + anchor.row,
+                column: item.x + anchor.column
+            )
+        }
+        return anchors.first(where: \.isFocused) ?? anchors.first
+    }
+
     private static func horizontalHitRegions(
         from items: [HorizontalItem],
         height: Int,
@@ -1162,6 +1200,34 @@ enum StackRenderer {
         }
 
         return nil
+    }
+
+    private static func verticalTextInputAnchor(
+        from items: [VerticalItem],
+        width: Int,
+        alignment: HorizontalAlignment
+    ) -> RenderedTextInputAnchor? {
+        let anchors = items.compactMap { item -> RenderedTextInputAnchor? in
+            guard let block = item.block,
+                  let anchor = block.textInputAnchor else {
+                return nil
+            }
+
+            return RenderedTextInputAnchor(
+                focusPath: anchor.focusPath,
+                generation: anchor.generation,
+                isFocused: anchor.isFocused,
+                hasFocusViewport: anchor.hasFocusViewport,
+                row: item.y + anchor.row,
+                column: horizontalOffset(
+                    for: block,
+                    in: items,
+                    containerWidth: width,
+                    alignment: alignment
+                ) + anchor.column
+            )
+        }
+        return anchors.first(where: \.isFocused) ?? anchors.first
     }
 
     private static func verticalHitRegions(

@@ -27,27 +27,42 @@ struct SingleLineEditableText<Label: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if let selection {
-            EditableText(text: text, selection: selection)
+        ScrollView(.horizontal) {
+            if let selection {
+                EditableText(
+                    text: text,
+                    selection: selection,
+                    inputPolicy: inputPolicy
+                )
                 .placeholder {
-                    if let prompt {
-                        prompt
-                    }
-                    else {
-                        label
-                    }
+                    placeholder
                 }
+            }
+            else {
+                EditableText(text: text, inputPolicy: inputPolicy)
+                    .placeholder {
+                        placeholder
+                    }
+            }
+        }
+        .scrollDisabled(true)
+        .frame(height: 1)
+    }
+
+    private var inputPolicy: EditableText.InputPolicy {
+        EditableText.InputPolicy(
+            allowsNewlineInsertion: false,
+            allowsVerticalNavigation: false
+        )
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
+        if let prompt {
+            prompt
         }
         else {
-            EditableText(text: text)
-                .placeholder {
-                    if let prompt {
-                        prompt
-                    }
-                    else {
-                        label
-                    }
-                }
+            label
         }
     }
 }
@@ -79,10 +94,21 @@ struct MaskedSingleLineEditableText: View {
     }
 
     var body: some View {
-        EditableText(text: text, mask: "•")
+        ScrollView(.horizontal) {
+            EditableText(
+                text: text,
+                inputPolicy: EditableText.InputPolicy(
+                    allowsNewlineInsertion: false,
+                    allowsVerticalNavigation: false
+                ),
+                mask: "•"
+            )
             .placeholder {
                 Text(title)
             }
+        }
+        .scrollDisabled(true)
+        .frame(height: 1)
     }
 }
 

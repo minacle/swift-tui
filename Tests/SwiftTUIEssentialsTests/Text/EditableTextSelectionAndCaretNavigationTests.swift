@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Single-Line Selection and Caret Navigation")
-struct EditableTextSingleLineSelectionAndCaretNavigationTests {
+@Suite("EditableText Selection and Caret Navigation")
+struct EditableTextSelectionAndCaretNavigationTests {
 
     @Test
-    func `selected single-line EditableText resolves an accentColor foreground through AnyShapeStyle`() {
+    func `selected horizontally scrolled EditableText resolves an accentColor foreground through AnyShapeStyle`() {
         let text = "abcd"
         let upperBound = text.index(text.startIndex, offsetBy: 2)
         let textProbe = BindingProbe<String>()
@@ -69,7 +69,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `pointer drags and arrow keys publish each single-line EditableText selection change`() {
+    func `pointer drags and arrow keys publish each horizontally scrolled EditableText selection change`() {
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = SelectionSingleLineEditableTextView(
@@ -213,7 +213,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `horizontal arrows reposition the single-line EditableText caret for subsequent insertion`() {
+    func `horizontal arrows reposition the horizontally scrolled EditableText caret for subsequent insertion`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView()
 
@@ -421,7 +421,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `clicking the reserved trailing cell inserts at the end of the single-line EditableText`() {
+    func `clicking the reserved trailing cell inserts at the end of the horizontally scrolled EditableText`() {
         let runtime = StateRuntime()
         let view = ExactFitDelimitedFixedSizeSingleLineEditableTextView()
 
@@ -451,7 +451,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `dragging across a single-line EditableText selects the traversed range for replacement`() {
+    func `dragging across a horizontally scrolled EditableText selects the traversed range for replacement`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
@@ -479,7 +479,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `navigationDirection extends a dragged single-line EditableText selection from its command-side endpoint`() {
+    func `navigationDirection extends a dragged horizontally scrolled EditableText selection from its command-side endpoint`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextInitialTextView(text: "abcdef")
             .environment(\.textSelectionNavigationBehavior, .navigationDirection)
@@ -532,7 +532,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `navigationDirection applies command-side extension to masked single-line EditableText selection`() {
+    func `navigationDirection applies command-side extension to masked horizontally scrolled EditableText selection`() {
         let runtime = StateRuntime()
         let probe = BindingProbe<String>()
         let view = MaskedSingleLineEditableTextEditingView(textProbe: probe)
@@ -568,20 +568,23 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
 
     @Test
     func `navigationDirection makes Shift-Home and Shift-End extend from the command-side endpoint`() {
-        let start = EditableTextSingleLineState(initialText: "abcdef") {}
-        start.beginSelection(toColumn: 2, layoutText: start.text)
-        start.extendSelection(toColumn: 5, layoutText: start.text)
-        start.moveToStart(
+        let layout = EditableTextLayout(text: "abcdef", maxWidth: nil)
+        let start = EditableTextState(initialText: "abcdef") {}
+        start.beginSelection(to: Point(column: 2, row: 0), layout: layout)
+        start.extendSelection(to: Point(column: 5, row: 0), layout: layout)
+        start.moveToLineStart(
+            layout: layout,
             selecting: true,
             navigationBehavior: .navigationDirection
         )
         #expect(start.offset == 0)
         #expect(start.selectedRange == 0..<5)
 
-        let end = EditableTextSingleLineState(initialText: "abcdef") {}
-        end.beginSelection(toColumn: 5, layoutText: end.text)
-        end.extendSelection(toColumn: 2, layoutText: end.text)
-        end.moveToEnd(
+        let end = EditableTextState(initialText: "abcdef") {}
+        end.beginSelection(to: Point(column: 5, row: 0), layout: layout)
+        end.extendSelection(to: Point(column: 2, row: 0), layout: layout)
+        end.moveToLineEnd(
+            layout: layout,
             selecting: true,
             navigationBehavior: .navigationDirection
         )
@@ -591,8 +594,9 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
 
     @Test
     func `navigationDirection starts selection extension from the current caret after a click or text synchronization`() {
-        let click = EditableTextSingleLineState(initialText: "abcdef") {}
-        click.beginSelection(toColumn: 2, layoutText: click.text)
+        let layout = EditableTextLayout(text: "abcdef", maxWidth: nil)
+        let click = EditableTextState(initialText: "abcdef") {}
+        click.beginSelection(to: Point(column: 2, row: 0), layout: layout)
         click.moveRight(
             selecting: true,
             navigationBehavior: .navigationDirection
@@ -600,9 +604,9 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(click.offset == 3)
         #expect(click.selectedRange == 2..<3)
 
-        let externalChange = EditableTextSingleLineState(initialText: "abcdef") {}
-        externalChange.beginSelection(toColumn: 2, layoutText: externalChange.text)
-        externalChange.extendSelection(toColumn: 5, layoutText: externalChange.text)
+        let externalChange = EditableTextState(initialText: "abcdef") {}
+        externalChange.beginSelection(to: Point(column: 2, row: 0), layout: layout)
+        externalChange.extendSelection(to: Point(column: 5, row: 0), layout: layout)
         externalChange.synchronize(with: "xy")
         externalChange.moveLeft(
             selecting: true,
@@ -614,9 +618,10 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
 
     @Test
     func `navigationDirection holds a boundary selection until movement reverses inward`() {
-        let state = EditableTextSingleLineState(initialText: "abcdef") {}
-        state.beginSelection(toColumn: 0, layoutText: state.text)
-        state.extendSelection(toColumn: 5, layoutText: state.text)
+        let layout = EditableTextLayout(text: "abcdef", maxWidth: nil)
+        let state = EditableTextState(initialText: "abcdef") {}
+        state.beginSelection(to: Point(column: 0, row: 0), layout: layout)
+        state.extendSelection(to: Point(column: 5, row: 0), layout: layout)
 
         state.moveLeft(
             selecting: true,
@@ -636,9 +641,10 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     @Test
     func `selection extension starts from the resulting caret after insertion or deletion`() {
         var insertedText = "abcdef"
-        let insertion = EditableTextSingleLineState(initialText: insertedText) {}
-        insertion.beginSelection(toColumn: 2, layoutText: insertion.text)
-        insertion.extendSelection(toColumn: 5, layoutText: insertion.text)
+        let layout = EditableTextLayout(text: insertedText, maxWidth: nil)
+        let insertion = EditableTextState(initialText: insertedText) {}
+        insertion.beginSelection(to: Point(column: 2, row: 0), layout: layout)
+        insertion.extendSelection(to: Point(column: 5, row: 0), layout: layout)
         insertion.insert(
             "X",
             update: Binding(
@@ -658,9 +664,9 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
         #expect(insertion.selectedRange == 2..<3)
 
         var deletedText = "abcdef"
-        let deletion = EditableTextSingleLineState(initialText: deletedText) {}
-        deletion.beginSelection(toColumn: 2, layoutText: deletion.text)
-        deletion.extendSelection(toColumn: 5, layoutText: deletion.text)
+        let deletion = EditableTextState(initialText: deletedText) {}
+        deletion.beginSelection(to: Point(column: 2, row: 0), layout: layout)
+        deletion.extendSelection(to: Point(column: 5, row: 0), layout: layout)
         deletion.deleteBackward(
             update: Binding(
                 get: {
@@ -680,7 +686,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `dragging beyond a narrow single-line EditableText scrolls the selected endpoint into view`() {
+    func `dragging beyond a narrow horizontally scrolled EditableText scrolls the selected endpoint into view`() {
         let runtime = StateRuntime()
         let view = PrefixedNarrowSingleLineEditableTextInitialTextView(text: "abcdef")
 
@@ -707,7 +713,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `unpressed pointer motion leaves the single-line EditableText caret unchanged`() {
+    func `unpressed pointer motion leaves the horizontally scrolled EditableText caret unchanged`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
@@ -729,7 +735,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `pointer-up ends a single-line EditableText drag so later motion cannot move its caret`() {
+    func `pointer-up ends a horizontally scrolled EditableText drag so later motion cannot move its caret`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextInitialTextView(text: "abcd")
 
@@ -761,7 +767,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `a scrolled single-line EditableText containing a wide glyph maps clicked terminal columns to source insertion points`() {
+    func `a scrolled horizontally scrolled EditableText containing a wide glyph maps clicked terminal columns to source insertion points`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextInitialTextView(text: "한ABC")
             .frame(width: 3)
@@ -786,7 +792,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `an indented single-line EditableText maps a click from its own receiver origin`() {
+    func `an indented horizontally scrolled EditableText maps a click from its own receiver origin`() {
         let runtime = StateRuntime()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = FocusableCompositeSingleLineEditableText(
@@ -813,7 +819,7 @@ struct EditableTextSingleLineSelectionAndCaretNavigationTests {
     }
 
     @Test
-    func `clicking the outer header leaves the single-line EditableText selection unchanged`() {
+    func `clicking the outer header leaves the horizontally scrolled EditableText selection unchanged`() {
         let runtime = StateRuntime()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = FocusableCompositeSingleLineEditableText(

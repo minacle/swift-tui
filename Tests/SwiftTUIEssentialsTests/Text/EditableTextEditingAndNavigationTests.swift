@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Multiline Editing")
-struct EditableTextMultilineEditingTests {
+@Suite("EditableText Editing and Navigation")
+struct EditableTextEditingAndNavigationTests {
 
     @Test
-    func `typing and Return update multiline EditableText content and place the caret after the inserted text`() {
+    func `typing and Return update vertically scrolled EditableText content and place the caret after the inserted text`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
 
@@ -22,12 +22,12 @@ struct EditableTextMultilineEditingTests {
         #expect(runtime.consumeInvalidation())
 
         let block = runtime.block(from: view)
-        #expect(block?.lines == ["a", "b"])
+        #expect(block?.lines == ["a ", "b "])
         #expect(block?.caret == RenderedCaret(row: 1, column: 1))
     }
 
     @Test
-    func `Backspace joins multiline EditableText lines when deletion crosses a newline`() {
+    func `Backspace joins vertically scrolled EditableText lines when deletion crosses a newline`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextInitialTextView(text: "ab\ncd")
 
@@ -41,7 +41,7 @@ struct EditableTextMultilineEditingTests {
         #expect(runtime.consumeInvalidation())
 
         let block = runtime.block(from: view)
-        #expect(block?.lines == ["ab"])
+        #expect(block?.lines == ["ab "])
         #expect(block?.caret == RenderedCaret(row: 0, column: 2))
     }
 
@@ -75,7 +75,7 @@ struct EditableTextMultilineEditingTests {
     }
 
     @Test
-    func `an exact-width multiline EditableText line exposes a trailing visual row for caret and further input`() {
+    func `an exact-width vertically scrolled EditableText line exposes a trailing visual row for caret and further input`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
         let proposal = RenderProposal(columns: 3, rows: 2)
@@ -136,7 +136,7 @@ struct EditableTextMultilineEditingTests {
     }
 
     @Test
-    func `the multiline EditableText caret advances by terminal columns for wide glyphs`() {
+    func `the vertically scrolled EditableText caret advances by terminal columns for wide glyphs`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
 
@@ -149,12 +149,12 @@ struct EditableTextMultilineEditingTests {
         #expect(runtime.consumeInvalidation())
         let block = runtime.block(from: view)
 
-        #expect(block?.lines == ["한A"])
+        #expect(block?.lines == ["한A "])
         #expect(block?.caret == RenderedCaret(row: 0, column: 3))
     }
 
     @Test
-    func `typing an emoji ZWJ sequence inserts one grapheme and advances the multiline EditableText caret two columns`() {
+    func `typing an emoji ZWJ sequence inserts one grapheme and advances the vertically scrolled EditableText caret two columns`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
 
@@ -171,7 +171,7 @@ struct EditableTextMultilineEditingTests {
         #expect(runtime.consumeInvalidation())
         let block = runtime.block(from: view)
 
-        #expect(block?.lines == ["👩‍❤️‍💋‍👨A"])
+        #expect(block?.lines == ["👩‍❤️‍💋‍👨A "])
         #expect(block?.caret == RenderedCaret(row: 0, column: 3))
     }
 
@@ -189,7 +189,7 @@ struct EditableTextMultilineEditingTests {
     }
 
     @Test
-    func `an empty multiline EditableText fills its proposed rows with one focus region and an initial caret`() {
+    func `an empty vertically scrolled EditableText fills its proposed rows with one focus region and an initial caret`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
 
@@ -205,7 +205,7 @@ struct EditableTextMultilineEditingTests {
     }
 
     @Test
-    func `a disabled multiline EditableText rejects focus and leaves its binding unchanged`() {
+    func `a disabled vertically scrolled EditableText rejects focus and leaves its binding unchanged`() {
         let runtime = StateRuntime()
         let textProbe = BindingProbe<String>()
         let focusProbe = FocusBindingProbe<Bool>()
@@ -222,7 +222,7 @@ struct EditableTextMultilineEditingTests {
     }
 
     @Test
-    func `an external text replacement rerenders the multiline EditableText and clamps its caret`() {
+    func `an external text replacement rerenders the vertically scrolled EditableText and clamps its caret`() {
         let runtime = StateRuntime()
         let probe = BindingProbe<String>()
         let view = CapturedMultilineEditableTextView(text: "abc", probe: probe)
@@ -233,9 +233,10 @@ struct EditableTextMultilineEditingTests {
 
         probe.binding?.wrappedValue = "x"
         #expect(runtime.consumeInvalidation())
+        #expect(renderUntilStable(runtime, view: view) <= 3)
         let block = runtime.block(from: view)
 
-        #expect(block?.lines == ["x"])
+        #expect(block?.lines == ["x "])
         #expect(block?.caret == RenderedCaret(row: 0, column: 1))
     }
 }

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `EditableText.InputPolicy` to independently control Return newline
+  insertion and Up/Down visual-line navigation without changing input tiers or
+  normalizing existing bound newlines ([#18](https://github.com/minacle/swift-tui/issues/18)).
 - Added `LazyHStack`, `LazyVStack`, `Section`, and
   `PinnedScrollableViews` for viewport-driven terminal stack rendering,
   stable `ForEach` state and scroll targets, and section header or footer
@@ -18,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** Unified `EditableText` layout and state, removed
+  `EditableText.LineMode` and its `lineMode` initializer arguments, and moved
+  viewport clipping, wheel input, and active-endpoint reveal into composing
+  `ScrollView` values. `TextField` and `SecureField` now use a one-row
+  wheel-disabled horizontal viewport, while `TextEditor` uses a vertical
+  viewport ([#18](https://github.com/minacle/swift-tui/issues/18)).
 - **Breaking:** Changed programmatic `scrollPosition(_:)` point and edge
   requests to remain semantic in their binding while only the displayed
   viewport is clamped. Rendering no longer replaces a request with its resolved

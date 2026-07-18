@@ -170,6 +170,45 @@ nonisolated struct RenderedCaret: Equatable, Sendable {
     }
 }
 
+/// An active editable-text endpoint used by scroll containers for reveal.
+///
+/// Unlike ``RenderedCaret``, this metadata remains present while a selection
+/// hides the rendered caret. `generation` changes only for editing and
+/// selection movement, allowing wheel scrolling to persist across ordinary
+/// renders.
+nonisolated struct RenderedTextInputAnchor: Equatable, Sendable {
+
+    let focusPath: [Int]
+
+    let generation: UInt64
+
+    /// Whether the anchor's focus identity is active in this render.
+    let isFocused: Bool
+
+    /// Whether the nearest scroll view has claimed responsibility for the focus viewport.
+    let hasFocusViewport: Bool
+
+    var row: Int
+
+    var column: Int
+
+    init(
+        focusPath: [Int],
+        generation: UInt64,
+        isFocused: Bool = false,
+        hasFocusViewport: Bool = false,
+        row: Int,
+        column: Int
+    ) {
+        self.focusPath = focusPath
+        self.generation = generation
+        self.isFocused = isFocused
+        self.hasFocusViewport = hasFocusViewport
+        self.row = row
+        self.column = column
+    }
+}
+
 nonisolated struct RenderedRect: Equatable, Sendable {
 
     var x: Int
@@ -234,12 +273,16 @@ nonisolated struct RenderedHitRegion: Equatable, Sendable {
 
     var frame: RenderedRect
 
+    /// The unclipped receiver frame used to convert pointer locations to local coordinates.
+    var positionFrame: RenderedRect? = nil
+
     var recognitionAttachmentIDs: [RecognitionAttachmentID] = []
 
     func offsetBy(x: Int, y: Int) -> RenderedHitRegion {
         RenderedHitRegion(
             path: path,
             frame: frame.offsetBy(x: x, y: y),
+            positionFrame: positionFrame?.offsetBy(x: x, y: y),
             recognitionAttachmentIDs: recognitionAttachmentIDs
         )
     }
@@ -249,6 +292,7 @@ nonisolated struct RenderedHitRegion: Equatable, Sendable {
             RenderedHitRegion(
                 path: path,
                 frame: $0,
+                positionFrame: positionFrame,
                 recognitionAttachmentIDs: recognitionAttachmentIDs
             )
         }
@@ -293,7 +337,7 @@ nonisolated struct RenderedFocusRegion: Equatable, Sendable {
             RenderedFocusRegion(
                 path: path,
                 frame: $0,
-                positionFrame: positionFrame?.clipped(to: bounds)
+                positionFrame: positionFrame
             )
         }
     }
@@ -342,9 +386,9 @@ nonisolated struct RenderedCoordinateSpaceRegion: Equatable, @unchecked Sendable
 /// A terminal-cell rendering result with its interaction metadata.
 ///
 /// Runs and regions share the block's zero-based coordinate space. Operations
-/// that frame, pad, offset, clip, or composite a block must transform its caret
-/// and every interaction region together with its visible runs so input and
-/// rendering continue to describe the same view hierarchy.
+/// that frame, pad, offset, clip, or composite a block must transform its caret,
+/// text-input anchor, and every interaction region together with its visible
+/// runs so input and rendering continue to describe the same view hierarchy.
 nonisolated struct RenderedBlock: Equatable, Sendable {
 
     var runs: [RenderedRun]
@@ -357,6 +401,8 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
     var paddedRows: Set<Int>
 
     var caret: RenderedCaret?
+
+    var textInputAnchor: RenderedTextInputAnchor?
 
     var hitRegions: [RenderedHitRegion]
 
@@ -376,6 +422,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         lines: [String],
         style: TextStyle = .plain,
         caret: RenderedCaret? = nil,
+        textInputAnchor: RenderedTextInputAnchor? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
@@ -398,6 +445,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             }
         )
         self.caret = caret
+        self.textInputAnchor = textInputAnchor
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
@@ -413,6 +461,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         height: Int? = nil,
         paddedRows: Set<Int> = [],
         caret: RenderedCaret? = nil,
+        textInputAnchor: RenderedTextInputAnchor? = nil,
         hitRegions: [RenderedHitRegion] = [],
         scrollRegions: [RenderedScrollRegion] = [],
         focusRegions: [RenderedFocusRegion] = [],
@@ -426,6 +475,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         self.minimumHeight = max(height ?? 0, 0)
         self.paddedRows = paddedRows
         self.caret = caret
+        self.textInputAnchor = textInputAnchor
         self.hitRegions = hitRegions
         self.scrollRegions = scrollRegions
         self.focusRegions = focusRegions
@@ -441,6 +491,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             && lhs.minimumHeight == rhs.minimumHeight
             && lhs.paddedRows == rhs.paddedRows
             && lhs.caret == rhs.caret
+            && lhs.textInputAnchor == rhs.textInputAnchor
             && lhs.hitRegions == rhs.hitRegions
             && lhs.scrollRegions == rhs.scrollRegions
             && lhs.focusRegions == rhs.focusRegions
@@ -568,6 +619,12 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             height: targetHeight,
             paddedRows: Set(0..<targetHeight),
             caret: framedCaret(x: x, y: y, width: targetWidth, height: targetHeight),
+            textInputAnchor: framedTextInputAnchor(
+                x: x,
+                y: y,
+                width: targetWidth,
+                height: targetHeight
+            ),
             hitRegions: framedHitRegions(x: x, y: y, width: targetWidth, height: targetHeight),
             scrollRegions: framedScrollRegions(x: x, y: y, width: targetWidth, height: targetHeight),
             focusRegions: framedFocusRegions(x: x, y: y, width: targetWidth, height: targetHeight),
@@ -601,6 +658,16 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             paddedRows: Set(0..<(height + insets.vertical)),
             caret: caret.map {
                 RenderedCaret(row: $0.row + insets.top, column: $0.column + insets.leading)
+            },
+            textInputAnchor: textInputAnchor.map {
+                RenderedTextInputAnchor(
+                    focusPath: $0.focusPath,
+                    generation: $0.generation,
+                    isFocused: $0.isFocused,
+                    hasFocusViewport: $0.hasFocusViewport,
+                    row: $0.row + insets.top,
+                    column: $0.column + insets.leading
+                )
             },
             hitRegions: hitRegions.map {
                 $0.offsetBy(x: insets.leading, y: insets.top)
@@ -638,6 +705,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
                 }
             ),
             caret: offsetCaret(x: x, y: y, bounds: bounds),
+            textInputAnchor: offsetTextInputAnchor(x: x, y: y, bounds: bounds),
             hitRegions: hitRegions.compactMap {
                 $0.offsetBy(x: x, y: y).clipped(to: bounds)
             },
@@ -695,6 +763,7 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             height: height,
             paddedRows: visiblePaddedRows,
             caret: blocks.reversed().compactMap(\.caret).first,
+            textInputAnchor: compositedTextInputAnchor(from: blocks),
             hitRegions: blocks.reversed().flatMap(\.hitRegions),
             scrollRegions: blocks.reversed().flatMap(\.scrollRegions),
             focusRegions: blocks.reversed().flatMap(\.focusRegions),
@@ -718,6 +787,13 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
             }
             return (key, values.reduce(0, +) / values.count)
         })
+    }
+
+    private static func compositedTextInputAnchor(
+        from blocks: [RenderedBlock]
+    ) -> RenderedTextInputAnchor? {
+        let anchors = blocks.reversed().compactMap(\.textInputAnchor)
+        return anchors.first(where: \.isFocused) ?? anchors.first
     }
 
     func offsetExplicitAlignments(x: Int, y: Int) -> [AlignmentKey: Int] {
@@ -748,6 +824,35 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         return RenderedCaret(row: row, column: min(column, targetWidth - 1))
     }
 
+    private func framedTextInputAnchor(
+        x: Int,
+        y: Int,
+        width targetWidth: Int,
+        height targetHeight: Int
+    ) -> RenderedTextInputAnchor? {
+        guard let textInputAnchor else {
+            return nil
+        }
+
+        let row = textInputAnchor.row + y
+        let column = textInputAnchor.column + x
+        guard row >= 0,
+              row < targetHeight,
+              column >= 0,
+              column <= targetWidth else {
+            return nil
+        }
+
+        return RenderedTextInputAnchor(
+            focusPath: textInputAnchor.focusPath,
+            generation: textInputAnchor.generation,
+            isFocused: textInputAnchor.isFocused,
+            hasFocusViewport: textInputAnchor.hasFocusViewport,
+            row: row,
+            column: min(column, targetWidth - 1)
+        )
+    }
+
     private func offsetCaret(x: Int, y: Int, bounds: RenderedRect) -> RenderedCaret? {
         guard let caret else {
             return nil
@@ -763,6 +868,34 @@ nonisolated struct RenderedBlock: Equatable, Sendable {
         }
 
         return RenderedCaret(
+            row: row - bounds.y,
+            column: min(column - bounds.x, bounds.width - 1)
+        )
+    }
+
+    private func offsetTextInputAnchor(
+        x: Int,
+        y: Int,
+        bounds: RenderedRect
+    ) -> RenderedTextInputAnchor? {
+        guard let textInputAnchor else {
+            return nil
+        }
+
+        let row = textInputAnchor.row + y
+        let column = textInputAnchor.column + x
+        guard row >= bounds.y,
+              row < bounds.y + bounds.height,
+              column >= bounds.x,
+              column <= bounds.x + bounds.width else {
+            return nil
+        }
+
+        return RenderedTextInputAnchor(
+            focusPath: textInputAnchor.focusPath,
+            generation: textInputAnchor.generation,
+            isFocused: textInputAnchor.isFocused,
+            hasFocusViewport: textInputAnchor.hasFocusViewport,
             row: row - bounds.y,
             column: min(column - bounds.x, bounds.width - 1)
         )

@@ -503,6 +503,14 @@ private struct ScrollIndicatorsFlashTriggerView<Content: View, Value: Equatable>
 /// handlers for that sample. At an edge, a scroll view leaves an inapplicable
 /// sample unhandled so an eligible outer scroll view or later handler can use
 /// it; among overlapping scroll views, the innermost eligible view moves.
+///
+/// Editable text exposes its active selection endpoint as internal rendering
+/// metadata. When that endpoint, its focus identity, or its edit generation
+/// changes, the nearest eligible scroll view moves by the minimum amount needed
+/// to reveal it on enabled axes. This reveal takes precedence over an explicit
+/// ``View/scrollPosition(_:)`` request and publishes the resulting concrete
+/// ``ScrollPoint`` through that binding. Pointer-wheel offsets remain unchanged
+/// until a later edit or actual navigation change requests another reveal.
 public nonisolated struct ScrollView<Content: View>: View {
 
     /// The body type for this primitive view.
@@ -921,7 +929,11 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             contentBlock,
             axes: axes,
             position: position,
-            proposal: viewportProposal
+            proposal: viewportProposal,
+            revealsTextInputAnchor: runtime?.shouldRevealTextInputAnchor(
+                contentBlock.textInputAnchor,
+                at: path
+            ) == true
         )
         runtime?.registerScrollView(
             at: path,
@@ -930,6 +942,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             maximumPoint: result.maximumPoint,
             viewportSize: Size(columns: result.block.width, rows: result.block.height),
             identifiedRegions: contentBlock.identifiedRegions,
+            textInputAnchor: contentBlock.textInputAnchor,
+            didRevealTextInputAnchor: result.didRevealTextInputAnchor,
             binding: binding,
             flashGeneration: environment.scrollIndicatorFlashGeneration
         )
@@ -1214,13 +1228,16 @@ enum ScrollViewRenderer {
         var point: ScrollPoint
 
         var maximumPoint: ScrollPoint
+
+        var didRevealTextInputAnchor: Bool
     }
 
     static func render(
         _ content: RenderedBlock,
         axes: Axis.Set,
         position: ScrollPosition,
-        proposal: RenderProposal?
+        proposal: RenderProposal?,
+        revealsTextInputAnchor: Bool = false
     ) -> Result {
         let width = proposal?.columns ?? content.width
         let height = proposal?.rows ?? content.height
@@ -1228,7 +1245,8 @@ enum ScrollViewRenderer {
             return Result(
                 block: RenderedBlock(lines: []),
                 point: ScrollPoint(),
-                maximumPoint: ScrollPoint()
+                maximumPoint: ScrollPoint(),
+                didRevealTextInputAnchor: false
             )
         }
 
@@ -1242,10 +1260,21 @@ enum ScrollViewRenderer {
             width: width,
             height: height
         )
-        let x = axes.contains(.horizontal) ? point.x : 0
-        let y = axes.contains(.vertical) ? point.y : 0
-        let clampedX = min(x, maximumPoint.x)
-        let clampedY = min(y, maximumPoint.y)
+        let x = axes.contains(.horizontal) ? min(point.x, maximumPoint.x) : 0
+        let y = axes.contains(.vertical) ? min(point.y, maximumPoint.y) : 0
+        let revealedPoint = revealsTextInputAnchor
+            ? revealedPoint(
+                from: ScrollPoint(x: x, y: y),
+                anchor: content.textInputAnchor,
+                content: content,
+                axes: axes,
+                width: width,
+                height: height,
+                maximumPoint: maximumPoint
+            )
+            : ScrollPoint(x: x, y: y)
+        let clampedX = revealedPoint.x
+        let clampedY = revealedPoint.y
         let bounds = RenderedRect(width: width, height: height)
         let runs = content.runs.flatMap {
             $0.offsetBy(x: -clampedX, y: -clampedY).clipped(to: bounds)
@@ -1265,6 +1294,13 @@ enum ScrollViewRenderer {
                     height: height,
                     constrainToBounds: proposal?.columns != nil
                 ),
+                textInputAnchor: textInputAnchor(
+                    from: content.textInputAnchor,
+                    x: clampedX,
+                    y: clampedY,
+                    width: width,
+                    height: height
+                ),
                 hitRegions: hitRegions(
                     from: content.hitRegions,
                     x: clampedX,
@@ -1281,6 +1317,8 @@ enum ScrollViewRenderer {
                 ),
                 focusRegions: focusRegions(
                     from: content.focusRegions,
+                    textInputAnchor: content.textInputAnchor,
+                    axes: axes,
                     x: clampedX,
                     y: clampedY,
                     width: width,
@@ -1306,8 +1344,63 @@ enum ScrollViewRenderer {
                 )
             ),
             point: ScrollPoint(x: clampedX, y: clampedY),
-            maximumPoint: maximumPoint
+            maximumPoint: maximumPoint,
+            didRevealTextInputAnchor: clampedX != x || clampedY != y
         )
+    }
+
+    private static func revealedPoint(
+        from point: ScrollPoint,
+        anchor: RenderedTextInputAnchor?,
+        content: RenderedBlock,
+        axes: Axis.Set,
+        width: Int,
+        height: Int,
+        maximumPoint: ScrollPoint
+    ) -> ScrollPoint {
+        guard let anchor else {
+            return point
+        }
+
+        return ScrollPoint(
+            x: axes.contains(.horizontal)
+                ? alignedHorizontalOffset(
+                    min(
+                        revealedOffset(
+                            from: point.x,
+                            target: anchor.column,
+                            viewportLength: width
+                        ),
+                        maximumPoint.x
+                    ),
+                    in: content
+                )
+                : point.x,
+            y: axes.contains(.vertical)
+                ? min(
+                    revealedOffset(
+                        from: point.y,
+                        target: anchor.row,
+                        viewportLength: height
+                    ),
+                    maximumPoint.y
+                )
+                : point.y
+        )
+    }
+
+    private static func revealedOffset(
+        from offset: Int,
+        target: Int,
+        viewportLength: Int
+    ) -> Int {
+        if target < offset {
+            return max(target, 0)
+        }
+        if target >= offset + viewportLength {
+            return max(target - viewportLength + 1, 0)
+        }
+        return offset
     }
 
     private static func caret(
@@ -1334,9 +1427,46 @@ enum ScrollViewRenderer {
         )
     }
 
+    private static func textInputAnchor(
+        from anchor: RenderedTextInputAnchor?,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int
+    ) -> RenderedTextInputAnchor? {
+        guard let anchor else {
+            return nil
+        }
+
+        let row = anchor.row - y
+        let column = anchor.column - x
+        guard row >= 0, row < height, column >= 0, column < width else {
+            return nil
+        }
+
+        return RenderedTextInputAnchor(
+            focusPath: anchor.focusPath,
+            generation: anchor.generation,
+            isFocused: anchor.isFocused,
+            hasFocusViewport: true,
+            row: row,
+            column: column
+        )
+    }
+
     static func maxHorizontalOffset(for content: RenderedBlock, width: Int) -> Int {
-        let caretAllowance = content.caret == nil || content.width < width ? 0 : 1
-        var offset = max(content.width - width + caretAllowance, 0)
+        let contentWidth = max(
+            content.width,
+            content.textInputAnchor.map { $0.column + 1 } ?? 0
+        )
+        return alignedHorizontalOffset(max(contentWidth - width, 0), in: content)
+    }
+
+    private static func alignedHorizontalOffset(
+        _ proposedOffset: Int,
+        in content: RenderedBlock
+    ) -> Int {
+        var offset = proposedOffset
         let lines = content.lines.compactMap {
             RunGroup($0).layout().lines.first
         }
@@ -1376,15 +1506,33 @@ enum ScrollViewRenderer {
 
     private static func focusRegions(
         from regions: [RenderedFocusRegion],
+        textInputAnchor: RenderedTextInputAnchor?,
+        axes: Axis.Set,
         x: Int,
         y: Int,
         width: Int,
         height: Int
     ) -> [RenderedFocusRegion] {
         let bounds = RenderedRect(width: width, height: height)
-        return regions.compactMap {
+        var transformedRegions = regions.compactMap {
             $0.offsetBy(x: -x, y: -y).clipped(to: bounds)
         }
+        guard let textInputAnchor,
+              !textInputAnchor.hasFocusViewport,
+              let index = transformedRegions.firstIndex(where: {
+                  $0.path == textInputAnchor.focusPath
+              }) else {
+            return transformedRegions
+        }
+
+        let frame = transformedRegions[index].frame
+        transformedRegions[index].frame = RenderedRect(
+            x: axes.contains(.horizontal) ? 0 : frame.x,
+            y: axes.contains(.vertical) ? 0 : frame.y,
+            width: axes.contains(.horizontal) ? width : frame.width,
+            height: axes.contains(.vertical) ? height : frame.height
+        )
+        return transformedRegions
     }
 
     private static func identifiedRegions(

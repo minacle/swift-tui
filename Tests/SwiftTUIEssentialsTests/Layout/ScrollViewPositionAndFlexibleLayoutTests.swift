@@ -620,6 +620,7 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
             "              ",
         ])
         #expect(block?.scrollRegions.map(\.frame) == [
+            RenderedRect(x: 1, y: 1, width: 12, height: 1),
             RenderedRect(x: 0, y: 3, width: 14, height: 3),
         ])
     }

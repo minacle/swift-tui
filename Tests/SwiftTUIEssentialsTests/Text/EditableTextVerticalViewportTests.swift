@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Multiline Layout and Scrolling")
-struct EditableTextMultilineLayoutAndScrollingTests {
+@Suite("EditableText Vertical Viewport")
+struct EditableTextVerticalViewportTests {
 
     @Test
-    func `Return at the viewport bottom scrolls the multiline EditableText and keeps subsequent input visible`() {
+    func `Return at the viewport bottom scrolls the vertically scrolled EditableText and keeps subsequent input visible`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextEditingView()
 
@@ -36,7 +36,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a fixed-height multiline EditableText scrolls after Return and remains editable`() {
+    func `a fixed-height vertically scrolled EditableText scrolls after Return and remains editable`() {
         let runtime = StateRuntime()
         let view = FramedMultilineEditableTextEditingView()
 
@@ -60,7 +60,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height framed multiline EditableText expands, scrolls, and remains editable after Return`() {
+    func `a max-height framed vertically scrolled EditableText expands, scrolls, and remains editable after Return`() {
         let runtime = StateRuntime()
         let view = MaxHeightFramedMultilineEditableTextEditingView()
 
@@ -86,7 +86,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height multiline EditableText without a row proposal remains editable`() {
+    func `a max-height vertically scrolled EditableText without a row proposal remains editable`() {
         let runtime = StateRuntime()
         let view = MaxHeightOnlyMultilineEditableTextEditingView()
 
@@ -104,7 +104,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `clicking a max-height multiline EditableText without a row proposal enables typing`() {
+    func `clicking a max-height vertically scrolled EditableText without a row proposal enables typing`() {
         let runtime = StateRuntime()
         let view = MaxHeightOnlyMultilineEditableTextClickFocusView()
 
@@ -125,7 +125,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height multiline EditableText below a scroll view accepts click focus in a short viewport`() {
+    func `a max-height vertically scrolled EditableText below a scroll view accepts click focus in a short viewport`() {
         let runtime = StateRuntime()
         let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 8, rows: 6)
@@ -146,7 +146,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a max-height multiline EditableText below a scroll view accepts click focus in a tall viewport`() {
+    func `a max-height vertically scrolled EditableText below a scroll view accepts click focus in a tall viewport`() {
         let runtime = StateRuntime()
         let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 80, rows: 24)
@@ -170,7 +170,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `Return grows a max-height multiline EditableText below a scroll view without hiding prior lines`() {
+    func `Return grows a max-height vertically scrolled EditableText below a scroll view without hiding prior lines`() {
         let runtime = StateRuntime()
         let view = MaxHeightConstantMultilineEditableTextBelowScrollViewView()
             .onTerminate {}
@@ -226,7 +226,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a prefilled framed multiline EditableText adds a line at the bottom and accepts more input`() {
+    func `a prefilled framed vertically scrolled EditableText adds a line at the bottom and accepts more input`() {
         let runtime = StateRuntime()
         let view = FramedMultilineEditableTextInitialTextView(text: "abcdef")
 
@@ -250,7 +250,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `wrapped overflow scrolls a framed multiline EditableText and keeps the caret visible at the insertion point`() {
+    func `wrapped overflow scrolls a framed vertically scrolled EditableText and keeps the caret visible at the insertion point`() {
         let runtime = StateRuntime()
         let view = FramedMultilineEditableTextEditingView()
 
@@ -272,7 +272,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a boxed multiline EditableText below a scroll view remains editable at its bottom row`() {
+    func `a boxed vertically scrolled EditableText below a scroll view remains editable at its bottom row`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextBelowScrollViewView()
 
@@ -295,7 +295,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `a boxed multiline EditableText scrolls after filling visible rows and continues accepting input`() {
+    func `a boxed vertically scrolled EditableText scrolls after filling visible rows and continues accepting input`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextBelowScrollViewView()
         let proposal = RenderProposal(columns: 80, rows: 24)
@@ -322,7 +322,7 @@ struct EditableTextMultilineLayoutAndScrollingTests {
     }
 
     @Test
-    func `clicking blank space inside a framed multiline EditableText requests focus`() {
+    func `clicking blank space inside a framed vertically scrolled EditableText requests focus`() {
         let runtime = StateRuntime()
         let focusProbe = FocusBindingProbe<Bool>()
         let view = FramedMultilineEditableTextClickFocusView(focusProbe: focusProbe)

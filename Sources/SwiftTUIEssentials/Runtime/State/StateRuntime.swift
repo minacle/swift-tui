@@ -30,9 +30,7 @@ final class StateRuntime {
 
     let navigation = NavigationRuntime()
 
-    private var editableTextSingleLineStates: [[Int]: EditableTextSingleLineState] = [:]
-
-    private var editableTextMultilineStates: [[Int]: EditableTextMultilineState] = [:]
+    private var editableTextStates: [[Int]: EditableTextState] = [:]
 
     private var textSelectionStates: [[Int]: TextSelectionState] = [:]
 
@@ -909,6 +907,18 @@ final class StateRuntime {
         scrollViewStates[path]?.point
     }
 
+    func shouldRevealTextInputAnchor(
+        _ anchor: RenderedTextInputAnchor?,
+        at path: [Int]
+    ) -> Bool {
+        guard let anchor else {
+            return false
+        }
+
+        return isFocused(at: anchor.focusPath)
+            && scrollViewStates[path]?.textInputAnchor != anchor
+    }
+
     func registerScrollView(
         at path: [Int],
         axes: Axis.Set,
@@ -916,6 +926,8 @@ final class StateRuntime {
         maximumPoint: ScrollPoint,
         viewportSize: Size,
         identifiedRegions: [RenderedIdentifiedRegion],
+        textInputAnchor: RenderedTextInputAnchor?,
+        didRevealTextInputAnchor: Bool,
         binding: Binding<ScrollPosition>?,
         flashGeneration: Int?,
         at date: Date? = nil
@@ -934,12 +946,16 @@ final class StateRuntime {
             previous?.point != point
                 || flashGeneration.map { $0 != previous?.flashGeneration } == true
         )
+        let activeTextInputAnchor = textInputAnchor.flatMap {
+            isFocused(at: $0.focusPath) ? $0 : nil
+        }
         scrollViewStates[path] = ScrollViewState(
             axes: axes,
             point: point,
             maximumPoint: maximumPoint,
             viewportSize: viewportSize,
             identifiedRegions: identifiedRegions,
+            textInputAnchor: activeTextInputAnchor,
             binding: binding,
             flashGeneration: flashGeneration,
             flashDeadline: requestsFlash
@@ -949,6 +965,10 @@ final class StateRuntime {
         )
         if requestsFlash {
             invalidate()
+        }
+        if didRevealTextInputAnchor,
+           binding?.wrappedValue.point != point {
+            binding?.wrappedValue = ScrollPosition(point: point)
         }
 
         if EnvironmentRenderContext.current.isEnabled,
@@ -1031,37 +1051,20 @@ final class StateRuntime {
         focus.activePath == path
     }
 
-    func editableTextSingleLineState(
+    func editableTextState(
         at path: [Int],
         initialText: String
-    ) -> EditableTextSingleLineState {
-        if let state = editableTextSingleLineStates[path] {
+    ) -> EditableTextState {
+        if let state = editableTextStates[path] {
             return state
         }
 
-        let state = EditableTextSingleLineState(initialText: initialText) {
+        let state = EditableTextState(initialText: initialText) {
             [weak self] in
 
             self?.invalidate()
         }
-        editableTextSingleLineStates[path] = state
-        return state
-    }
-
-    func editableTextMultilineState(
-        at path: [Int],
-        initialText: String
-    ) -> EditableTextMultilineState {
-        if let state = editableTextMultilineStates[path] {
-            return state
-        }
-
-        let state = EditableTextMultilineState(initialText: initialText) {
-            [weak self] in
-
-            self?.invalidate()
-        }
-        editableTextMultilineStates[path] = state
+        editableTextStates[path] = state
         return state
     }
 
@@ -1790,10 +1793,7 @@ final class StateRuntime {
         renderKeysByStorageID = renderKeysByStorageID.filter {
             !removedRenderKeys.contains($0.value)
         }
-        editableTextSingleLineStates = editableTextSingleLineStates.filter {
-            !$0.key.starts(with: path)
-        }
-        editableTextMultilineStates = editableTextMultilineStates.filter {
+        editableTextStates = editableTextStates.filter {
             !$0.key.starts(with: path)
         }
         textSelectionStates = textSelectionStates.filter {
@@ -2299,6 +2299,8 @@ private struct ScrollViewState {
     var viewportSize: Size
 
     var identifiedRegions: [RenderedIdentifiedRegion]
+
+    var textInputAnchor: RenderedTextInputAnchor?
 
     var binding: Binding<ScrollPosition>?
 
