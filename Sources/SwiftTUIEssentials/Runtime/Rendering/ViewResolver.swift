@@ -534,6 +534,69 @@ extension ViewResolver {
         ]
     }
 
+    static func lazyStackDescriptors<Content: View>(
+        from view: Content,
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        if let group = view as? ViewGroup {
+            return group.elements.enumerated().flatMap { index, element in
+                element.lazyStackDescriptors(
+                    path: path + [index],
+                    runtime: runtime,
+                    sectionID: sectionID
+                )
+            }
+        }
+
+        if let content = view as? any LazyViewContent {
+            return content.lazyStackDescriptors(
+                path: path,
+                runtime: runtime,
+                sectionID: sectionID
+            )
+        }
+
+        if view is EmptyView {
+            return []
+        }
+
+        let identity = AnyHashable(
+            LazyStackDescriptorIdentity(
+                path: path,
+                value: nil,
+                role: .item
+            )
+        )
+        return [
+            LazyStackDescriptor(
+                identity: identity,
+                scrollID: nil,
+                sectionID: sectionID,
+                role: .item,
+                expand: nil,
+                render: { childProposal, suppressRegistrations in
+                    let render = {
+                        element(
+                            from: view,
+                            in: childProposal,
+                            path: path,
+                            runtime: runtime
+                        )
+                    }
+                    guard suppressRegistrations else {
+                        return render()
+                    }
+
+                    return LayoutMeasurementContext.withMeasurement {
+                        runtime?.withoutRenderRegistrations(render) ?? render()
+                    }
+                }
+            ),
+        ]
+    }
+
     static func layoutTraits<Content: View>(from view: Content) -> LayoutTraits {
         if let traits = view as? any LayoutTraitRenderable {
             return traits.layoutTraits

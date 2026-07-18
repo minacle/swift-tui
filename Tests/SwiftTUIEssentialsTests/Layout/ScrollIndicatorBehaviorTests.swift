@@ -132,6 +132,30 @@ struct ScrollIndicatorBehaviorTests {
     }
 
     @Test
+    func `a lazy stack reports its estimated full extent to a scroll indicator`() {
+        let probe = ScrollIndicatorConfigurationProbe()
+        let view = ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(0..<1_000) { index in
+                    Text("\(index)")
+                }
+            }
+        }
+        .viewAttachment(VerticalScrollIndicatorAttachmentKey.self) { configuration in
+            probe.values.append(configuration)
+            return Text("!")
+        }
+        .scrollIndicators(.visible, axes: .vertical)
+
+        _ = ViewResolver.block(from: view, in: RenderProposal(columns: 4, rows: 3))
+
+        #expect(probe.values.last?.offset == 0)
+        #expect(probe.values.last?.maximumOffset == 997)
+        #expect(probe.values.last?.viewportLength == 3)
+        #expect(probe.values.last?.contentLength == 1_000)
+    }
+
+    @Test
     func `onAppear flashes hidden indicators once for a stable identity`() {
         let clock = ScrollIndicatorClock()
         let runtime = StateRuntime(now: { clock.date })

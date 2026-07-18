@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `LazyHStack`, `LazyVStack`, `Section`, and
+  `PinnedScrollableViews` for viewport-driven terminal stack rendering,
+  stable `ForEach` state and scroll targets, and section header or footer
+  pinning in same-axis scroll views, including flexible scroll views that
+  receive their finite viewport from a parent `HStack` or `VStack`
+  ([#8](https://github.com/minacle/swift-tui/issues/8)).
+
 ### Changed
 
 - **Breaking:** Changed programmatic `scrollPosition(_:)` point and edge

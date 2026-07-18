@@ -90,6 +90,37 @@ User and proxy scrolling instead update the binding with a concrete
 ``ScrollPoint``. Scope the modifier close to the intended scroll view when
 multiple descendants shouldn't share one position.
 
+### Render long stacks lazily
+
+Put ``LazyVStack`` in a vertical scroll view or ``LazyHStack`` in a horizontal
+scroll view when constructing every child would be unnecessary. A lazy stack
+uses cached terminal-cell measurements to estimate its full extent, then
+creates the children intersecting the viewport and one adjacent child on each
+side. Newly measured children refine the estimate without replacing a
+programmatic ``ScrollPosition`` point or edge in its binding. In particular, a
+semantic bottom or trailing edge follows the corrected extent.
+
+The finite viewport may come from a frame applied directly to the scroll view
+or from the remainder that a parent `HStack` or `VStack` assigns to a flexible
+scroll view. Parent stack measurement keeps that finite bound, so it doesn't
+construct the complete lazy content merely to divide the available cells among
+siblings. A genuinely unspecified proposal on the stack's axis still resolves
+eagerly because the scroll view must report its natural extent.
+
+`ForEach` data IDs are scroll targets in eager and lazy stacks without an
+additional `id(_:)` modifier. A lazy proxy jump can therefore estimate a distant
+target's frame and create its surrounding window without constructing every
+intermediate child. Removing a data ID discards its state; merely scrolling it
+offscreen preserves state while ending its lifecycle and cancelling its view
+task until it appears again.
+
+Use ``Section`` to group lazy content and pass ``PinnedScrollableViews`` to the
+stack to pin section headers or footers. Vertical stacks use the top and bottom
+edges; horizontal stacks use leading and trailing. Each pinned view remains
+inside its section, so the following section pushes it away. Without a bounded
+same-axis scroll viewport, lazy stacks resolve eagerly to report their natural
+size.
+
 ``ScrollViewReader`` supplies a ``ScrollViewProxy`` for action callbacks.
 `scrollTo(_:anchor:)` searches descendant scroll views in render order for a
 matching `id(_:)`. With no anchor it moves by the minimum amount needed to
@@ -127,6 +158,10 @@ by both systems.
 ### Scroll containers and actions
 
 - ``ScrollView``
+- ``LazyHStack``
+- ``LazyVStack``
+- ``Section``
+- ``PinnedScrollableViews``
 - ``ScrollViewReader``
 - ``ScrollViewProxy``
 - ``ScrollPosition``

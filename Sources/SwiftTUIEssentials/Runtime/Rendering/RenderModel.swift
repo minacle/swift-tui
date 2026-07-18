@@ -32,6 +32,14 @@ nonisolated struct LayoutTraits: Sendable {
 
     var flexibleAxes: Axis.Set = []
 
+    /// Axes that should keep a finite parent bound during flexible measurement.
+    ///
+    /// Built-in stacks normally ask flexible children for an unbounded natural
+    /// size before distributing their remainder. A child opts into this set
+    /// when that probe would destroy bounded behavior, such as viewport-driven
+    /// lazy materialization.
+    var preferredFiniteMeasurementAxes: Axis.Set = []
+
     var fillsStackMinorAxis = false
 
     var maximumColumns: Int? = nil
