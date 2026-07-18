@@ -25,8 +25,9 @@ struct ProgrammaticScrollingTests {
     }
 
     @Test
-    func `a scroll position binding clamps an oversized point to the maximum valid offset`() {
+    func `an oversized point stays in its binding without invoking its setter while the viewport clamps it`() {
         var position = ScrollPosition(x: 99, y: 99)
+        var setterCallCount = 0
         let scrollView = ScrollView([.horizontal, .vertical]) {
             VStack(spacing: 0) {
                 Text("ABCDE")
@@ -37,7 +38,10 @@ struct ProgrammaticScrollingTests {
         .scrollPosition(
             Binding(
                 get: { position },
-                set: { position = $0 }
+                set: {
+                    setterCallCount += 1
+                    position = $0
+                }
             )
         )
 
@@ -47,12 +51,14 @@ struct ProgrammaticScrollingTests {
         )
 
         #expect(block?.lines == ["HIJ", "MNO"])
-        #expect(position.point == ScrollPoint(x: 2, y: 1))
+        #expect(position.point == ScrollPoint(x: 99, y: 99))
+        #expect(setterCallCount == 0)
     }
 
     @Test
-    func `an edge-based scroll position resolves to its clamped point offset`() {
+    func `an edge stays in its binding without invoking its setter while the viewport aligns it`() {
         var position = ScrollPosition(edge: .bottom)
+        var setterCallCount = 0
         let scrollView = ScrollView {
             VStack(spacing: 0) {
                 Text("A")
@@ -63,14 +69,78 @@ struct ProgrammaticScrollingTests {
         .scrollPosition(
             Binding(
                 get: { position },
-                set: { position = $0 }
+                set: {
+                    setterCallCount += 1
+                    position = $0
+                }
             )
         )
 
         let block = ViewResolver.block(from: scrollView, in: RenderProposal(rows: 2))
 
         #expect(block?.lines == ["B", "C"])
-        #expect(position.point == ScrollPoint(y: 1))
+        #expect(position.edge == .bottom)
+        #expect(position.point == nil)
+        #expect(setterCallCount == 0)
+    }
+
+    @Test
+    func `repeated edge requests evaluate the root once and leave no residual invalidation`() {
+        let runtime = StateRuntime()
+        let probe = RootBodyProbe()
+        let view = RepeatedEdgeRequestView(probe: probe)
+
+        #expect(runtime.block(from: view)?.trimmedLines == ["go", "B", "C"])
+        #expect(!runtime.consumeInvalidation())
+
+        for _ in 1 ... 3 {
+            let previousEvaluationCount = probe.evaluationCount
+            dispatchButtonClick(to: runtime, column: 1, row: 1)
+            #expect(runtime.consumeInvalidation())
+
+            #expect(runtime.block(from: view)?.trimmedLines == ["go", "B", "C"])
+            #expect(probe.evaluationCount == previousEvaluationCount + 1)
+            #expect(!runtime.consumeInvalidation())
+        }
+    }
+
+    @Test
+    func `a bottom edge follows appended content without changing its binding`() {
+        var position = ScrollPosition(edge: .bottom)
+        var setterCallCount = 0
+        let model = ScrollContentModel()
+        let runtime = StateRuntime()
+        let view = EdgeFollowingContentView(
+            model: model,
+            position: Binding(
+                get: { position },
+                set: {
+                    setterCallCount += 1
+                    position = $0
+                }
+            )
+        )
+
+        #expect(runtime.block(from: view)?.lines == ["B", "C"])
+        #expect(!runtime.consumeInvalidation())
+
+        model.includesFourthRow = true
+        #expect(runtime.consumeInvalidation())
+        #expect(runtime.block(from: view)?.lines == ["C", "D"])
+        #expect(position.edge == .bottom)
+        #expect(setterCallCount == 0)
+    }
+
+    @Test
+    func `an onAppear state change still invalidates an edge-positioned render`() {
+        let runtime = StateRuntime()
+        let view = EdgePositionLifecycleView()
+
+        #expect(runtime.block(from: view)?.trimmedLines == ["B", "waiting"])
+        #expect(runtime.consumeInvalidation())
+
+        #expect(runtime.block(from: view)?.trimmedLines == ["B", "ready"])
+        #expect(!runtime.consumeInvalidation())
     }
 
     @Test
@@ -200,5 +270,93 @@ struct ProgrammaticScrollingTests {
             ),
         ])
         #expect(block?.lines == ["CDE"])
+    }
+}
+
+@MainActor
+private final class RootBodyProbe {
+
+    var evaluationCount = 0
+}
+
+@MainActor
+private struct RepeatedEdgeRequestView: View {
+
+    @State
+    private var position = ScrollPosition(edge: .bottom)
+
+    let probe: RootBodyProbe
+
+    var body: some View {
+        probe.evaluationCount += 1
+        return VStack(alignment: .leading, spacing: 0) {
+            Button("go") {
+                position.scrollTo(edge: .bottom)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("A")
+                    Text("B")
+                    Text("C")
+                }
+            }
+            .scrollPosition($position)
+            .frame(width: 1, height: 2)
+        }
+    }
+}
+
+@MainActor
+@Observable
+private final class ScrollContentModel {
+
+    var includesFourthRow = false
+}
+
+@MainActor
+private struct EdgeFollowingContentView: View {
+
+    let model: ScrollContentModel
+
+    let position: Binding<ScrollPosition>
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                Text("A")
+                Text("B")
+                Text("C")
+                if model.includesFourthRow {
+                    Text("D")
+                }
+            }
+        }
+        .scrollPosition(position)
+        .frame(width: 1, height: 2)
+    }
+}
+
+@MainActor
+private struct EdgePositionLifecycleView: View {
+
+    @State
+    private var position = ScrollPosition(edge: .bottom)
+
+    @State
+    private var status = "waiting"
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("A")
+                Text("B")
+                Text(status)
+            }
+        }
+        .scrollPosition($position)
+        .frame(width: 7, height: 2, alignment: .leading)
+        .onAppear {
+            status = "ready"
+        }
     }
 }

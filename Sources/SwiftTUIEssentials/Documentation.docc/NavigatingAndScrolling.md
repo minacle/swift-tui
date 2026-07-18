@@ -83,9 +83,11 @@ direction; at an edge, the unhandled sample can move an eligible outer scroll
 view or continue to a later input handler.
 
 `scrollPosition(_:)` supplies a ``ScrollPosition`` binding. A concrete point or
-edge is resolved against the current content and viewport, clamped to enabled
-axes, and written back as a concrete ``ScrollPoint``. User and proxy scrolling
-also update that binding. Scope it close to the intended scroll view when
+edge remains in the binding while the scroll view resolves it against the
+current content and viewport and clamps only the displayed offset. Keeping an
+edge semantic lets the viewport remain aligned as its content or size changes.
+User and proxy scrolling instead update the binding with a concrete
+``ScrollPoint``. Scope the modifier close to the intended scroll view when
 multiple descendants shouldn't share one position.
 
 ``ScrollViewReader`` supplies a ``ScrollViewProxy`` for action callbacks.

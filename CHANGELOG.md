@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Changed programmatic `scrollPosition(_:)` point and edge
+  requests to remain semantic in their binding while only the displayed
+  viewport is clamped. Rendering no longer replaces a request with its resolved
+  `ScrollPoint` or invokes the binding setter, preventing a redundant render
+  pass; user and `ScrollViewProxy` scrolling continue to publish concrete
+  points ([#15](https://github.com/minacle/swift-tui/issues/15)).
+
 ## [0.11.0] - 2026-07-18
 
 ### Added

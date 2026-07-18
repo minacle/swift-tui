@@ -685,8 +685,9 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
     }
 
     @Test
-    func `stack measurement clamps a scroll position binding against the final viewport`() {
+    func `stack measurement clamps the viewport without replacing a programmatic position or invoking its setter`() {
         var position = ScrollPosition(x: 99)
+        var setterCallCount = 0
         let view = HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 Text("ABCDE")
@@ -694,7 +695,10 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
             .scrollPosition(
                 Binding(
                     get: { position },
-                    set: { position = $0 }
+                    set: {
+                        setterCallCount += 1
+                        position = $0
+                    }
                 )
             )
         }
@@ -702,7 +706,8 @@ struct ScrollViewPositionAndFlexibleLayoutTests {
         let block = ViewResolver.block(from: view, in: RenderProposal(columns: 3))
 
         #expect(block?.lines == ["CDE"])
-        #expect(position.point == ScrollPoint(x: 2))
+        #expect(position.point == ScrollPoint(x: 99))
+        #expect(setterCallCount == 0)
     }
 
     @Test
