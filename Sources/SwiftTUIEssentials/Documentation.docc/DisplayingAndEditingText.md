@@ -12,8 +12,10 @@ and produce terminal SGR attributes when supported by the active terminal.
 
 ``EditableText`` is the lower-level editing primitive used to build text
 controls. It synchronizes accepted edits through a ``Binding`` and provides
-keyboard navigation, pointer selection, a rendered text caret, and scrolling
-that keeps the caret visible.
+keyboard navigation, pointer selection, and a rendered text caret. It reports
+its natural content size instead of owning a viewport; place it in a
+``ScrollView`` when content needs clipping, wheel input, or automatic reveal of
+the active selection endpoint.
 
 ```swift
 import SwiftTUIEssentials
@@ -30,11 +32,12 @@ struct NotesView: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text("Notes").bold().foregroundStyle(.cyan)
-            EditableText(
-                text: $notes,
-                selection: $selection,
-                lineMode: .multiline
-            )
+            ScrollView(.vertical) {
+                EditableText(
+                    text: $notes,
+                    selection: $selection
+                )
+            }
             .frame(width: 40, height: 8)
         }
     }
@@ -71,18 +74,37 @@ range through a binding or copy the content automatically. Selection
 background comes from `tint(_:)`; `textSelectionForegroundStyle(_:)` can
 replace only the selected foreground color.
 
-### Choose an editing mode
+### Configure editing and scrolling
 
-``EditableText/LineMode/singleLine`` edits one rendered row and scrolls
-horizontally under a finite column proposal. It ignores Return so an enclosing
-handler can interpret that key as submission. Existing newline characters in
-the binding aren't sanitized or removed.
+`EditableText` wraps at terminal-cell boundaries when its proposed column count
+is finite. With an unspecified column count it uses its intrinsic width. In
+both cases it ignores a proposed row limit and returns the full natural height
+of its content. The active selection endpoint is exposed to an enclosing
+`ScrollView`, which performs the minimum reveal only after editing or actual
+navigation changes that endpoint. Pointer-wheel movement otherwise remains in
+place.
 
-``EditableText/LineMode/multiline`` inserts newlines, supports vertical caret
-navigation, and wraps to a finite proposed width. When either proposed axis is
-finite, it scrolls within that axis as needed to keep the rendered text caret
-visible. The caret is part of SwiftTUI's rendered block and is distinct from
-the terminal cursor used to present it on screen.
+``EditableText/InputPolicy`` independently controls whether Return inserts a
+newline and whether Up and Down navigate visual lines. Both operations are
+enabled by default. A control that reserves those keys can disable them without
+changing layout or normalizing newline characters already present in the
+binding:
+
+```swift
+EditableText(
+    text: $query,
+    inputPolicy: EditableText.InputPolicy(
+        allowsNewlineInsertion: false,
+        allowsVerticalNavigation: false
+    )
+)
+```
+
+Disallowed operations do not match the editor's key handler, so ancestor and
+global handlers and key-resolution fallback can process them. Editing remains
+in the existing view-defined immediate input stage. The rendered text caret is
+part of SwiftTUI's rendered block and is distinct from the terminal cursor used
+to present it on screen.
 
 A selection binding publishes the editor's insertion point or range while the
 view is active. Losing focus leaves the last published value intact. Apply an
@@ -115,6 +137,7 @@ See <doc:InputRecognition> for the input path used by editing and
 ### Edit and select
 
 - ``EditableText``
+- ``EditableText/InputPolicy``
 - ``TextSelection``
 - ``TextSelectionNavigationBehavior``
 - ``TextSelectability``

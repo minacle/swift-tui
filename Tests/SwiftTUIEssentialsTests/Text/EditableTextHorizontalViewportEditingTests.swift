@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Single-Line Editing")
-struct EditableTextSingleLineEditingTests {
+@Suite("EditableText Horizontal Viewport Editing")
+struct EditableTextHorizontalViewportEditingTests {
 
     @Test
-    func `typing and backspace update a focused single-line EditableText while unrelated control input is ignored`() {
+    func `typing and backspace update a focused horizontally scrolled EditableText while unrelated control input is ignored`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView()
 
@@ -31,7 +31,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a focused empty single-line EditableText overlays its placeholder without reserving a trailing caret cell`() {
+    func `a focused empty horizontally scrolled EditableText overlays its placeholder without reserving a trailing caret cell`() {
         let runtime = StateRuntime()
         let view = OverlayPlaceholderSingleLineEditableTextView()
 
@@ -45,7 +45,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a disabled single-line EditableText rejects focus and leaves its binding unchanged`() {
+    func `a disabled horizontally scrolled EditableText rejects focus and leaves its binding unchanged`() {
         let runtime = StateRuntime()
         let textProbe = BindingProbe<String>()
         let focusProbe = FocusBindingProbe<Bool>()
@@ -62,7 +62,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `stack layout offsets a single-line EditableText's caret by preceding content`() {
+    func `stack layout offsets a horizontally scrolled EditableText's caret by preceding content`() {
         let runtime = StateRuntime()
         let view = LabeledSingleLineEditableTextEditingView()
 
@@ -75,7 +75,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a single-line EditableText caret advances by terminal columns for wide glyphs`() {
+    func `a horizontally scrolled EditableText caret advances by terminal columns for wide glyphs`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView()
 
@@ -91,7 +91,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `typing an emoji ZWJ sequence inserts one grapheme and advances the single-line EditableText caret two columns`() {
+    func `typing an emoji ZWJ sequence inserts one grapheme and advances the horizontally scrolled EditableText caret two columns`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView()
 
@@ -112,7 +112,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `horizontal scrolling follows the single-line EditableText caret in both directions`() {
+    func `horizontal scrolling follows the horizontally scrolled EditableText caret in both directions`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView().frame(width: 3)
 
@@ -141,7 +141,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `single-line EditableText scrolling clips wide glyphs only at terminal-cell boundaries`() {
+    func `an EditableText horizontal viewport clips wide glyphs only at terminal-cell boundaries`() {
         let runtime = StateRuntime()
         let view = SingleLineEditableTextEditingView().frame(width: 3)
 
@@ -158,7 +158,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `an exact-fit single-line EditableText keeps its boundary caret out of the trailing sibling`() {
+    func `an exact-fit horizontally scrolled EditableText keeps its boundary caret out of the trailing sibling`() {
         let runtime = StateRuntime()
         let view = ExactFitDelimitedFixedSizeSingleLineEditableTextView()
 
@@ -219,7 +219,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `inserting into a full framed single-line EditableText scrolls content before its trailing delimiter`() {
+    func `inserting into a full framed horizontally scrolled EditableText scrolls content before its trailing delimiter`() {
         let runtime = StateRuntime()
         let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
         let view = DelimitedSingleLineEditableTextView(text: text)
@@ -237,7 +237,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a flexible single-line EditableText with wide overflow reaches a stable render after measurement`() {
+    func `a flexible horizontally scrolled EditableText with wide overflow reaches a stable render after measurement`() {
         let runtime = StateRuntime()
         let view = FlexibleLabeledSingleLineEditableTextView(
             text: String(repeating: "한글", count: 30)
@@ -253,7 +253,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `an overlaid single-line EditableText in nested stacks remains stable after overflow input`() {
+    func `an overlaid horizontally scrolled EditableText in nested stacks remains stable after overflow input`() {
         let runtime = StateRuntime()
         let view = NestedOverlaidURLSingleLineEditableTextEditingView()
         let proposal = RenderProposal(columns: 80, rows: 24)
@@ -273,7 +273,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a single-line EditableText nested in ZStack accepts input after its overflow render stabilizes`() {
+    func `a horizontally scrolled EditableText nested in ZStack accepts input after its overflow render stabilizes`() {
         let runtime = StateRuntime()
         let view = NestedZStackDelimitedSingleLineEditableTextEditingView()
         let proposal = RenderProposal(columns: 20, rows: 4)
@@ -287,7 +287,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a single-line EditableText nested in HStack accepts input after its overflow render stabilizes`() {
+    func `a horizontally scrolled EditableText nested in HStack accepts input after its overflow render stabilizes`() {
         let runtime = StateRuntime()
         let view = NestedHStackSingleLineEditableTextEditingView()
         let proposal = RenderProposal(columns: 20, rows: 4)
@@ -301,7 +301,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a nested masked single-line EditableText accepts input after its overflow render stabilizes`() {
+    func `a nested masked horizontally scrolled EditableText accepts input after its overflow render stabilizes`() {
         let runtime = StateRuntime()
         let view = NestedMaskedSingleLineEditableTextEditingView()
         let proposal = RenderProposal(columns: 20, rows: 4)
@@ -332,7 +332,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `clicking a single-line EditableText transfers focus and routes subsequent typing to its binding`() {
+    func `clicking a horizontally scrolled EditableText transfers focus and routes subsequent typing to its binding`() {
         let runtime = StateRuntime()
         let focusProbe = FocusBindingProbe<FocusField?>()
         let textProbe = LabeledStringBindingProbe()
@@ -359,7 +359,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `clicking blank space inside a framed single-line EditableText requests focus`() {
+    func `clicking blank space inside a framed horizontally scrolled EditableText requests focus`() {
         let runtime = StateRuntime()
         let focusProbe = FocusBindingProbe<Bool>()
         let view = FramedSingleLineEditableTextClickFocusView(focusProbe: focusProbe)
@@ -375,7 +375,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `moving optional row focus to a single-line EditableText reveals its caret and enables editing`() {
+    func `moving optional row focus to a horizontally scrolled EditableText reveals its caret and enables editing`() {
         let runtime = StateRuntime()
         let view = DynamicSingleLineEditableTextFocusWithOptionalRowFocusView()
 
@@ -398,7 +398,7 @@ struct EditableTextSingleLineEditingTests {
     }
 
     @Test
-    func `a dynamically focused single-line EditableText remains visible and editable inside a vertical scroll view`() {
+    func `a dynamically focused horizontally scrolled EditableText remains visible and editable inside a vertical scroll view`() {
         let runtime = StateRuntime()
         let view = ScrollWrappedDynamicSingleLineEditableTextFocusView()
 

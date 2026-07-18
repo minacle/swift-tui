@@ -17,6 +17,15 @@ enum ViewResolver {
         block(from: view)?.text
     }
 
+    /// Extracts text under a caller-supplied structural path.
+    ///
+    /// The path keeps otherwise identical placeholder views in separate
+    /// pass-local measurement-cache entries while their interactive metadata
+    /// remains excluded by rendering without a state runtime.
+    static func text<Content: View>(from view: Content, path: [Int]) -> String? {
+        block(from: view, in: nil, path: path, runtime: nil)?.text
+    }
+
     static func block<Content: View>(from view: Content) -> RenderedBlock? {
         block(from: view, in: nil)
     }

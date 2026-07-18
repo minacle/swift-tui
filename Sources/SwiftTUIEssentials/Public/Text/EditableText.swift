@@ -1,10 +1,10 @@
 /// A primitive view that edits text in the terminal.
 ///
-/// `EditableText` provides the editing, selection, caret, pointer, and
-/// scrolling behavior used to build higher-level text controls. Use
-/// ``LineMode/singleLine`` for a one-row control that leaves Return available
-/// to an enclosing view, or ``LineMode/multiline`` for an editor that inserts
-/// newlines and supports vertical caret movement.
+/// `EditableText` provides the editing, selection, caret, and pointer behavior
+/// used to build higher-level text controls. It edits the complete bound
+/// string, inserts a newline for Return by default, and navigates wrapped
+/// visual lines. Place it in a ``ScrollView`` when its natural content size
+/// needs a viewport or automatic text-input reveal.
 ///
 /// Most applications should use the controls provided by the
 /// `SwiftTUIControls` module. Use this primitive when a control needs custom
@@ -32,24 +32,36 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
     LayoutTraitRenderable
 {
 
-    /// The line-editing behavior of editable text.
-    public nonisolated enum LineMode: Sendable {
+    /// Selects the keyboard editing operations accepted by editable text.
+    ///
+    /// Layout and scrolling don't depend on this policy. A finite column
+    /// proposal still wraps content, and `EditableText` always returns its
+    /// natural full height. Higher-level controls can disable operations that
+    /// they reserve for submission or focus navigation without changing those
+    /// layout rules.
+    public nonisolated struct InputPolicy: Sendable {
 
-        /// Edits one rendered row and leaves Return available to an enclosing
-        /// handler.
-        ///
-        /// The view scrolls horizontally when a finite column proposal can't
-        /// show the caret. Return is ignored rather than inserted, allowing an
-        /// ancestor or global key handler to treat it as submission. This mode
-        /// doesn't sanitize newline characters already supplied by the binding.
-        case singleLine
+        /// Whether Return inserts a newline into the bound string.
+        public let allowsNewlineInsertion: Bool
 
-        /// Edits multiple lines with newline insertion and vertical navigation.
+        /// Whether Up and Down navigate between visual lines.
+        public let allowsVerticalNavigation: Bool
+
+        /// Creates a keyboard editing policy.
         ///
-        /// Text wraps to a finite proposed width. When either proposed axis is
-        /// finite, the editor scrolls as needed to keep its rendered text caret
-        /// visible within that axis.
-        case multiline
+        /// - Parameters:
+        ///   - allowsNewlineInsertion: Whether Return inserts `"\n"`. The
+        ///     default is `true`. Disabling this operation doesn't remove or
+        ///     normalize newlines already present in the binding.
+        ///   - allowsVerticalNavigation: Whether Up and Down move the active
+        ///     selection endpoint between visual lines. The default is `true`.
+        public init(
+            allowsNewlineInsertion: Bool = true,
+            allowsVerticalNavigation: Bool = true
+        ) {
+            self.allowsNewlineInsertion = allowsNewlineInsertion
+            self.allowsVerticalNavigation = allowsVerticalNavigation
+        }
     }
 
     /// The body type for this directly rendered primitive view.
@@ -59,17 +71,12 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
 
     let selection: Binding<TextSelection?>?
 
-    let lineMode: LineMode
+    let inputPolicy: InputPolicy
 
     let mask: Character?
 
     var layoutTraits: LayoutTraits {
-        switch lineMode {
-        case .singleLine:
-            LayoutTraits(flexibleAxes: .horizontal)
-        case .multiline:
-            LayoutTraits(flexibleAxes: [.horizontal, .vertical])
-        }
+        LayoutTraits(flexibleAxes: [.horizontal, .vertical])
     }
 
     /// Creates editable text with selection managed entirely by SwiftTUI.
@@ -90,19 +97,22 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
     /// - Parameters:
     ///   - text: A binding to the editable string. Unmasked content isn't
     ///     sanitized before terminal rendering.
-    ///   - lineMode: Whether the view edits one line or multiple lines.
+    ///   - inputPolicy: The keyboard operations accepted by the editor. The
+    ///     default inserts newlines and supports vertical visual-line
+    ///     navigation. Disabled operations remain available to later input
+    ///     handlers and key fallback.
     ///   - mask: A character to display for each editable character, or `nil`
     ///     to display the bound string. The mask itself isn't sanitized.
     ///     Multiline rendering preserves newline separators rather than
     ///     replacing them.
     public init(
         text: Binding<String>,
-        lineMode: LineMode = .singleLine,
+        inputPolicy: InputPolicy = InputPolicy(),
         mask: Character? = nil
     ) {
         self.text = text
         self.selection = nil
-        self.lineMode = lineMode
+        self.inputPolicy = inputPolicy
         self.mask = mask
     }
 
@@ -133,7 +143,10 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
     ///   - selection: A binding through which the caller can supply and observe
     ///     a selection in the current `text` value. `nil` means no externally
     ///     supplied selection; it isn't a focus indicator.
-    ///   - lineMode: Whether the view edits one line or multiple lines.
+    ///   - inputPolicy: The keyboard operations accepted by the editor. The
+    ///     default inserts newlines and supports vertical visual-line
+    ///     navigation. Disabled operations remain available to later input
+    ///     handlers and key fallback.
     ///   - mask: A character to display for each editable character, or `nil`
     ///     to display the bound string. The mask itself isn't sanitized.
     ///     Multiline rendering preserves newline separators rather than
@@ -141,12 +154,12 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
     public init(
         text: Binding<String>,
         selection: Binding<TextSelection?>,
-        lineMode: LineMode = .singleLine,
+        inputPolicy: InputPolicy = InputPolicy(),
         mask: Character? = nil
     ) {
         self.text = text
         self.selection = selection
-        self.lineMode = lineMode
+        self.inputPolicy = inputPolicy
         self.mask = mask
     }
 
@@ -163,31 +176,18 @@ public nonisolated struct EditableText: View, EditableTextRenderable,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        switch lineMode {
-        case .singleLine:
-            return EditableTextSingleLineRenderer.renderedBlock(
-                text: text,
-                selection: selection,
-                prompt: nil,
-                label: Text(""),
-                displayMode: mask.map(EditableTextDisplayMode.masked) ?? .plain,
-                proposal: proposal,
-                path: path,
-                runtime: runtime
-            )
-        case .multiline:
-            return renderedMultilineBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            )
-        }
+        renderedEditableTextBlock(
+            in: proposal,
+            placeholder: nil,
+            path: path,
+            runtime: runtime
+        )
     }
 }
 
 extension EditableText {
 
-    /// Displays placeholder text while single-line editable text is empty.
+    /// Displays placeholder text while editable text is empty.
     ///
     /// The placeholder participates in the editable text's own rendering, so it
     /// follows the current editing state even when the source binding rejects a
@@ -195,10 +195,10 @@ extension EditableText {
     ///
     /// SwiftTUI extracts textual content from the supplied view and renders it
     /// dimmed using the editable text's current style; the placeholder view's
-    /// own layout and interactive regions aren't embedded in the editor. This
-    /// modifier has no visual effect in ``LineMode/multiline``.
-    /// Extracted placeholder text isn't sanitized for terminal controls, so
-    /// sanitize untrusted placeholder content before supplying it.
+    /// own interactive regions aren't embedded in the editor. Extracted
+    /// placeholder text follows the same finite-width wrapping as editable
+    /// content. It isn't sanitized for terminal controls, so sanitize untrusted
+    /// placeholder content before supplying it.
     ///
     /// - Parameter content: A view builder that creates trusted or
     ///   caller-sanitized placeholder content.
@@ -229,21 +229,17 @@ private nonisolated struct EditableTextPlaceholder<Placeholder: View>:
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
-        guard case .singleLine = content.lineMode else {
-            return content.renderedBlock(
-                in: proposal,
-                path: path,
-                runtime: runtime
-            )
+        let focusPath = EnvironmentRenderContext.current.focusPath ?? path
+        var placeholderEnvironment = EnvironmentRenderContext.current
+        placeholderEnvironment.isFocused = runtime?.isFocused(at: focusPath) == true
+        let placeholderText = EnvironmentRenderContext.withValues(
+            placeholderEnvironment
+        ) {
+            ViewResolver.text(from: placeholder, path: path + [1])
         }
-
-        return EditableTextSingleLineRenderer.renderedBlock(
-            text: content.text,
-            selection: content.selection,
-            prompt: nil,
-            label: placeholder,
-            displayMode: content.mask.map(EditableTextDisplayMode.masked) ?? .plain,
-            proposal: proposal,
+        return content.renderedEditableTextBlock(
+            in: proposal,
+            placeholder: placeholderText,
             path: path,
             runtime: runtime
         )

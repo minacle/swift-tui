@@ -17,9 +17,9 @@ to declare an ``App``, build a view hierarchy, store model values with
 | --- | --- | --- |
 | Run an action | ``Button`` | Runs its action synchronously after a completed primary-pointer tap or for Return key-down and repeat events while focused, then handles the completing input sample. |
 | Reveal optional content | ``DisclosureGroup`` | Toggles only when its leading triangle receives a completed primary-pointer tap; it adds no focus or keyboard interaction. |
-| Edit one rendered row | ``TextField`` | Within a finite width, scrolls horizontally to keep its caret visible; Return invokes an installed submission action and then handles the sample without inserting a newline. |
+| Edit one rendered row | ``TextField`` | Within a finite width, reveals its caret in a horizontal viewport that ignores wheel input; Return invokes an installed submission action and then handles the sample without inserting a newline. |
 | Mask one rendered row | ``SecureField`` | Uses the same editing and conditional Return-handling model as `TextField`, but renders one bullet per `Character`. |
-| Edit wrapped, multi-line text | ``TextEditor`` | Is flexible in both axes, wraps to a finite column proposal, and inserts a newline for Return. |
+| Edit wrapped, multi-line text | ``TextEditor`` | Wraps to a finite column proposal, inserts a newline for Return, and accepts vertical wheel input in its viewport. |
 | Show scroll position | ``View/scrollIndicators(_:axes:)`` | Installs the standard horizontal and vertical indicator attachments on the selected axes. |
 
 ``TextField`` and ``SecureField`` invoke the nearest
@@ -30,7 +30,8 @@ Return remains unhandled when no submission action is installed. ``TextEditor``
 never invokes that action. Single-line describes the fields' layout and input
 behavior, not validation: they don't remove newline characters already present
 in a bound string. Editable controls request focus from primary-pointer presses
-and use keyboard and pointer selection while enabled.
+and use keyboard and pointer selection while enabled. A `TextEditor` also
+requests focus from pointer-down in blank rows of its vertical viewport.
 
 ### Compose controls with shared state
 

@@ -20,15 +20,16 @@ struct MultilineEditableText: View {
 
     @ViewBuilder
     var body: some View {
-        if let selection {
-            EditableText(
-                text: text,
-                selection: selection,
-                lineMode: .multiline
-            )
-        }
-        else {
-            EditableText(text: text, lineMode: .multiline)
+        ScrollView(.vertical) {
+            if let selection {
+                EditableText(
+                    text: text,
+                    selection: selection
+                )
+            }
+            else {
+                EditableText(text: text)
+            }
         }
     }
 }

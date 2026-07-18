@@ -170,6 +170,11 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
             height: targetHeight,
             paddedRows: Set(0..<targetHeight),
             caret: frameCaret(block.caret, width: targetWidth, height: targetHeight),
+            textInputAnchor: frameTextInputAnchor(
+                block.textInputAnchor,
+                width: targetWidth,
+                height: targetHeight
+            ),
             hitRegions: frameHitRegions(
                 block.hitRegions,
                 width: targetWidth,
@@ -210,6 +215,29 @@ extension GeometryReader: GeometryReaderRenderable, LayoutTraitRenderable {
         return RenderedCaret(
             row: caret.row,
             column: min(caret.column, width - 1)
+        )
+    }
+
+    private func frameTextInputAnchor(
+        _ anchor: RenderedTextInputAnchor?,
+        width: Int,
+        height: Int
+    ) -> RenderedTextInputAnchor? {
+        guard let anchor,
+              anchor.row >= 0,
+              anchor.row < height,
+              anchor.column >= 0,
+              anchor.column <= width else {
+            return nil
+        }
+
+        return RenderedTextInputAnchor(
+            focusPath: anchor.focusPath,
+            generation: anchor.generation,
+            isFocused: anchor.isFocused,
+            hasFocusViewport: anchor.hasFocusViewport,
+            row: anchor.row,
+            column: min(anchor.column, width - 1)
         )
     }
 

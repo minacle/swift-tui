@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Multiline Selection and Hit Testing")
-struct EditableTextMultilineSelectionAndHitTestingTests {
+@Suite("EditableText Selection and Hit Testing")
+struct EditableTextSelectionAndHitTestingTests {
 
     @Test
-    func `replacing an external multiline EditableText selection with Return publishes a caret after the newline`() {
+    func `replacing an external vertically scrolled EditableText selection with Return publishes a caret after the newline`() {
         let text = "ab\ncd"
         let lowerBound = text.index(after: text.startIndex)
         let upperBound = text.index(text.startIndex, offsetBy: 4)
@@ -37,7 +37,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `clicking a scrolled multiline EditableText publishes a source-relative insertion point`() {
+    func `clicking a scrolled vertically scrolled EditableText publishes a source-relative insertion point`() {
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = SelectionMultilineEditableTextView(
@@ -64,7 +64,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `measurement rendering leaves the multiline EditableText selection binding untouched`() {
+    func `measurement rendering leaves the vertically scrolled EditableText selection binding untouched`() {
         let textProbe = BindingProbe<String>()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = SelectionMultilineEditableTextView(
@@ -107,14 +107,14 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `Return replaces a multiline EditableText selection while external text changes clear stale selection`() {
+    func `Return replaces a vertically scrolled EditableText selection while external text changes clear stale selection`() {
         var boundText = "ab\ncd"
         let binding = Binding(
             get: { boundText },
             set: { boundText = $0 }
         )
-        let state = EditableTextMultilineState(initialText: boundText) {}
-        var layout = EditableTextMultilineLayout(text: state.text, maxWidth: 4)
+        let state = EditableTextState(initialText: boundText) {}
+        var layout = EditableTextLayout(text: state.text, maxWidth: 4)
 
         state.moveToLineStart(layout: layout, selecting: true)
         state.insert("\n", update: binding)
@@ -128,15 +128,15 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(state.offset == 1)
 
         boundText = "x"
-        layout = EditableTextMultilineLayout(text: state.text, maxWidth: 4)
+        layout = EditableTextLayout(text: state.text, maxWidth: 4)
         state.moveToLineEnd(layout: layout)
         state.insert("y", update: binding)
         #expect(boundText == "xy")
     }
 
     @Test
-    func `multiline alignment shifts both the multiline EditableText rendering and pointer-to-offset mapping`() {
-        let layout = EditableTextMultilineLayout(
+    func `multiline alignment shifts both the vertically scrolled EditableText rendering and pointer-to-offset mapping`() {
+        let layout = EditableTextLayout(
             text: "A\nBBB",
             maxWidth: 5,
             alignment: .trailing
@@ -156,7 +156,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `clicking a multiline EditableText line positions the caret for insertion at that source offset`() {
+    func `clicking a vertically scrolled EditableText line positions the caret for insertion at that source offset`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextInitialTextView(text: "ab\ncd")
         let proposal = RenderProposal(columns: 4)
@@ -179,7 +179,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `clicking inside a multiline EditableText selection defers its collapse until pointer-up`() {
+    func `clicking inside a vertically scrolled EditableText selection defers its collapse until pointer-up`() {
         var text = "ab\ncd"
         var selection: TextSelection?
         let runtime = StateRuntime()
@@ -226,7 +226,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `dragging across multiline EditableText lines selects the traversed source range for replacement`() {
+    func `dragging across vertically scrolled EditableText lines selects the traversed source range for replacement`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextInitialTextView(text: "ab\ncd")
         let proposal = RenderProposal(columns: 4)
@@ -255,11 +255,11 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `navigationDirection reanchors dragged multiline EditableText selection before vertical, Home, and End extension`() {
+    func `navigationDirection reanchors dragged vertically scrolled EditableText selection before vertical, Home, and End extension`() {
         let text = "ab\ncd\nef\ngh"
-        let layout = EditableTextMultilineLayout(text: text, maxWidth: 4)
+        let layout = EditableTextLayout(text: text, maxWidth: 4)
 
-        let up = EditableTextMultilineState(initialText: text) {}
+        let up = EditableTextState(initialText: text) {}
         up.beginSelection(to: Point(column: 1, row: 1), layout: layout)
         up.extendSelection(to: Point(column: 1, row: 2), layout: layout)
         up.moveVertically(
@@ -271,7 +271,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(up.offset == 1)
         #expect(up.selectedRange == 1..<7)
 
-        let down = EditableTextMultilineState(initialText: text) {}
+        let down = EditableTextState(initialText: text) {}
         down.beginSelection(to: Point(column: 1, row: 2), layout: layout)
         down.extendSelection(to: Point(column: 1, row: 1), layout: layout)
         down.moveVertically(
@@ -283,7 +283,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(down.offset == 10)
         #expect(down.selectedRange == 4..<10)
 
-        let home = EditableTextMultilineState(initialText: text) {}
+        let home = EditableTextState(initialText: text) {}
         home.beginSelection(to: Point(column: 1, row: 1), layout: layout)
         home.extendSelection(to: Point(column: 1, row: 2), layout: layout)
         home.moveToLineStart(
@@ -294,7 +294,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
         #expect(home.offset == 3)
         #expect(home.selectedRange == 3..<7)
 
-        let end = EditableTextMultilineState(initialText: text) {}
+        let end = EditableTextState(initialText: text) {}
         end.beginSelection(to: Point(column: 1, row: 2), layout: layout)
         end.extendSelection(to: Point(column: 1, row: 1), layout: layout)
         end.moveToLineEnd(
@@ -309,8 +309,8 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     @Test
     func `dragEndpoint continues from the pointer endpoint and collapses the selection when it reaches the anchor`() {
         let text = "ab\ncd\nef"
-        let layout = EditableTextMultilineLayout(text: text, maxWidth: 4)
-        let state = EditableTextMultilineState(initialText: text) {}
+        let layout = EditableTextLayout(text: text, maxWidth: 4)
+        let state = EditableTextState(initialText: text) {}
         state.beginSelection(to: Point(column: 1, row: 1), layout: layout)
         state.extendSelection(to: Point(column: 1, row: 2), layout: layout)
 
@@ -326,7 +326,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `dragging beyond a multiline EditableText frame scrolls the selected endpoint into view`() {
+    func `dragging beyond a vertically scrolled EditableText frame scrolls the selected endpoint into view`() {
         let runtime = StateRuntime()
         let view = PrefixedBoundedMultilineEditableTextInitialTextView(text: "a\nb\nc\nd")
         let proposal = RenderProposal(columns: 4)
@@ -354,7 +354,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `a scrolled multiline EditableText maps viewport clicks through its scroll offset before insertion`() {
+    func `a scrolled EditableText vertical viewport maps clicks through its offset before insertion`() {
         let runtime = StateRuntime()
         let view = MultilineEditableTextInitialTextView(text: "a\nb\nc\nd")
         let proposal = RenderProposal(columns: 3, rows: 2)
@@ -378,7 +378,7 @@ struct EditableTextMultilineSelectionAndHitTestingTests {
     }
 
     @Test
-    func `an indented multiline EditableText uses its receiver geometry without reacting to the outer header`() {
+    func `an indented vertically scrolled EditableText uses its receiver geometry without reacting to the outer header`() {
         let runtime = StateRuntime()
         let selectionProbe = BindingProbe<TextSelection?>()
         let view = FocusableCompositeMultilineEditableText(
@@ -457,8 +457,7 @@ private struct CapturedFocusableCompositeMultilineEditableText: View {
                 Text("> ")
                 EditableText(
                     text: text,
-                    selection: selection,
-                    lineMode: .multiline
+                    selection: selection
                 )
                 .focused(isEditorFocused)
             }

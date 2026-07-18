@@ -168,6 +168,7 @@ extension RenderedBlock {
             height: height,
             paddedRows: Set(0..<height),
             caret: caret,
+            textInputAnchor: textInputAnchor,
             hitRegions: hitRegions,
             scrollRegions: scrollRegions,
             focusRegions: focusRegions,

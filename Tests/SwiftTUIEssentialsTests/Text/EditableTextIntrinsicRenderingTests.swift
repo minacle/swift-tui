@@ -4,11 +4,11 @@ import Testing
 
 @testable import SwiftTUIEssentials
 
-@Suite("EditableText Single-Line Rendering")
-struct EditableTextSingleLineRenderingTests {
+@Suite("EditableText Intrinsic Rendering")
+struct EditableTextIntrinsicRenderingTests {
 
     @Test
-    func `an unfocused nonempty single-line EditableText reserves a trailing caret cell without rendering a caret`() {
+    func `an unfocused nonempty horizontally scrolled EditableText reserves a trailing caret cell without rendering a caret`() {
         let textField = SingleLineEditableText("Name", text: .constant("mayu"))
         let block = ViewResolver.block(from: textField)
 
@@ -18,7 +18,7 @@ struct EditableTextSingleLineRenderingTests {
     }
 
     @Test
-    func `a single-line EditableText applies inherited text styles to its visible value`() {
+    func `a horizontally scrolled EditableText applies inherited text styles to its visible value`() {
         let textField = SingleLineEditableText("Name", text: .constant("mayu"))
             .foregroundStyle(.brightGreen)
             .bold()
@@ -43,7 +43,7 @@ struct EditableTextSingleLineRenderingTests {
     }
 
     @Test
-    func `a single-line EditableText placeholder inherits text styles and adds dimming`() {
+    func `a horizontally scrolled EditableText placeholder inherits text styles and adds dimming`() {
         let editableText = EditableText(text: .constant(""))
             .placeholder {
                 Text("Required")
@@ -64,7 +64,7 @@ struct EditableTextSingleLineRenderingTests {
     }
 
     @Test
-    func `a single-line EditableText placeholder is dimmed when its value is empty`() {
+    func `a horizontally scrolled EditableText placeholder is dimmed when its value is empty`() {
         let editableText = EditableText(text: .constant(""))
             .placeholder {
                 Text("Name")
@@ -79,7 +79,7 @@ struct EditableTextSingleLineRenderingTests {
     }
 
     @Test
-    func `a single-line EditableText renders its bound value with a trailing caret cell`() {
+    func `a horizontally scrolled EditableText renders its bound value with a trailing caret cell`() {
         var value = "mayu"
         let textField = SingleLineEditableText(
             "Name",

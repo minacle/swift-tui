@@ -1252,7 +1252,7 @@ final class RecognitionRuntime {
                     .filter({
                         $0.recognitionAttachmentIDs.contains(attachmentID)
                     })
-                    .map(\.frame)
+                    .map { $0.positionFrame ?? $0.frame }
                 if let frame = attachmentFrames.min(by: { $0.area < $1.area }) {
                     return Point(
                         column: point.column - frame.x,

@@ -6,6 +6,10 @@ public import SwiftTUIEssentials
 /// wraps content to a finite proposed column count and scrolls a constrained
 /// viewport as needed to keep the caret visible. Return inserts a newline and
 /// never invokes ``View/onSubmit(_:)``.
+/// Its vertical viewport accepts pointer-wheel input; wheel movement remains
+/// in place until editing or actual selection navigation requests another
+/// minimal caret reveal. Pointer-down anywhere in an empty viewport requests
+/// focus, not only on a row containing text.
 ///
 /// The editor is focusable unless disabled. Pointer presses request focus;
 /// clicking positions the caret and dragging creates a replacement selection.
@@ -80,15 +84,16 @@ public nonisolated struct TextEditor: View {
     @ViewBuilder
     @MainActor
     public var body: some View {
-        if let selection {
-            EditableText(
-                text: text,
-                selection: selection,
-                lineMode: .multiline
-            )
-        }
-        else {
-            EditableText(text: text, lineMode: .multiline)
+        ScrollView(.vertical) {
+            if let selection {
+                EditableText(
+                    text: text,
+                    selection: selection
+                )
+            }
+            else {
+                EditableText(text: text)
+            }
         }
     }
 }

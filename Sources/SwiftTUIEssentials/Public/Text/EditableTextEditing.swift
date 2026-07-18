@@ -4,21 +4,22 @@ import Terminal
 
 extension EditableText {
 
-    func renderedMultilineBlock(
+    func renderedEditableTextBlock(
         in proposal: RenderProposal?,
+        placeholder: String?,
         path: [Int],
         runtime: StateRuntime?
     ) -> RenderedBlock? {
         let alignment = EnvironmentRenderContext.current.multilineTextAlignment
-        let editorState = runtime?.editableTextMultilineState(
+        let bindingText = text.wrappedValue
+        let editorState = runtime?.editableTextState(
             at: path,
-            initialText: text.wrappedValue
+            initialText: bindingText
         )
         let focusPath = EnvironmentRenderContext.current.focusPath ?? path
         let updatesInteractiveState = !LayoutMeasurementContext.isMeasuring
             && runtime?.isSuppressingInteractiveRenderRegistrations != true
         if updatesInteractiveState {
-            let bindingText = text.wrappedValue
             let textChanged = editorState?.text != bindingText
             editorState?.synchronize(with: bindingText)
             editorState?.synchronizeSelection(
@@ -34,7 +35,9 @@ extension EditableText {
         runtime?.registerKeyPressHandler(
             KeyPressHandler(
                 actionPath: focusPath,
-                matches: EditableTextMultilineInput.matches,
+                matches: {
+                    EditableTextInput.matches($0, policy: inputPolicy)
+                },
                 action: {
                     handle(
                         $0,
@@ -56,7 +59,7 @@ extension EditableText {
                         return false
                     }
 
-                    let layout = EditableTextMultilineLayout(
+                    let layout = EditableTextLayout(
                         text: displayedText(for: editorState.text),
                         maxWidth: editorState.layoutWidth,
                         alignment: alignment
@@ -68,7 +71,7 @@ extension EditableText {
                         return
                     }
 
-                    let layout = EditableTextMultilineLayout(
+                    let layout = EditableTextLayout(
                         text: displayedText(for: editorState.text),
                         maxWidth: editorState.layoutWidth,
                         alignment: alignment
@@ -81,7 +84,7 @@ extension EditableText {
                         return
                     }
 
-                    let layout = EditableTextMultilineLayout(
+                    let layout = EditableTextLayout(
                         text: displayedText(for: editorState.text),
                         maxWidth: editorState.layoutWidth,
                         alignment: alignment
@@ -94,15 +97,27 @@ extension EditableText {
             requiringFocusAt: focusPath
         ) ?? []
 
-        let currentText = displayedText(for: editorState?.text ?? text.wrappedValue)
-        let layout = EditableTextMultilineLayout(
-            text: currentText,
+        let editableText = editorState.map {
+            updatesInteractiveState
+                ? $0.text
+                : $0.textForMeasurement(bindingText: bindingText)
+        } ?? bindingText
+        let displayedEditableText = displayedText(for: editableText)
+        let displaysPlaceholder = editableText.isEmpty && placeholder != nil
+        let renderedText = displaysPlaceholder ? placeholder ?? "" : displayedEditableText
+        let renderedLayout = EditableTextLayout(
+            text: renderedText,
+            maxWidth: proposal?.columns,
+            alignment: alignment
+        )
+        let editingLayout = EditableTextLayout(
+            text: displayedEditableText,
             maxWidth: proposal?.columns,
             alignment: alignment
         )
         let caret = renderedCaret(
             state: editorState,
-            layout: layout,
+            layout: editingLayout,
             runtime: runtime,
             path: focusPath
         )
@@ -111,49 +126,57 @@ extension EditableText {
                 runtime?.isFocused(at: focusPath) == true,
                 to: selection
             )
-            editorState?.updateScrollPoint(
-                for: caret,
-                viewportWidth: proposal?.columns,
-                viewportHeight: proposal?.rows,
-                contentWidth: layout.renderedWidth,
-                contentHeight: layout.height
-            )
         }
 
         let environment = EnvironmentRenderContext.current
         let visibleCaret = editorState?.selectedRange == nil ? caret : nil
-        let content = RenderedBlock(
-            runs: layout.lines.enumerated().flatMap { row, line in
+        let textInputEndpoint = editingLayout.caret(
+            at: editorState?.offset ?? editableText.count
+        )
+        var placeholderStyle = environment.textStyle
+        placeholderStyle.isDim = true
+        let intrinsicCaret = editingLayout.caret(at: editableText.count)
+        let contentWidth = max(
+            renderedLayout.renderedWidth,
+            editingLayout.renderedWidth,
+            proposal?.columns == nil ? intrinsicCaret.column + 1 : 0
+        )
+        var block = RenderedBlock(
+            runs: renderedLayout.lines.enumerated().flatMap { row, line in
                 TextSelectionRenderer.runs(
                     text: line.text,
                     row: row,
                     baseOffset: line.lowerOffset,
-                    style: environment.textStyle,
-                    selection: editorState?.selectedRange,
+                    style: displaysPlaceholder ? placeholderStyle : environment.textStyle,
+                    selection: displaysPlaceholder ? nil : editorState?.selectedRange,
                     tint: environment.tint,
                     foregroundStyle: environment.textSelectionForegroundStyle
                 )
                 .map {
-                    $0.offsetBy(x: layout.horizontalOffset(onLine: row), y: 0)
+                    $0.offsetBy(
+                        x: renderedLayout.horizontalOffset(onLine: row),
+                        y: 0
+                    )
                 }
             },
-            width: layout.renderedWidth,
-            height: layout.height,
-            paddedRows: Set(0..<layout.height),
-            caret: visibleCaret
+            width: contentWidth,
+            height: max(renderedLayout.height, editingLayout.height),
+            paddedRows: Set(0..<max(renderedLayout.height, editingLayout.height)),
+            caret: visibleCaret,
+            textInputAnchor: RenderedTextInputAnchor(
+                focusPath: focusPath,
+                generation: editorState?.textInputGeneration ?? 0,
+                isFocused: runtime?.isFocused(at: focusPath) == true,
+                row: textInputEndpoint.row,
+                column: textInputEndpoint.column
+            )
         )
-
-        var block = ScrollViewRenderer.render(
-            content,
-            axes: [.horizontal, .vertical],
-            position: ScrollPosition(point: editorState?.scrollPoint ?? ScrollPoint()),
-            proposal: RenderProposal(columns: proposal?.columns, rows: proposal?.rows)
-        ).block
         if !pointerAttachmentIDs.isEmpty {
             block.hitRegions.append(
                 RenderedHitRegion(
                     path: path,
                     frame: block.bounds,
+                    positionFrame: block.bounds,
                     recognitionAttachmentIDs: pointerAttachmentIDs
                 )
             )
@@ -169,8 +192,8 @@ extension EditableText {
     }
 
     private func renderedCaret(
-        state: EditableTextMultilineState?,
-        layout: EditableTextMultilineLayout,
+        state: EditableTextState?,
+        layout: EditableTextLayout,
         runtime: StateRuntime?,
         path: [Int]
     ) -> RenderedCaret? {
@@ -185,14 +208,14 @@ extension EditableText {
         _ keyPress: KeyPress,
         text: Binding<String>,
         selection: Binding<TextSelection?>?,
-        state: EditableTextMultilineState?,
+        state: EditableTextState?,
         displayedText: String
     ) -> InputEventResult {
         guard let state else {
             return .ignored
         }
 
-        let layout = EditableTextMultilineLayout(
+        let layout = EditableTextLayout(
             text: displayedText,
             maxWidth: state.layoutWidth,
             alignment: EnvironmentRenderContext.current.multilineTextAlignment
@@ -216,23 +239,27 @@ extension EditableText {
             state.publishSelection(to: selection)
             return .handled
         case .upArrow:
-            state.moveVertically(
+            let moved = state.moveVertically(
                 by: -1,
                 layout: layout,
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
-            state.publishSelection(to: selection)
-            return .handled
+            if moved {
+                state.publishSelection(to: selection)
+            }
+            return moved ? .handled : .ignored
         case .downArrow:
-            state.moveVertically(
+            let moved = state.moveVertically(
                 by: 1,
                 layout: layout,
                 selecting: selecting,
                 navigationBehavior: navigationBehavior
             )
-            state.publishSelection(to: selection)
-            return .handled
+            if moved {
+                state.publishSelection(to: selection)
+            }
+            return moved ? .handled : .ignored
         case .home:
             state.moveToLineStart(
                 layout: layout,
@@ -262,7 +289,7 @@ extension EditableText {
             state.publishSelection(to: selection)
             return .handled
         default:
-            guard EditableTextMultilineInput.isTextInsertion(keyPress) else {
+            guard EditableTextInput.isTextInsertion(keyPress) else {
                 return .ignored
             }
 
@@ -273,7 +300,16 @@ extension EditableText {
     }
 }
 
-final class EditableTextMultilineState {
+final class EditableTextState {
+
+    private struct AnchorSnapshot: Equatable {
+
+        let text: String
+
+        let offset: Int
+
+        let selectedRange: Range<Int>?
+    }
 
     private let invalidate: () -> Void
 
@@ -301,13 +337,8 @@ final class EditableTextMultilineState {
 
     private(set) var layoutWidth: Int?
 
-    private(set) var scrollPoint = ScrollPoint() {
-        didSet {
-            if scrollPoint != oldValue {
-                invalidate()
-            }
-        }
-    }
+    /// Changes only when editing or selection movement changes the input anchor.
+    private(set) var textInputGeneration: UInt64 = 0
 
     init(initialText: String, invalidate: @escaping () -> Void) {
         self.text = initialText
@@ -316,25 +347,34 @@ final class EditableTextMultilineState {
         self.selection = TextSelectionState(offset: initialText.count, invalidate: invalidate)
     }
 
-    func synchronize(with bindingText: String) {
+    @discardableResult
+    func synchronize(with bindingText: String) -> Bool {
         guard bindingText != lastObservedBindingText else {
-            return
+            return false
         }
 
+        let snapshot = anchorSnapshot
         text = bindingText
         lastObservedBindingText = bindingText
         selection.clamp(upperBound: text.count, clearsSelection: true)
+        return completeAnchorMutation(from: snapshot)
     }
 
-    func clamp() {
+    @discardableResult
+    func clamp() -> Bool {
+        let snapshot = anchorSnapshot
         selection.clamp(upperBound: text.count)
+        return completeAnchorMutation(from: snapshot)
     }
 
+    @discardableResult
     func synchronizeSelection(
         with binding: Binding<TextSelection?>?,
         textChanged: Bool
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         selection.synchronize(with: binding, in: text, force: textChanged)
+        return completeAnchorMutation(from: snapshot)
     }
 
     func publishSelection(to binding: Binding<TextSelection?>?) {
@@ -352,13 +392,29 @@ final class EditableTextMultilineState {
         layoutWidth = width
     }
 
+    /// Returns text for a side-effect-free measurement render.
+    ///
+    /// A newly observed binding value must determine natural layout before the
+    /// subsequent interactive render synchronizes state. When the binding still
+    /// equals the last committed value, retained internal text wins so a binding
+    /// that rejected an edit does not make measurement roll that edit back.
+    func textForMeasurement(bindingText: String) -> String {
+        bindingText == lastObservedBindingText ? text : bindingText
+    }
+
+    @discardableResult
     func moveLeft(
         selecting: Bool = false,
         navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         if !selecting, let selectedRange {
-            move(to: selectedRange.lowerBound, preservesPreferredColumn: false, selecting: false)
-            return
+            moveSelection(
+                to: selectedRange.lowerBound,
+                preservesPreferredColumn: false,
+                selecting: false
+            )
+            return completeAnchorMutation(from: snapshot)
         }
 
         prepareForSelectionNavigation(
@@ -366,16 +422,27 @@ final class EditableTextMultilineState {
             selecting: selecting,
             behavior: navigationBehavior
         )
-        move(to: offset - 1, preservesPreferredColumn: false, selecting: selecting)
+        moveSelection(
+            to: offset - 1,
+            preservesPreferredColumn: false,
+            selecting: selecting
+        )
+        return completeAnchorMutation(from: snapshot)
     }
 
+    @discardableResult
     func moveRight(
         selecting: Bool = false,
         navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         if !selecting, let selectedRange {
-            move(to: selectedRange.upperBound, preservesPreferredColumn: false, selecting: false)
-            return
+            moveSelection(
+                to: selectedRange.upperBound,
+                preservesPreferredColumn: false,
+                selecting: false
+            )
+            return completeAnchorMutation(from: snapshot)
         }
 
         prepareForSelectionNavigation(
@@ -383,15 +450,22 @@ final class EditableTextMultilineState {
             selecting: selecting,
             behavior: navigationBehavior
         )
-        move(to: offset + 1, preservesPreferredColumn: false, selecting: selecting)
+        moveSelection(
+            to: offset + 1,
+            preservesPreferredColumn: false,
+            selecting: selecting
+        )
+        return completeAnchorMutation(from: snapshot)
     }
 
+    @discardableResult
     func moveVertically(
         by delta: Int,
-        layout: EditableTextMultilineLayout,
+        layout: EditableTextLayout,
         selecting: Bool = false,
         navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         prepareForSelectionNavigation(
             toward: delta < 0 ? .backward : .forward,
             selecting: selecting,
@@ -401,76 +475,91 @@ final class EditableTextMultilineState {
         let column = preferredColumn ?? current.column
         preferredColumn = column
         let lineIndex = min(max(current.lineIndex + delta, 0), layout.lines.count - 1)
-        move(
+        moveSelection(
             to: layout.offset(onLine: lineIndex, nearestColumn: column),
             preservesPreferredColumn: true,
             selecting: selecting
         )
+        return completeAnchorMutation(from: snapshot)
     }
 
+    @discardableResult
     func moveToLineStart(
-        layout: EditableTextMultilineLayout,
+        layout: EditableTextLayout,
         selecting: Bool = false,
         navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         prepareForSelectionNavigation(
             toward: .backward,
             selecting: selecting,
             behavior: navigationBehavior
         )
         let current = layout.lineAndColumn(at: offset)
-        move(
+        moveSelection(
             to: layout.lines[current.lineIndex].lowerOffset,
             preservesPreferredColumn: false,
             selecting: selecting
         )
+        return completeAnchorMutation(from: snapshot)
     }
 
+    @discardableResult
     func moveToLineEnd(
-        layout: EditableTextMultilineLayout,
+        layout: EditableTextLayout,
         selecting: Bool = false,
         navigationBehavior: TextSelectionNavigationBehavior = .dragEndpoint
-    ) {
+    ) -> Bool {
+        let snapshot = anchorSnapshot
         prepareForSelectionNavigation(
             toward: .forward,
             selecting: selecting,
             behavior: navigationBehavior
         )
         let current = layout.lineAndColumn(at: offset)
-        move(
+        moveSelection(
             to: layout.lines[current.lineIndex].upperOffset,
             preservesPreferredColumn: false,
             selecting: selecting
         )
+        return completeAnchorMutation(from: snapshot)
     }
 
-    func beginSelection(to point: Point, layout: EditableTextMultilineLayout) {
+    @discardableResult
+    func beginSelection(to point: Point, layout: EditableTextLayout) -> Bool {
+        let snapshot = anchorSnapshot
         selection.begin(
             at: offset(to: point, layout: layout),
             upperBound: text.count
         )
         preferredColumn = nil
+        return completeAnchorMutation(from: snapshot)
     }
 
-    func selectionContains(_ point: Point, layout: EditableTextMultilineLayout) -> Bool {
+    func selectionContains(_ point: Point, layout: EditableTextLayout) -> Bool {
         selectedRange?.contains(offset(to: point, layout: layout)) == true
     }
 
-    func extendSelection(to point: Point, layout: EditableTextMultilineLayout) {
+    @discardableResult
+    func extendSelection(to point: Point, layout: EditableTextLayout) -> Bool {
+        let snapshot = anchorSnapshot
         selection.extendFromPointer(
             to: offset(to: point, layout: layout),
             upperBound: text.count
         )
         preferredColumn = nil
+        return completeAnchorMutation(from: snapshot)
     }
 
-    private func offset(to point: Point, layout: EditableTextMultilineLayout) -> Int {
-        let lineIndex = min(max(scrollPoint.y + point.row, 0), layout.lines.count - 1)
-        let column = max(scrollPoint.x + point.column, 0)
+    private func offset(to point: Point, layout: EditableTextLayout) -> Int {
+        let lineIndex = min(max(point.row, 0), layout.lines.count - 1)
+        let column = max(point.column, 0)
         return layout.offset(onLine: lineIndex, nearestRenderedColumn: column)
     }
 
-    func insert(_ newText: String, update binding: Binding<String>) {
+    @discardableResult
+    func insert(_ newText: String, update binding: Binding<String>) -> Bool {
+        let snapshot = anchorSnapshot
         let replacementRange = selectedRange ?? offset..<offset
         text.replaceCharacters(in: replacementRange, with: newText)
         commit(update: binding)
@@ -479,37 +568,40 @@ final class EditableTextMultilineState {
             upperBound: text.count
         )
         preferredColumn = nil
+        return completeAnchorMutation(from: snapshot)
     }
 
-    func deleteBackward(update binding: Binding<String>) {
+    @discardableResult
+    func deleteBackward(update binding: Binding<String>) -> Bool {
         if let selectedRange {
-            delete(selectedRange, update: binding)
-            return
+            return delete(selectedRange, update: binding)
         }
         guard offset > 0 else {
-            return
+            return false
         }
 
-        delete((offset - 1)..<offset, update: binding)
+        return delete((offset - 1)..<offset, update: binding)
     }
 
-    func deleteForward(update binding: Binding<String>) {
+    @discardableResult
+    func deleteForward(update binding: Binding<String>) -> Bool {
         if let selectedRange {
-            delete(selectedRange, update: binding)
-            return
+            return delete(selectedRange, update: binding)
         }
         guard offset < text.count else {
-            return
+            return false
         }
 
-        delete(offset..<(offset + 1), update: binding)
+        return delete(offset..<(offset + 1), update: binding)
     }
 
-    private func delete(_ range: Range<Int>, update binding: Binding<String>) {
+    private func delete(_ range: Range<Int>, update binding: Binding<String>) -> Bool {
+        let snapshot = anchorSnapshot
         text.replaceCharacters(in: range, with: "")
         commit(update: binding)
         selection.collapse(to: range.lowerBound, upperBound: text.count)
         preferredColumn = nil
+        return completeAnchorMutation(from: snapshot)
     }
 
     private func commit(update binding: Binding<String>) {
@@ -533,49 +625,24 @@ final class EditableTextMultilineState {
         )
     }
 
-    func updateScrollPoint(
-        for caret: RenderedCaret?,
-        viewportWidth: Int?,
-        viewportHeight: Int?,
-        contentWidth: Int,
-        contentHeight: Int
-    ) {
-        guard let caret else {
-            return
-        }
-
-        var x = scrollPoint.x
-        var y = scrollPoint.y
-        if let viewportWidth, viewportWidth > 0 {
-            if caret.column < x {
-                x = caret.column
-            }
-            else if caret.column >= x + viewportWidth {
-                x = caret.column - viewportWidth + 1
-            }
-            x = min(max(x, 0), max(contentWidth - viewportWidth, 0))
-        }
-        else {
-            x = 0
-        }
-
-        if let viewportHeight, viewportHeight > 0 {
-            if caret.row < y {
-                y = caret.row
-            }
-            else if caret.row >= y + viewportHeight {
-                y = caret.row - viewportHeight + 1
-            }
-            y = min(max(y, 0), max(contentHeight - viewportHeight, 0))
-        }
-        else {
-            y = 0
-        }
-
-        scrollPoint = ScrollPoint(x: x, y: y)
+    private var anchorSnapshot: AnchorSnapshot {
+        AnchorSnapshot(
+            text: text,
+            offset: offset,
+            selectedRange: selectedRange
+        )
     }
 
-    private func move(
+    private func completeAnchorMutation(from snapshot: AnchorSnapshot) -> Bool {
+        guard snapshot != anchorSnapshot else {
+            return false
+        }
+
+        textInputGeneration &+= 1
+        return true
+    }
+
+    private func moveSelection(
         to newOffset: Int,
         preservesPreferredColumn: Bool,
         selecting: Bool
@@ -587,9 +654,9 @@ final class EditableTextMultilineState {
     }
 }
 
-struct EditableTextMultilineLayout {
+struct EditableTextLayout {
 
-    let lines: [EditableTextMultilineLine]
+    let lines: [EditableTextLine]
 
     private let runLayout: RunLayout
 
@@ -604,7 +671,7 @@ struct EditableTextMultilineLayout {
     ) {
         let runLayout = RunGroup(text).layout(fittingColumns: maxWidth)
         self.runLayout = runLayout
-        self.lines = EditableTextMultilineLayout.lines(
+        self.lines = EditableTextLayout.lines(
             from: runLayout,
             maxWidth: maxWidth
         )
@@ -679,16 +746,16 @@ struct EditableTextMultilineLayout {
     private static func lines(
         from runLayout: RunLayout,
         maxWidth: Int?
-    ) -> [EditableTextMultilineLine] {
+    ) -> [EditableTextLine] {
         var lines = runLayout.lines.map { line in
-            EditableTextMultilineLine(
+            EditableTextLine(
                 text: line.runs.map(\.content).joined(),
                 lowerOffset: line.sourceRange.lowerBound.characterOffset,
                 upperOffset: line.sourceRange.upperBound.characterOffset
             )
         }
         if lines.isEmpty {
-            lines = [EditableTextMultilineLine(text: "", lowerOffset: 0, upperOffset: 0)]
+            lines = [EditableTextLine(text: "", lowerOffset: 0, upperOffset: 0)]
         }
         guard let maxWidth,
               maxWidth > 0,
@@ -700,7 +767,7 @@ struct EditableTextMultilineLayout {
         }
 
         lines.append(
-            EditableTextMultilineLine(
+            EditableTextLine(
                 text: "",
                 lowerOffset: lastLine.upperOffset,
                 upperOffset: lastLine.upperOffset
@@ -710,7 +777,7 @@ struct EditableTextMultilineLayout {
     }
 }
 
-struct EditableTextMultilineLine {
+struct EditableTextLine {
 
     let text: String
 
@@ -719,22 +786,25 @@ struct EditableTextMultilineLine {
     let upperOffset: Int
 }
 
-private enum EditableTextMultilineInput {
+private enum EditableTextInput {
 
-    static func matches(_ keyPress: KeyPress) -> Bool {
+    static func matches(
+        _ keyPress: KeyPress,
+        policy: EditableText.InputPolicy
+    ) -> Bool {
         guard keyPress.phase.contains(.down) || keyPress.phase.contains(.repeat) else {
             return false
         }
 
         return keyPress.key == .delete
             || keyPress.key == .deleteForward
-            || keyPress.key == .downArrow
+            || (keyPress.key == .downArrow && policy.allowsVerticalNavigation)
             || keyPress.key == .end
             || keyPress.key == .home
             || keyPress.key == .leftArrow
-            || keyPress.key == .return
+            || (keyPress.key == .return && policy.allowsNewlineInsertion)
             || keyPress.key == .rightArrow
-            || keyPress.key == .upArrow
+            || (keyPress.key == .upArrow && policy.allowsVerticalNavigation)
             || isTextInsertion(keyPress)
     }
 
