@@ -146,8 +146,9 @@ public nonisolated struct ScrollPoint: Equatable, Sendable {
 /// A scroll position can be automatic, a concrete content point, or an edge
 /// request that the renderer resolves for the current content and viewport.
 /// These states are mutually exclusive. When used through
-/// ``View/scrollPosition(_:)``, concrete and edge requests are clamped and the
-/// binding is updated with the resolved concrete point.
+/// ``View/scrollPosition(_:)``, programmatic point and edge requests remain in
+/// the binding while the renderer clamps only the viewport it displays. User
+/// and proxy scrolling replace the binding with the resulting concrete point.
 public nonisolated struct ScrollPosition: Equatable, Sendable {
 
     private enum Storage: Equatable, Sendable {
@@ -197,7 +198,8 @@ public nonisolated struct ScrollPosition: Equatable, Sendable {
     /// Creates a position at a concrete content point.
     ///
     /// - Parameter point: The nonnegative offsets to request. The scroll view
-    ///   clamps them to its enabled axes and maximum content extent.
+    ///   clamps its displayed viewport to enabled axes and the maximum content
+    ///   extent without changing this stored request.
     public init(point: ScrollPoint) {
         self.storage = .point(point)
     }
@@ -776,13 +778,17 @@ extension View {
 
     /// Supplies a scroll-position binding to descendant scroll views.
     ///
-    /// A descendant reads the binding as its requested position. After resolving
-    /// a concrete point or edge against its viewport, and after user or proxy
-    /// scrolling, it writes the clamped concrete point back. Axes not enabled by
-    /// that scroll view remain at zero. Scope this modifier close to the intended
-    /// scroll view when multiple descendants should not share a position.
+    /// A descendant reads the binding as its requested position. Programmatic
+    /// points and edges remain unchanged while the descendant resolves and
+    /// clamps its displayed viewport; an edge therefore remains aligned as the
+    /// content or viewport changes. User and proxy scrolling instead write the
+    /// resulting concrete point to the binding, with disabled axes set to zero.
+    /// Rendering a programmatic request doesn't invoke the binding setter. Scope
+    /// this modifier close to the intended scroll view when multiple descendants
+    /// should not share a position.
     ///
-    /// - Parameter position: The requested and resolved scroll position.
+    /// - Parameter position: The semantic programmatic request, or the concrete
+    ///   position most recently published by user or proxy scrolling.
     /// - Returns: A view that supplies the binding to scrollable descendants in
     ///   its modified subtree.
     public func scrollPosition(_ position: Binding<ScrollPosition>) -> some View {
@@ -909,13 +915,6 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             binding: binding,
             flashGeneration: environment.scrollIndicatorFlashGeneration
         )
-        if binding != nil
-            && !LayoutMeasurementContext.isMeasuring
-            && runtime?.isSuppressingInteractiveRenderRegistrations != true
-            && (position.point != nil || position.edge != nil) {
-            ScrollPositionContext.updateCurrentPosition(to: ScrollPosition(point: result.point))
-        }
-
         let temporarilyVisible = runtime?.scrollIndicatorIsTemporarilyVisible(at: path) == true
         let showsHorizontal = hasHorizontalIndicator
             && result.maximumPoint.x > 0
@@ -1127,10 +1126,6 @@ private enum ScrollPositionContext {
     @TaskLocal
     private static var taskBinding = TaskBinding(binding: nil)
 
-    static var currentPosition: ScrollPosition {
-        currentBinding?.wrappedValue ?? ScrollPosition()
-    }
-
     static func withPosition<Value>(
         _ position: Binding<ScrollPosition>,
         perform operation: () -> Value
@@ -1138,14 +1133,6 @@ private enum ScrollPositionContext {
         $taskBinding.withValue(TaskBinding(binding: position)) {
             return operation()
         }
-    }
-
-    static func updateCurrentPosition(to position: ScrollPosition) {
-        guard let binding = currentBinding, binding.wrappedValue != position else {
-            return
-        }
-
-        binding.wrappedValue = position
     }
 
     static var currentBinding: Binding<ScrollPosition>? {
