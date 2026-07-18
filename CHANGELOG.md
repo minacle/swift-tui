@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-18
+
 ### Added
 
 - Added `EditableText.InputPolicy` to independently control Return newline
@@ -579,7 +581,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added terminal rendering and input behavior that accounts for Unicode display
   width and Unicode line-break data.
 
-[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/minacle/swift-tui/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/minacle/swift-tui/releases/tag/v0.12.0
 [0.11.0]: https://github.com/minacle/swift-tui/releases/tag/v0.11.0
 [0.10.2]: https://github.com/minacle/swift-tui/releases/tag/v0.10.2
 [0.10.1]: https://github.com/minacle/swift-tui/releases/tag/v0.10.1
