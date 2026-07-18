@@ -100,6 +100,13 @@ side. Newly measured children refine the estimate without replacing a
 programmatic ``ScrollPosition`` point or edge in its binding. In particular, a
 semantic bottom or trailing edge follows the corrected extent.
 
+The finite viewport may come from a frame applied directly to the scroll view
+or from the remainder that a parent `HStack` or `VStack` assigns to a flexible
+scroll view. Parent stack measurement keeps that finite bound, so it doesn't
+construct the complete lazy content merely to divide the available cells among
+siblings. A genuinely unspecified proposal on the stack's axis still resolves
+eagerly because the scroll view must report its natural extent.
+
 `ForEach` data IDs are scroll targets in eager and lazy stacks without an
 additional `id(_:)` modifier. A lazy proxy jump can therefore estimate a distant
 target's frame and create its surrounding window without constructing every

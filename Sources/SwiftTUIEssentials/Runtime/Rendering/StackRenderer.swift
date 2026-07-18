@@ -914,8 +914,20 @@ enum StackRenderer {
                     && child.traits.flexibleAxes.contains(.vertical)
             }
 
+            let axisSet: Axis.Set = stackAxis == .horizontal ? .horizontal : .vertical
+            let finiteMeasurementLength: Int?
+            if flexibleOnStackAxis,
+               child.traits.preferredFiniteMeasurementAxes.contains(axisSet) {
+                finiteMeasurementLength = stackAxis == .horizontal
+                    ? proposal?.columns
+                    : proposal?.rows
+            }
+            else {
+                finiteMeasurementLength = nil
+            }
+
             guard let content = child.render(
-                childProposal(nil, child.traits, proposal),
+                childProposal(finiteMeasurementLength, child.traits, proposal),
                 flexibleOnStackAxis
             ), content.isRenderable || flexibleOnStackAxis else {
                 return nil

@@ -824,7 +824,16 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
         if axes.contains(.vertical) {
             flexibleAxes.insert(.horizontal)
         }
-        return LayoutTraits(flexibleAxes: flexibleAxes)
+        var traits = LayoutTraits(flexibleAxes: flexibleAxes)
+        if let lazyContent = content as? any LazyScrollRenderable {
+            let lazyAxis: Axis.Set = lazyContent.lazyAxis == .horizontal
+                ? .horizontal
+                : .vertical
+            if axes.contains(lazyAxis) {
+                traits.preferredFiniteMeasurementAxes.insert(lazyAxis)
+            }
+        }
+        return traits
     }
 
     func renderedBlock(
@@ -846,8 +855,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
             && environment.verticalScrollIndicatorVisibility.permitsDisplay
         let initialContentBlock = measuredContentBlock(
             in: contentProposal(from: proposal),
-            viewportWidth: proposal?.columns ?? 0,
-            viewportHeight: proposal?.rows ?? 0,
+            viewportWidth: proposal?.columns,
+            viewportHeight: proposal?.rows,
             position: position,
             path: path,
             runtime: runtime
@@ -1060,8 +1069,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
 
     private func measuredContentBlock(
         in proposal: RenderProposal,
-        viewportWidth: Int,
-        viewportHeight: Int,
+        viewportWidth: Int?,
+        viewportHeight: Int?,
         position: ScrollPosition,
         path: [Int],
         runtime: StateRuntime?
@@ -1084,8 +1093,8 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
 
     private func resolvedContentBlock(
         in proposal: RenderProposal,
-        viewportWidth: Int,
-        viewportHeight: Int,
+        viewportWidth: Int?,
+        viewportHeight: Int?,
         position: ScrollPosition,
         path: [Int],
         runtime: StateRuntime?,
@@ -1095,10 +1104,19 @@ extension ScrollView: ScrollRenderable, LayoutTraitRenderable {
            (lazyContent.lazyAxis == .horizontal
                ? axes.contains(.horizontal)
                : axes.contains(.vertical)),
-           (lazyContent.lazyAxis == .horizontal ? viewportWidth : viewportHeight) > 0 {
+           let viewportLength = lazyContent.lazyAxis == .horizontal
+               ? viewportWidth
+               : viewportHeight {
+            guard viewportLength > 0 else {
+                return RenderedBlock(lines: [])
+            }
+
             return lazyContent.lazyRenderedBlock(
                 in: proposal,
-                viewportSize: Size(columns: viewportWidth, rows: viewportHeight),
+                viewportSize: Size(
+                    columns: viewportWidth ?? 0,
+                    rows: viewportHeight ?? 0
+                ),
                 position: position,
                 path: path + [0],
                 runtime: runtime,
