@@ -311,7 +311,16 @@ extension ForEach: FlattenableViewContent where Content: View {
                 in: proposal,
                 path: childPath,
                 runtime: runtime
-            )
+            ).map { element in
+                guard case .block(var block) = element else {
+                    return element
+                }
+
+                block.identifiedRegions.append(
+                    RenderedIdentifiedRegion(id: elementID, frame: block.bounds)
+                )
+                return .block(block)
+            }
         }
 
         runtime?.finishForEachRender(at: path, activeIDs: activeIDs)
@@ -344,7 +353,9 @@ extension ForEach: FlattenableViewContent where Content: View {
                 in: proposal,
                 path: childPath,
                 runtime: runtime
-            )
+            ).map {
+                $0.identified(by: elementID)
+            }
         }
 
         runtime?.finishForEachRender(at: path, activeIDs: activeIDs)
@@ -471,5 +482,302 @@ extension ForEach: GridContentRenderable where Content: View {
 
         runtime?.finishForEachRender(at: path, activeIDs: activeIDs)
         return items
+    }
+}
+
+extension AnyView: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        storage.lazyStackDescriptors(
+            path: path,
+            runtime: runtime,
+            sectionID: sectionID
+        )
+    }
+}
+
+extension Group: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        ViewResolver.lazyStackDescriptors(
+            from: content,
+            path: path + [0],
+            runtime: runtime,
+            sectionID: sectionID
+        )
+    }
+}
+
+extension OptionalViewContent: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        guard let content else {
+            return []
+        }
+
+        return ViewResolver.lazyStackDescriptors(
+            from: content,
+            path: path + [0],
+            runtime: runtime,
+            sectionID: sectionID
+        )
+    }
+}
+
+extension ConditionalViewContent: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        switch storage {
+        case .trueContent(let content):
+            ViewResolver.lazyStackDescriptors(
+                from: content,
+                path: path + [0],
+                runtime: runtime,
+                sectionID: sectionID
+            )
+        case .falseContent(let content):
+            ViewResolver.lazyStackDescriptors(
+                from: content,
+                path: path + [1],
+                runtime: runtime,
+                sectionID: sectionID
+            )
+        }
+    }
+}
+
+extension LimitedAvailabilityViewContent: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        ViewResolver.lazyStackDescriptors(
+            from: content,
+            path: path + [0],
+            runtime: runtime,
+            sectionID: sectionID
+        )
+    }
+}
+
+extension ForEach: LazyViewContent where Content: View {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        var seenIDs: Set<AnyHashable> = []
+        var activeIDs: [AnyHashable] = []
+        let descriptors = data.enumerated().map { offset, element in
+            let elementID = AnyHashable(element[keyPath: id])
+            precondition(
+                seenIDs.insert(elementID).inserted,
+                "ForEach data IDs must be unique."
+            )
+
+            activeIDs.append(elementID)
+            let childIndex = runtime?.forEachChildIndex(at: path, id: elementID) ?? offset
+            let childPath = path + [childIndex]
+            let identity = AnyHashable(
+                LazyStackDescriptorIdentity(
+                    path: path,
+                    value: elementID,
+                    role: .item
+                )
+            )
+            return LazyStackDescriptor(
+                identity: identity,
+                scrollID: elementID,
+                sectionID: sectionID,
+                role: .item,
+                expand: {
+                    let child = contentElement(element, runtime: runtime)
+                    var descriptors = ViewResolver.lazyStackDescriptors(
+                        from: child,
+                        path: childPath,
+                        runtime: runtime,
+                        sectionID: sectionID
+                    )
+                    if !descriptors.isEmpty {
+                        descriptors[0].scrollID = elementID
+                    }
+                    return descriptors
+                },
+                render: { proposal, suppressRegistrations in
+                    let render = {
+                        let child = contentElement(element, runtime: runtime)
+                        return ViewResolver.element(
+                            from: child,
+                            in: proposal,
+                            path: childPath,
+                            runtime: runtime
+                        )
+                    }
+                    guard suppressRegistrations else {
+                        return render()
+                    }
+
+                    return LayoutMeasurementContext.withMeasurement {
+                        runtime?.withoutRenderRegistrations(render) ?? render()
+                    }
+                }
+            )
+        }
+
+        runtime?.finishForEachRender(at: path, activeIDs: activeIDs)
+        return descriptors
+    }
+}
+
+extension Section: FlattenableViewContent {
+
+    func renderedElements(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [RenderedElement] {
+        ViewResolver.elements(
+            from: parent,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        ) + ViewResolver.elements(
+            from: content,
+            in: proposal,
+            path: path + [1],
+            runtime: runtime
+        ) + ViewResolver.elements(
+            from: footer,
+            in: proposal,
+            path: path + [2],
+            runtime: runtime
+        )
+    }
+
+    func stackChildren(
+        in proposal: RenderProposal?,
+        path: [Int],
+        runtime: StateRuntime?
+    ) -> [StackChild] {
+        ViewResolver.stackChildren(
+            from: parent,
+            in: proposal,
+            path: path + [0],
+            runtime: runtime
+        ) + ViewResolver.stackChildren(
+            from: content,
+            in: proposal,
+            path: path + [1],
+            runtime: runtime
+        ) + ViewResolver.stackChildren(
+            from: footer,
+            in: proposal,
+            path: path + [2],
+            runtime: runtime
+        )
+    }
+}
+
+extension Section: LazyViewContent {
+
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID _: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        let sectionID = AnyHashable(
+            LazyStackDescriptorIdentity(
+                path: path,
+                value: nil,
+                role: .section
+            )
+        )
+        var descriptors: [LazyStackDescriptor] = []
+        if !(parent is EmptyView) {
+            descriptors.append(
+                supplementaryDescriptor(
+                    from: parent,
+                    role: .sectionHeader,
+                    path: path + [0],
+                    sectionID: sectionID,
+                    runtime: runtime
+                )
+            )
+        }
+        descriptors.append(
+            contentsOf: ViewResolver.lazyStackDescriptors(
+                from: content,
+                path: path + [1],
+                runtime: runtime,
+                sectionID: sectionID
+            )
+        )
+        if !(footer is EmptyView) {
+            descriptors.append(
+                supplementaryDescriptor(
+                    from: footer,
+                    role: .sectionFooter,
+                    path: path + [2],
+                    sectionID: sectionID,
+                    runtime: runtime
+                )
+            )
+        }
+        return descriptors
+    }
+
+    private func supplementaryDescriptor<Supplementary: View>(
+        from view: Supplementary,
+        role: LazyStackDescriptorRole,
+        path: [Int],
+        sectionID: AnyHashable,
+        runtime: StateRuntime?
+    ) -> LazyStackDescriptor {
+        let identity = AnyHashable(
+            LazyStackDescriptorIdentity(path: path, value: nil, role: role)
+        )
+        return LazyStackDescriptor(
+            identity: identity,
+            scrollID: nil,
+            sectionID: sectionID,
+            role: role,
+            expand: nil,
+            render: { proposal, suppressRegistrations in
+                let render = {
+                    ViewResolver.element(
+                        from: view,
+                        in: proposal,
+                        path: path,
+                        runtime: runtime
+                    )
+                }
+                guard suppressRegistrations else {
+                    return render()
+                }
+
+                return LayoutMeasurementContext.withMeasurement {
+                    runtime?.withoutRenderRegistrations(render) ?? render()
+                }
+            }
+        )
     }
 }

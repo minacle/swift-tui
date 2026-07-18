@@ -287,6 +287,17 @@ final class StateRuntime {
         return operation(&box.cache)
     }
 
+    func lazyStackGeometryCache(at path: [Int]) -> LazyStackGeometryCache {
+        activeLayoutPaths.insert(path)
+        if let cache = layoutCaches[path] as? LazyStackGeometryCache {
+            return cache
+        }
+
+        let cache = LazyStackGeometryCache()
+        layoutCaches[path] = cache
+        return cache
+    }
+
     private func beginLayoutRender() {
         layoutGeneration &+= 1
         activeLayoutPaths = []

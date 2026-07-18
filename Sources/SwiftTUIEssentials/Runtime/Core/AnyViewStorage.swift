@@ -19,6 +19,12 @@ nonisolated struct AnyViewStorage {
 
     private let gridItemElements: @MainActor (RenderProposal?, [Int], StateRuntime?) -> [GridItem]
 
+    private let lazyDescriptorElements: @MainActor (
+        [Int],
+        StateRuntime?,
+        AnyHashable?
+    ) -> [LazyStackDescriptor]
+
     private let traits: @MainActor () -> LayoutTraits
 
     nonisolated init<Content: View>(_ content: Content) {
@@ -45,6 +51,14 @@ nonisolated struct AnyViewStorage {
                 in: proposal,
                 path: path,
                 runtime: runtime
+            )
+        }
+        self.lazyDescriptorElements = { path, runtime, sectionID in
+            ViewResolver.lazyStackDescriptors(
+                from: box.content,
+                path: path,
+                runtime: runtime,
+                sectionID: sectionID
             )
         }
         self.elements = { proposal, path, runtime in
@@ -99,6 +113,15 @@ nonisolated struct AnyViewStorage {
         runtime: StateRuntime?
     ) -> [GridItem] {
         gridItemElements(proposal, path, runtime)
+    }
+
+    @MainActor
+    func lazyStackDescriptors(
+        path: [Int],
+        runtime: StateRuntime?,
+        sectionID: AnyHashable?
+    ) -> [LazyStackDescriptor] {
+        lazyDescriptorElements(path, runtime, sectionID)
     }
 
     @MainActor

@@ -84,6 +84,132 @@ public nonisolated struct VStack<Content: View>: View {
     }
 }
 
+/// A view that arranges only the needed horizontal children from left to right.
+///
+/// Inside a horizontal ``ScrollView``, `LazyHStack` creates children as their
+/// estimated terminal-cell frames approach the visible viewport. Measurements
+/// from visible children refine later estimates, so the scrollable extent can
+/// change as differently sized content appears. Without a bounded horizontal
+/// scroll viewport, the stack eagerly resolves its content to determine its
+/// natural size.
+///
+/// Section headers can remain at the viewport's leading edge and section
+/// footers at its trailing edge. Pinned views remain bounded by their section
+/// and move with all of their input, focus, caret, identity, and coordinate
+/// metadata.
+public nonisolated struct LazyHStack<Content: View>: View {
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let alignment: VerticalAlignment
+
+    let spacing: Int?
+
+    let pinnedViews: PinnedScrollableViews
+
+    let content: Content
+
+    /// Creates a lazy horizontal stack.
+    ///
+    /// - Parameters:
+    ///   - alignment: The vertical guide used for children with different
+    ///     heights. The default is center.
+    ///   - spacing: The number of blank terminal columns between children, or
+    ///     `nil` to use adjacent views' spacing preferences. Negative values
+    ///     are clamped to zero.
+    ///   - pinnedViews: The section supplementary views that remain visible at
+    ///     the horizontal viewport edges. The default pins none.
+    ///   - content: A view builder that creates the stack's children.
+    public init(
+        alignment: VerticalAlignment = .center,
+        spacing: Int? = nil,
+        pinnedViews: PinnedScrollableViews = .init(),
+        @ViewBuilder content: () -> Content
+    ) {
+        self.alignment = alignment
+        self.spacing = spacing.map { max($0, 0) }
+        self.pinnedViews = pinnedViews
+        self.content = content()
+    }
+}
+
+/// A view that arranges only the needed vertical children from top to bottom.
+///
+/// Inside a vertical ``ScrollView``, `LazyVStack` creates children as their
+/// estimated terminal-cell frames approach the visible viewport. Measurements
+/// from visible children refine later estimates, so the scrollable extent can
+/// change as differently sized content appears. Without a bounded vertical
+/// scroll viewport, the stack eagerly resolves its content to determine its
+/// natural size.
+///
+/// Section headers can remain at the viewport's top edge and section footers
+/// at its bottom edge. Pinned views remain bounded by their section and move
+/// with all of their input, focus, caret, identity, and coordinate metadata.
+public nonisolated struct LazyVStack<Content: View>: View {
+
+    /// The body type for this primitive view.
+    public typealias Body = Never
+
+    let alignment: HorizontalAlignment
+
+    let spacing: Int?
+
+    let pinnedViews: PinnedScrollableViews
+
+    let content: Content
+
+    /// Creates a lazy vertical stack.
+    ///
+    /// - Parameters:
+    ///   - alignment: The horizontal guide used for children with different
+    ///     widths. The default is center.
+    ///   - spacing: The number of blank terminal rows between children, or
+    ///     `nil` to use adjacent views' spacing preferences. Negative values
+    ///     are clamped to zero.
+    ///   - pinnedViews: The section supplementary views that remain visible at
+    ///     the vertical viewport edges. The default pins none.
+    ///   - content: A view builder that creates the stack's children.
+    public init(
+        alignment: HorizontalAlignment = .center,
+        spacing: Int? = nil,
+        pinnedViews: PinnedScrollableViews = .init(),
+        @ViewBuilder content: () -> Content
+    ) {
+        self.alignment = alignment
+        self.spacing = spacing.map { max($0, 0) }
+        self.pinnedViews = pinnedViews
+        self.content = content()
+    }
+}
+
+/// Options for pinning section supplementary views in a lazy stack.
+///
+/// A ``LazyVStack`` pins selected views to the top or bottom of its vertical
+/// scroll viewport. A ``LazyHStack`` uses the leading or trailing edge of its
+/// horizontal viewport instead. Pinning has no effect when the stack is not
+/// rendered lazily by a same-axis ``ScrollView``.
+public nonisolated struct PinnedScrollableViews: OptionSet, Sendable {
+
+    /// The bit mask that stores the selected supplementary-view kinds.
+    public let rawValue: UInt32
+
+    /// Creates a set from a raw bit mask.
+    ///
+    /// Unknown bits are preserved and ignored by lazy stack rendering.
+    ///
+    /// - Parameter rawValue: The bit mask to store.
+    public init(rawValue: UInt32) {
+        self.rawValue = rawValue
+    }
+
+    /// Pins section headers to the viewport's top or leading edge.
+    public static let sectionHeaders = PinnedScrollableViews(rawValue: 1 << 0)
+
+    /// Pins section footers to the viewport's bottom or trailing edge.
+    public static let sectionFooters = PinnedScrollableViews(rawValue: 1 << 1)
+}
+
 /// A view that overlays its children, aligning them in both axes.
 ///
 /// Later children are rendered above earlier children unless ``View/zIndex(_:)``

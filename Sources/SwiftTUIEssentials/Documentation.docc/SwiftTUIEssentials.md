@@ -130,7 +130,10 @@ sequences aren't escaped by the rendering pipeline.
 
 - ``HStack``
 - ``VStack``
+- ``LazyHStack``
+- ``LazyVStack``
 - ``ZStack``
+- ``Section``
 - ``Grid``
 - ``GridRow``
 - ``HStackLayout``
@@ -155,6 +158,7 @@ sequences aren't escaped by the rendering pipeline.
 - ``Axis``
 - ``Edge``
 - ``ScrollIndicatorVisibility``
+- ``PinnedScrollableViews``
 - ``ScrollIndicatorConfiguration``
 - ``HorizontalScrollIndicatorAttachmentKey``
 - ``VerticalScrollIndicatorAttachmentKey``

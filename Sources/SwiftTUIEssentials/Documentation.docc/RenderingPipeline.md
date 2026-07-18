@@ -111,6 +111,14 @@ only for the current render generation. Removing a layout path removes its
 persistent cache; starting or finishing a render clears the generation-local
 measurement store.
 
+``LazyHStack`` and ``LazyVStack`` retain only child geometry across render
+passes. In a bounded same-axis ``ScrollView``, they keep the estimated logical
+content extent separate from the sparse runs and interaction metadata created
+for the current viewport. Visible measurements refine subsequent child frames;
+offscreen `ForEach` state remains associated with its ID even though lifecycle,
+task, focus, pointer, and caret registrations are absent until that child is
+rendered again.
+
 ## Carry pixels and interaction metadata together
 
 Layout produces a `RenderedBlock`. A block contains positioned text runs,
